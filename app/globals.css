@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+
+  /* brand */
+  --cnl-coffee: #6f4e37;
+  --cnl-laundry: #0284c7;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-coffee: var(--cnl-coffee);
+  --color-laundry: var(--cnl-laundry);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* ========================================= */
+/* MAP MARKERS                                */
+/* ========================================= */
+
+.cnl-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+  cursor: pointer;
+}
+
+.cnl-marker:hover {
+  transform: translateY(-3px) scale(1.08);
+}
+
+.cnl-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  border: 3px solid #ffffff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.cnl-pin-coffee {
+  background: var(--cnl-coffee);
+}
+
+.cnl-pin-laundry {
+  background: var(--cnl-laundry);
+}
+
+.cnl-pin-stale {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.leaflet-marker-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* ========================================= */
+/* PRINT                                      */
+/* ========================================= */
+
+@media print {
+  body {
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ========================================= */
+/* LAYERS — the map must never cover the menu  */
+/* ========================================= */
+
+header {
+  position: sticky;
+  z-index: 1000;
+}
+
+/* Leaflet's panes go up to 800; keep the map under the header. */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 400 !important;
+}
