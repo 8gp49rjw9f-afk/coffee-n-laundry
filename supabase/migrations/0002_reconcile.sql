@@ -123,13 +123,17 @@ create index if not exists place_field_checks_user_idx
 -- verify.ts catches the 23505 this produces and turns it into
 -- "You already checked this week. Come back in a few days."
 --
+-- The week is pinned to UTC ("at time zone 'UTC'") so the expression
+-- is IMMUTABLE and can be indexed. Plain date_trunc('week', verified_at)
+-- depends on the session timezone and Postgres rejects it with 42P17.
+--
 -- date_trunc('week', …) is ISO: weeks start on Monday.
 create unique index if not exists place_field_checks_weekly_uniq
   on public.place_field_checks (
     place_id,
     field_key,
     verified_by,
-    (date_trunc('week', verified_at))
+    (date_trunc('week', verified_at at time zone 'UTC'))
   );
 
 
