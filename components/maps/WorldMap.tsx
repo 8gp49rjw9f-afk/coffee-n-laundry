@@ -15,6 +15,14 @@ interface BoundsLike {
   contains: (point: [number, number]) => boolean;
 }
 
+/*
+ * Anything that calls useMap() has to be a CHILD of MapContainer.
+ * React-Leaflet provides the map through context, and context only
+ * flows downwards — a sibling of the container never sees it. That
+ * is why MapState lives inside TheMap below, and why there is one
+ * copy per breakpoint rather than one shared above them.
+ */
+
 function MapState({
   onZoom,
   onBounds,
@@ -73,12 +81,16 @@ function TheMap({
   selected,
   onSelect,
   panelOpen,
+  onZoom,
+  onBounds,
 }: {
   places: PlaceWithFreshness[];
   visible: PlaceWithFreshness[];
   selected: PlaceWithFreshness | null;
   onSelect: (id: string) => void;
   panelOpen: boolean;
+  onZoom: (z: number) => void;
+  onBounds: (b: BoundsLike) => void;
 }) {
   return (
     <MapContainer
@@ -94,12 +106,13 @@ function TheMap({
       maxBoundsViscosity={1}
       style={{ height: "100%", width: "100%" }}
     >
+      <MapState onZoom={onZoom} onBounds={onBounds} />
       <MapResizeFix trigger={panelOpen} />
       <FlyToSelected place={selected} />
 
       <TileLayer
         attribution='&copy; <a href="[openstreetmap.org](https://www.openstreetmap.org/copyright)">OpenStreetMap</a> contributors'
-        url={"[tile.openstreetmap.org](https://tile.openstreetmap.org/{z}/{x}/{y}.png)"}
+        url="[tile.openstreetmap.org](https://tile.openstreetmap.org/{z}/{x}/{y}.png)"
       />
 
       {visible.map((place) => (
@@ -166,14 +179,14 @@ export default function WorldMap({
           className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
           style={{ height: "min(58vh, 520px)" }}
         >
-          <MapState onZoom={setZoom} onBounds={setBounds} />
-
           <TheMap
             places={places}
             visible={visible}
             selected={selected}
             onSelect={onSelect}
             panelOpen={panelOpen}
+            onZoom={setZoom}
+            onBounds={setBounds}
           />
         </div>
       </div>
@@ -191,14 +204,14 @@ export default function WorldMap({
         )}
 
         <div className="relative h-full flex-1">
-          <MapState onZoom={setZoom} onBounds={setBounds} />
-
           <TheMap
             places={places}
             visible={visible}
             selected={selected}
             onSelect={onSelect}
             panelOpen={panelOpen}
+            onZoom={setZoom}
+            onBounds={setBounds}
           />
         </div>
       </div>

@@ -4,19 +4,23 @@ import { useState, useTransition } from "react";
 import imageCompression from "browser-image-compression";
 
 import { ErrorBanner } from "@/components/ui";
+import { SquareCrop } from "@/components/place/SquareCrop";
 
 import { addPlacePhotos } from "@/app/actions/photos";
 
 /*
  * A phone camera produces up to about 10MB. Refusing below that locks
  * out entire handsets — the compression is what brings the file down,
- * not the input limit. 800px and roughly 80KB is plenty to recognise
- * a machine and read a price list.
+ * not the input limit.
+ *
+ * Order matters: crop first, then compress. Cropping a photo that has
+ * already been through a lossy pass throws away pixels twice, and the
+ * crop is the step that decides what the photo even shows.
  */
 
 const PHOTO_OPTIONS = {
   maxSizeMB: 0.4,
-  maxWidthOrHeight: 1600,
+  maxWidthOrHeight: 1400,
   useWebWorker: true,
 };
 
@@ -29,37 +33,63 @@ export function PhotoUpload({ placeId }: { placeId: string }) {
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
-  async function handleFiles(list: FileList | null) {
+  /* The photo waiting to be squared, one at a time. */
+  const [cropping, setCropping] = useState<File | null>(null);
+
+  const [queue, setQueue] = useState<File[]>([]);
+
+  function handleFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
 
-    setCompressing(true);
     setError("");
     setDone(false);
 
+    const picked = Array.from(list).slice(0, 5);
+
+    const tooBig = picked.find((file) => file.size > MAX_INPUT_MB * 1_000_000);
+
+    if (tooBig) {
+      setError(`One photo is larger than ${MAX_INPUT_MB} MB.`);
+      return;
+    }
+
+    /* Every photo goes through the crop, one after another. */
+    setQueue(picked.slice(1));
+    setCropping(picked[0]);
+  }
+
+  async function compress(file: File) {
+    const result = await imageCompression(file, PHOTO_OPTIONS);
+
+    return new File([result], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+      type: "image/jpeg",
+    });
+  }
+
+  async function acceptCropped(cropped: File) {
+    setCropping(null);
+    setCompressing(true);
+
     try {
-      const compressed: File[] = [];
+      const compressed = await compress(cropped);
 
-      for (const file of Array.from(list).slice(0, 5)) {
-        if (file.size > MAX_INPUT_MB * 1_000_000) {
-          setError(`One photo is larger than ${MAX_INPUT_MB} MB.`);
-          continue;
-        }
-
-        const result = await imageCompression(file, PHOTO_OPTIONS);
-
-        compressed.push(
-          new File([result], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
-            type: "image/jpeg",
-          })
-        );
-      }
-
-      setFiles((current) => [...current, ...compressed].slice(0, 5));
+      setFiles((current) => [...current, compressed].slice(0, 5));
     } catch {
-      setError("Could not process those photos. Try smaller ones.");
+      setError("Could not process that photo. Try a smaller one.");
     }
 
     setCompressing(false);
+
+    /* Next in the queue, if any. */
+    if (queue.length > 0) {
+      setCropping(queue[0]);
+      setQueue((current) => current.slice(1));
+    }
+  }
+
+  function skipCrop() {
+    setCropping(null);
+    setQueue([]);
   }
 
   function upload() {
@@ -86,6 +116,17 @@ export function PhotoUpload({ placeId }: { placeId: string }) {
         );
       }
     });
+  }
+
+  /* The crop owns the screen while it lasts. */
+  if (cropping) {
+    return (
+      <SquareCrop
+        file={cropping}
+        onCancel={skipCrop}
+        onDone={acceptCropped}
+      />
+    );
   }
 
   return (
@@ -140,9 +181,9 @@ export function PhotoUpload({ placeId }: { placeId: string }) {
       )}
 
       <p className="text-xs text-slate-500">
-        Up to {MAX_INPUT_MB} MB each photo. They are compressed to 800px before
-        upload — a phone photo of a washing machine does not need to be 12
-        megapixels.
+        Up to {MAX_INPUT_MB} MB each photo. Each one is squared, then
+        compressed to 1400px — a photo of a washing machine does not need to
+        be 12 megapixels.
       </p>
     </div>
   );

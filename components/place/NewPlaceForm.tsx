@@ -5,6 +5,7 @@ import imageCompression from "browser-image-compression";
 
 import { Button, Card, ErrorBanner } from "@/components/ui";
 import { LocationPicker } from "@/components/location/LocationPicker";
+import { SquareCrop } from "@/components/place/SquareCrop";
 
 import { matchesChain } from "@/lib/chainFlags";
 import { AMBIENCE, COFFEE_KINDS } from "@/lib/coffee";
@@ -14,11 +15,15 @@ import type { PlaceType } from "@/lib/types";
 /* Photos are deliberately crushed: we care about being able to
    recognise a machine and read a price list, not about the image.
    The input accepts 10MB because that is what a phone camera sends;
-   compression brings it down to roughly 400KB before upload. */
+   compression brings it down to roughly 400KB before upload.
+
+   Order matters: crop first, then compress. Cropping a photo that
+   has already been through a lossy pass throws away pixels twice,
+   and the crop is the step that decides what the photo even shows. */
 
 const PHOTO_OPTIONS = {
   maxSizeMB: 0.4,
-  maxWidthOrHeight: 1600,
+  maxWidthOrHeight: 1400,
   useWebWorker: true,
 };
 
@@ -169,6 +174,10 @@ export function NewPlaceForm({
   const [photos, setPhotos] = useState<File[]>([]);
   const [compressing, setCompressing] = useState(false);
 
+  /* The photo waiting to be squared, and the ones still queued. */
+  const [cropping, setCropping] = useState<File | null>(null);
+  const [queue, setQueue] = useState<File[]>([]);
+
   const [chainConfirmed, setChainConfirmed] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -179,36 +188,49 @@ export function NewPlaceForm({
 
   const chainHit = matchesChain(name, chainPatterns);
 
-  async function handlePhotos(files: FileList | null) {
+  /* Every photo goes through the crop, one after another. */
+  function handlePhotos(files: FileList | null) {
     if (!files || files.length === 0) return;
 
-    setCompressing(true);
     setError("");
 
+    const picked = Array.from(files).slice(0, 5);
+
+    const tooBig = picked.find((file) => file.size > MAX_INPUT_MB * 1_000_000);
+
+    if (tooBig) {
+      setError(`One photo is larger than ${MAX_INPUT_MB} MB.`);
+      return;
+    }
+
+    setQueue(picked.slice(1));
+    setCropping(picked[0]);
+  }
+
+  async function acceptCropped(cropped: File) {
+    setCropping(null);
+    setCompressing(true);
+
     try {
-      const compressed: File[] = [];
+      const result = await imageCompression(cropped, PHOTO_OPTIONS);
 
-      for (const file of Array.from(files).slice(0, 5)) {
-        if (file.size > MAX_INPUT_MB * 1_000_000) {
-          setError(`One photo is larger than ${MAX_INPUT_MB} MB.`);
-          continue;
-        }
+      const compressed = new File(
+        [result],
+        cropped.name.replace(/\.[^.]+$/, "") + ".jpg",
+        { type: "image/jpeg" }
+      );
 
-        const result = await imageCompression(file, PHOTO_OPTIONS);
-
-        compressed.push(
-          new File([result], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
-            type: "image/jpeg",
-          })
-        );
-      }
-
-      setPhotos((current) => [...current, ...compressed].slice(0, 5));
+      setPhotos((current) => [...current, compressed].slice(0, 5));
     } catch {
-      setError("Could not process those photos. Try smaller ones.");
+      setError("Could not process that photo. Try a smaller one.");
     }
 
     setCompressing(false);
+
+    if (queue.length > 0) {
+      setCropping(queue[0]);
+      setQueue((current) => current.slice(1));
+    }
   }
 
   function toggleIn(list: string[], set: (v: string[]) => void, key: string) {
@@ -288,6 +310,20 @@ export function NewPlaceForm({
 
       setLoading(false);
     }
+  }
+
+  /* The crop owns the screen while it lasts. */
+  if (cropping) {
+    return (
+      <SquareCrop
+        file={cropping}
+        onCancel={() => {
+          setCropping(null);
+          setQueue([]);
+        }}
+        onDone={acceptCropped}
+      />
+    );
   }
 
   if (step === "choose") {
@@ -824,7 +860,8 @@ export function NewPlaceForm({
         )}
 
         <p className="mt-2 text-xs text-slate-500">
-          Up to {MAX_INPUT_MB} MB each, compressed to 1600px before upload.
+          Up to {MAX_INPUT_MB} MB each. Each photo is squared, then compressed
+          to 1400px before upload.
         </p>
       </Card>
 
