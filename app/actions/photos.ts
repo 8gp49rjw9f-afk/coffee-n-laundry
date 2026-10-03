@@ -74,17 +74,24 @@ export async function addPlacePhotos(formData: FormData): Promise<void> {
  * One photo per place represents the place: on the map, on a shared
  * link, anywhere a single image is needed.
  *
- * The promise is atomic. Clearing the old primary and setting the new
- * one used to be two statements with a gap in between — a failed
- * second write would leave the place with no cover at all, and the
- * partial unique index means they cannot simply run in the other
- * order. So the whole swap is one database function, in one
- * transaction: either the place has a new cover, or nothing moved.
+ * The swap is two statements rather than a database function. A
+ * plpgsql function called through PostgREST's rpc endpoint was the
+ * tidier design, but PostgREST discovers functions through a schema
+ * cache that can miss one created after the service started — the
+ * call then answers "function not found" while the function works
+ * perfectly in the SQL editor. Two plain table updates use the same
+ * path as the rest of this file, which is known to work.
  *
- * No ownership check here: choosing which photo represents a place is
- * the same kind of act as correcting a price, and anyone signed in may
- * do it. Who may DELETE a photo is a different question, and that one
- * is enforced in the database (see 0003's delete policy).
+ * Order matters and is not interchangeable: the partial unique index
+ * allows one primary per place, so the old one must be cleared before
+ * the new one is set. Each write is checked, and a failure on the
+ * second one puts the old cover back rather than leaving the place
+ * with none.
+ *
+ * No ownership check: choosing which photo represents a place is the
+ * same kind of act as correcting a price, and anyone signed in may do
+ * it. Who may DELETE a photo is a different question, and that one is
+ * enforced in the database (see 0003's delete policy).
  */
 
 export async function setPrimaryPhoto(
@@ -101,13 +108,46 @@ export async function setPrimaryPhoto(
     throw new Error("You need to be signed in to choose a cover photo.");
   }
 
-  const { error } = await supabase.rpc("set_primary_photo", {
-    p_place_id: placeId,
-    p_photo_id: photoId,
-  });
+  /* Remember the current cover so it can be restored if the second
+     write fails. */
+  const { data: previous } = await supabase
+    .from("place_photos")
+    .select("id")
+    .eq("place_id", placeId)
+    .eq("is_primary", true)
+    .maybeSingle();
 
-  if (error) {
-    throw new Error("Could not change the cover photo.");
+  if (previous?.id === photoId) return;
+
+  const { error: clearError } = await supabase
+    .from("place_photos")
+    .update({ is_primary: false })
+    .eq("place_id", placeId)
+    .eq("is_primary", true);
+
+  if (clearError) {
+    throw new Error(`Could not change the cover photo: ${clearError.message}`);
+  }
+
+  const { data: updated, error } = await supabase
+    .from("place_photos")
+    .update({ is_primary: true })
+    .eq("id", photoId)
+    .eq("place_id", placeId)
+    .select("id");
+
+  if (error || !updated || updated.length === 0) {
+    /* Put the old cover back rather than leaving the place bare. */
+    if (previous?.id) {
+      await supabase
+        .from("place_photos")
+        .update({ is_primary: true })
+        .eq("id", previous.id);
+    }
+
+    throw new Error(
+      error?.message ?? "That photo could not be set as the cover."
+    );
   }
 
   /* Both surfaces read the cover: the place page shows the strip, the
@@ -168,7 +208,7 @@ export async function deletePlacePhoto(
     .select("id");
 
   if (error) {
-    throw new Error("Could not delete that photo.");
+    throw new Error(`Could not delete that photo: ${error.message}`);
   }
 
   if (!deleted || deleted.length === 0) {
