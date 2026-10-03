@@ -86,18 +86,23 @@ export function PlacePanel({
 
   return (
     <div>
-      {place.primary_photo_path ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`${bucketUrl}/${place.primary_photo_path}`}
-          alt={place.name}
-          className="h-40 w-full object-cover"
-        />
-      ) : (
-        <div className="flex h-24 w-full items-center justify-center bg-slate-100 text-4xl">
-          {isCoffee ? "☕" : "🧺"}
-        </div>
-      )}
+      {/* The cover photo is the place's face. A square, because the
+          photo was cropped as one — a 16:9 frame would trim away the
+          very part someone chose to show. */}
+      <div className="flex justify-center bg-slate-100 px-5 pt-5">
+        {place.primary_photo_path ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={`${bucketUrl}/${place.primary_photo_path}`}
+            alt={place.name}
+            className="aspect-square w-full max-w-[200px] rounded-2xl border border-slate-200 object-cover shadow-sm"
+          />
+        ) : (
+          <div className="flex aspect-square w-full max-w-[200px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-5xl shadow-sm">
+            {isCoffee ? "☕" : "🧺"}
+          </div>
+        )}
+      </div>
 
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
@@ -206,7 +211,7 @@ export function PlacePanel({
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <a
-            href={`[google.com](https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude})`}
+            href={`https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`}
             target="_blank"
             rel="noreferrer"
             className="flex min-h-11 items-center justify-center rounded-xl bg-slate-900 px-4 font-semibold text-white hover:bg-slate-800"
