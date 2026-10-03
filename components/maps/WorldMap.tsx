@@ -93,43 +93,47 @@ function TheMap({
   onBounds: (b: BoundsLike) => void;
 }) {
   return (
-    <MapContainer
-      center={[20, 0]}
-      zoom={2}
-      minZoom={2}
-      maxZoom={18}
-      worldCopyJump
-      maxBounds={[
-        [-90, -180],
-        [90, 180],
-      ]}
-      maxBoundsViscosity={1}
-      style={{ height: "100%", width: "100%" }}
-    >
-      <MapState onZoom={onZoom} onBounds={onBounds} />
-      <MapResizeFix trigger={panelOpen} />
-      <FlyToSelected place={selected} />
+    /* The wrapper is relative so the pin counter can sit over the map
+       without being an invalid child of MapContainer. */
+    <div className="relative h-full w-full">
+      <MapContainer
+        center={[20, 0]}
+        zoom={2}
+        minZoom={2}
+        maxZoom={18}
+        worldCopyJump
+        maxBounds={[
+          [-90, -180],
+          [90, 180],
+        ]}
+        maxBoundsViscosity={1}
+        style={{ height: "100%", width: "100%" }}
+      >
+        <MapState onZoom={onZoom} onBounds={onBounds} />
+        <MapResizeFix trigger={panelOpen} />
+        <FlyToSelected place={selected} />
 
-      <TileLayer
-        attribution='&copy; <a href="[openstreetmap.org](https://www.openstreetmap.org/copyright)">OpenStreetMap</a> contributors'
-        url="[tile.openstreetmap.org](https://tile.openstreetmap.org/{z}/{x}/{y}.png)"
-      />
-
-      {visible.map((place) => (
-        <Marker
-          key={place.id}
-          position={[place.latitude, place.longitude]}
-          icon={markerIcon(place)}
-          eventHandlers={{ click: () => onSelect(place.id) }}
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-      ))}
+
+        {visible.map((place) => (
+          <Marker
+            key={place.id}
+            position={[place.latitude, place.longitude]}
+            icon={markerIcon(place)}
+            eventHandlers={{ click: () => onSelect(place.id) }}
+          />
+        ))}
+      </MapContainer>
 
       {visible.length < places.length && (
         <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow">
           {visible.length} of {places.length} pins · zoom in
         </div>
       )}
-    </MapContainer>
+    </div>
   );
 }
 
