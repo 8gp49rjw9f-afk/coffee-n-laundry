@@ -14,14 +14,17 @@ import {
 import type { PlacePhoto } from "@/lib/types";
 
 /*
- * The strip scrolls sideways, as it always did. What is new: each
- * photo carries its own two actions underneath, and the cover photo
- * is outlined to say "this is the one on the map".
+ * The strip scrolls sideways, as it always did. The cover photo is
+ * outlined and labelled, so what you see matches what is true; the
+ * per-photo actions sit underneath it.
  *
- * The cover is a fact about the place, not about the order the photos
- * arrived in, so it lives in a real column (is_primary) — see 0003.
- * The strip sorts the cover first, so what you see matches what is
- * true; "Set as cover" is how you choose a different one.
+ * The cover lives in a real column (is_primary, see 0003), not in the
+ * order the photos happen to arrive in. "Set as cover" points it at a
+ * different photo, and the strip re-sorts with the cover first.
+ *
+ * Signed out, the strip is read-only: the actions are not rendered at
+ * all. Hiding them is the honest move — the database would refuse the
+ * write anyway, and a button that always fails is worse than no button.
  *
  * Tapping the image still opens it full-screen: a price list is
  * unreadable in a 140px square.
@@ -45,10 +48,12 @@ export function PhotoStrip({
   photos,
   bucketUrl,
   placeId,
+  signedIn = false,
 }: {
   photos: PlacePhoto[];
   bucketUrl: string;
   placeId: string;
+  signedIn?: boolean;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -199,13 +204,15 @@ export function PhotoStrip({
 
   return (
     <div className="space-y-2">
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => onFileChosen(event.target.files)}
-      />
+      {signedIn && (
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => onFileChosen(event.target.files)}
+        />
+      )}
 
       <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         <ul className="flex snap-x snap-mandatory gap-3">
@@ -217,10 +224,12 @@ export function PhotoStrip({
               <button
                 type="button"
                 onClick={() => setOpenIndex(index)}
-                className={`block w-full rounded-2xl p-0.5 transition ${
+                /* A light blue ring marks the cover: enough to read at
+                   a glance, quiet enough not to fight the photo. */
+                className={`block w-full overflow-hidden rounded-xl transition ${
                   photo.is_primary
-                    ? "ring-2 ring-[#6f4e37] ring-offset-1"
-                    : "ring-1 ring-transparent"
+                    ? "ring-2 ring-sky-400 ring-offset-2"
+                    : "ring-0"
                 }`}
                 aria-label={
                   photo.is_primary
@@ -233,46 +242,48 @@ export function PhotoStrip({
                   src={`${bucketUrl}/${photo.storage_path}`}
                   alt={photo.caption ?? "Photo of this place"}
                   loading="lazy"
-                  className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
+                  className="aspect-square w-full border border-slate-200 object-cover"
                 />
               </button>
 
               {photo.is_primary && (
-                <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-wide text-[#6f4e37]">
+                <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-wide text-sky-600">
                   Cover
                 </p>
               )}
 
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => pickReplacement(photo.id)}
-                  disabled={pending}
-                  className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Modify
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => remove(photo.id)}
-                  disabled={pending}
-                  className="min-h-9 flex-1 rounded-lg border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
-                >
-                  Delete
-                </button>
-
-                {!photo.is_primary && (
+              {signedIn && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    onClick={() => makeCover(photo.id)}
+                    onClick={() => pickReplacement(photo.id)}
                     disabled={pending}
-                    className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                    className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                   >
-                    Set as cover
+                    Modify
                   </button>
-                )}
-              </div>
+
+                  <button
+                    type="button"
+                    onClick={() => remove(photo.id)}
+                    disabled={pending}
+                    className="min-h-9 flex-1 rounded-lg border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+
+                  {!photo.is_primary && (
+                    <button
+                      type="button"
+                      onClick={() => makeCover(photo.id)}
+                      disabled={pending}
+                      className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Set as cover
+                    </button>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
