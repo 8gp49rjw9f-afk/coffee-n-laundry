@@ -1,17 +1,20 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { Card, Badge } from "@/components/ui";
+import Link from "next/link";
+
+import { Card } from "@/components/ui";
 
 import { createClient } from "@/lib/supabase/server";
 import { currentAdmin, isMaster } from "@/lib/services/admin";
-import { getSettings } from "@/lib/services/settings";
-import { describeDays } from "@/lib/services/freshness";
 
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { CreditRulesPanel } from "@/components/admin/CreditRulesPanel";
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { AdminsPanel } from "@/components/admin/AdminsPanel";
+
+import type { CreditRuleRow } from "@/components/admin/CreditRulesPanel";
+import type { ReportGroup } from "@/components/admin/ReportsPanel";
+import type { AdminRow } from "@/components/admin/AdminsPanel";
 
 /*
  * Four sections, one page. They are all short, and an admin who has
@@ -51,16 +54,18 @@ export default async function AdminPage({
 
   const supabase = await createClient();
 
-  /* ---------- what the active section needs ---------- */
+  /* ---------- what each section needs ---------- */
 
-  const settings = await getSettings();
+  const { data: settings } = await supabase
+    .from("site_settings")
+    .select("*")
+    .eq("id", 1)
+    .maybeSingle();
 
   const { data: rules } = await supabase
     .from("credit_rules")
     .select("action_key, credits, daily_cap, description, active")
     .order("credits", { ascending: false });
-
-  /* ---------- moderation: open reports, grouped by place ---------- */
 
   const { data: reports } = await supabase
     .from("place_reports")
@@ -70,7 +75,6 @@ export default async function AdminPage({
     .limit(200);
 
   const reportList = reports ?? [];
-
   const placeIds = [...new Set(reportList.map((r) => r.place_id))];
 
   const { data: places } = placeIds.length
@@ -82,16 +86,19 @@ export default async function AdminPage({
 
   const placeById = new Map((places ?? []).map((p) => [p.id, p]));
 
-  /* One card per place, with every report against it listed inside. */
-  const grouped = placeIds
+  const groups: ReportGroup[] = placeIds
     .map((id) => ({
-      place: placeById.get(id) ?? null,
       placeId: id,
-      reports: reportList.filter((r) => r.place_id === id),
+      place: placeById.get(id) ?? null,
+      reports: reportList
+        .filter((r) => r.place_id === id)
+        .map((r) => ({
+          id: r.id,
+          reason: r.reason,
+          created_at: r.created_at,
+        })),
     }))
     .sort((a, b) => b.reports.length - a.reports.length);
-
-  /* ---------- admins: master only ---------- */
 
   const { data: adminRows } = master
     ? await supabase.from("admins").select("email, is_master, created_at")
@@ -124,28 +131,31 @@ export default async function AdminPage({
         ))}
       </nav>
 
-      {active === "settings" && <SettingsPanel settings={settings} />}
+      {active === "settings" &&
+        (settings ? (
+          <SettingsPanel settings={settings} />
+        ) : (
+          <Card>
+            <p className="text-sm text-slate-500">
+              Site settings row is missing from the database.
+            </p>
+          </Card>
+        ))}
 
-      {active === "rewards" && <CreditRulesPanel rules={rules ?? []} />}
+      {active === "rewards" && (
+        <CreditRulesPanel rules={(rules ?? []) as CreditRuleRow[]} />
+      )}
 
-      {active === "moderation" && <ReportsPanel groups={grouped} />}
+      {active === "moderation" && <ReportsPanel groups={groups} />}
 
       {active === "admins" && master && (
         <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} self={admin.email} />
       )}
 
       <p className="pb-8 text-center text-xs text-slate-400">
-        Settings are read by the app once a minute. A change lands within that
-        window.
+        Settings are read by the app once a minute, so a change lands within
+        that window.
       </p>
     </main>
   );
 }
-
-interface AdminRow {
-  email: string;
-  is_master: boolean;
-  created_at: string;
-}
-
-export { describeDays };
