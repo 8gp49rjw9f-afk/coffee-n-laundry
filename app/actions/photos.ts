@@ -74,14 +74,17 @@ export async function addPlacePhotos(formData: FormData): Promise<void> {
  * One photo per place represents the place: on the map, on a shared
  * link, anywhere a single image is needed.
  *
- * The partial unique index allows at most one true per place, so the
- * old one must be cleared BEFORE the new one is set — in the other
- * order the update collides with itself.
+ * The promise is atomic. Clearing the old primary and setting the new
+ * one used to be two statements with a gap in between — a failed
+ * second write would leave the place with no cover at all, and the
+ * partial unique index means they cannot simply run in the other
+ * order. So the whole swap is one database function, in one
+ * transaction: either the place has a new cover, or nothing moved.
  *
- * No ownership check: choosing which photo represents a place is the
- * same kind of act as correcting a price, and anyone signed in may do
- * it. Who may DELETE a photo is a different question, and that one is
- * enforced in the database (see 0003's delete policy).
+ * No ownership check here: choosing which photo represents a place is
+ * the same kind of act as correcting a price, and anyone signed in may
+ * do it. Who may DELETE a photo is a different question, and that one
+ * is enforced in the database (see 0003's delete policy).
  */
 
 export async function setPrimaryPhoto(
@@ -98,26 +101,17 @@ export async function setPrimaryPhoto(
     throw new Error("You need to be signed in to choose a cover photo.");
   }
 
-  const { error: clearError } = await supabase
-    .from("place_photos")
-    .update({ is_primary: false })
-    .eq("place_id", placeId)
-    .eq("is_primary", true);
-
-  if (clearError) {
-    throw new Error("Could not change the cover photo.");
-  }
-
-  const { error } = await supabase
-    .from("place_photos")
-    .update({ is_primary: true })
-    .eq("id", photoId)
-    .eq("place_id", placeId);
+  const { error } = await supabase.rpc("set_primary_photo", {
+    p_place_id: placeId,
+    p_photo_id: photoId,
+  });
 
   if (error) {
     throw new Error("Could not change the cover photo.");
   }
 
+  /* Both surfaces read the cover: the place page shows the strip, the
+     home page's map panel shows a single square. */
   revalidatePath(`/place/${placeId}`);
   revalidatePath("/");
 }
