@@ -1,86 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import imageCompression from "browser-image-compression";
-
-import { SquareCrop } from "@/components/place/SquareCrop";
-
-import {
-  deletePlacePhoto,
-  replacePlacePhoto,
-  setPrimaryPhoto,
-} from "@/app/actions/photos";
+import { useEffect, useState } from "react";
 
 import type { PlacePhoto } from "@/lib/types";
 
 /*
- * The strip scrolls sideways, as it always did. What is new: each
- * photo carries its own two actions underneath, and the cover photo
- * is outlined to say "this is the one on the map".
- *
- * The cover is a fact about the place, not about the order the photos
- * arrived in, so it lives in a real column (is_primary) — see 0003.
- * The strip sorts the cover first, so what you see matches what is
- * true; "Set as cover" is how you choose a different one.
- *
- * Tapping the image still opens it full-screen: a price list is
- * unreadable in a 140px square.
+ * Photos are for deciding whether to walk over — a machine, a price
+ * list, the front door. Three at a time on desktop, one on a phone,
+ * and the tap opens the whole picture: a price list is unreadable in
+ * a 140px thumbnail.
  */
-
-const PHOTO_OPTIONS = {
-  maxSizeMB: 0.4,
-  maxWidthOrHeight: 1400,
-  useWebWorker: true,
-};
-
-async function compress(file: File): Promise<File> {
-  const result = await imageCompression(file, PHOTO_OPTIONS);
-
-  return new File([result], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
-    type: "image/jpeg",
-  });
-}
 
 export function PhotoStrip({
   photos,
   bucketUrl,
-  placeId,
 }: {
   photos: PlacePhoto[];
   bucketUrl: string;
-  placeId: string;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const [error, setError] = useState("");
-  const [pending, startTransition] = useTransition();
 
-  /* The photo being replaced, and the one waiting to be cropped. */
-  const [replacingId, setReplacingId] = useState<string | null>(null);
-  const [cropping, setCropping] = useState<File | null>(null);
+  const open = openIndex !== null ? photos[openIndex] : null;
 
-  const fileInput = useRef<HTMLInputElement>(null);
-
-  const ordered = [...photos].sort((a, b) => {
-    if (a.is_primary === b.is_primary) return 0;
-    return a.is_primary ? -1 : 1;
-  });
-
-  const open = openIndex !== null ? ordered[openIndex] : null;
-
-  /* Lightbox: Escape closes, arrows move, the page does not scroll. */
+  /* Escape closes it, and the page must not scroll behind it. */
   useEffect(() => {
     if (openIndex === null) return;
 
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") setOpenIndex(null);
-
-      if (event.key === "ArrowRight") {
-        setOpenIndex((i) => ((i ?? 0) + 1) % ordered.length);
-      }
-
-      if (event.key === "ArrowLeft") {
-        setOpenIndex((i) => ((i ?? 0) - 1 + ordered.length) % ordered.length);
-      }
     }
 
     document.addEventListener("keydown", onKey);
@@ -90,199 +37,37 @@ export function PhotoStrip({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [openIndex, ordered.length]);
+  }, [openIndex]);
 
-  function pickReplacement(photoId: string) {
-    setError("");
-    setReplacingId(photoId);
-    fileInput.current?.click();
-  }
-
-  function onFileChosen(list: FileList | null) {
-    if (!list || list.length === 0) {
-      setReplacingId(null);
-      return;
-    }
-
-    /* Always clear the input, or picking the same file twice fires
-       no change event the second time. */
-    if (fileInput.current) fileInput.current.value = "";
-
-    setCropping(list[0]);
-  }
-
-  async function acceptCropped(cropped: File) {
-    const photoId = replacingId;
-
-    setCropping(null);
-
-    if (!photoId) return;
-
-    setError("");
-
-    try {
-      const compressed = await compress(cropped);
-
-      const formData = new FormData();
-      formData.set("place_id", placeId);
-      formData.set("photo_id", photoId);
-      formData.set("photo", compressed);
-
-      startTransition(async () => {
-        try {
-          await replacePlacePhoto(formData);
-        } catch (err) {
-          setError(
-            err instanceof Error && err.message
-              ? err.message
-              : "Could not change that photo."
-          );
-        } finally {
-          setReplacingId(null);
-        }
-      });
-    } catch {
-      setError("Could not process that photo. Try a smaller one.");
-      setReplacingId(null);
-    }
-  }
-
-  function makeCover(photoId: string) {
-    setError("");
-
-    startTransition(async () => {
-      try {
-        await setPrimaryPhoto(placeId, photoId);
-      } catch (err) {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Could not change the cover photo."
-        );
-      }
-    });
-  }
-
-  function remove(photoId: string) {
-    if (!confirm("Delete this photo? This cannot be undone.")) return;
-
-    setError("");
-
-    startTransition(async () => {
-      try {
-        await deletePlacePhoto(placeId, photoId);
-      } catch (err) {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Could not delete that photo."
-        );
-      }
-    });
-  }
-
-  /* The crop owns the screen while it lasts. */
-  if (cropping) {
-    return (
-      <SquareCrop
-        file={cropping}
-        onCancel={() => {
-          setCropping(null);
-          setReplacingId(null);
-        }}
-        onDone={acceptCropped}
-      />
-    );
-  }
-
-  if (ordered.length === 0) return null;
+  if (!photos || photos.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => onFileChosen(event.target.files)}
-      />
-
+    <>
       <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        <ul className="flex snap-x snap-mandatory gap-3">
-          {ordered.map((photo, index) => (
+        <ul className="flex snap-x snap-mandatory gap-2">
+          {photos.map((photo, index) => (
             <li
               key={photo.id}
-              className="w-[62%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
+              className="w-[88%] shrink-0 snap-start sm:w-[calc((100%-1rem)/3)]"
             >
               <button
                 type="button"
                 onClick={() => setOpenIndex(index)}
-                className={`block w-full rounded-2xl p-0.5 transition ${
-                  photo.is_primary
-                    ? "ring-2 ring-[#6f4e37] ring-offset-1"
-                    : "ring-1 ring-transparent"
-                }`}
-                aria-label={
-                  photo.is_primary
-                    ? "Cover photo — open full size"
-                    : "Open this photo"
-                }
+                className="block w-full"
+                aria-label="Open this photo"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`${bucketUrl}/${photo.storage_path}`}
                   alt={photo.caption ?? "Photo of this place"}
                   loading="lazy"
-                  className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
+                  className="h-40 w-full rounded-xl border border-slate-200 object-cover sm:h-44"
                 />
               </button>
-
-              {photo.is_primary && (
-                <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-wide text-[#6f4e37]">
-                  Cover
-                </p>
-              )}
-
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => pickReplacement(photo.id)}
-                  disabled={pending}
-                  className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Modify
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => remove(photo.id)}
-                  disabled={pending}
-                  className="min-h-9 flex-1 rounded-lg border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
-                >
-                  Delete
-                </button>
-
-                {!photo.is_primary && (
-                  <button
-                    type="button"
-                    onClick={() => makeCover(photo.id)}
-                    disabled={pending}
-                    className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Set as cover
-                  </button>
-                )}
-              </div>
             </li>
           ))}
         </ul>
       </div>
-
-      {error && (
-        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800">
-          {error}
-        </p>
-      )}
 
       {open && (
         <div
@@ -307,9 +92,9 @@ export function PhotoStrip({
             ✕
           </button>
 
-          {ordered.length > 1 && (
+          {photos.length > 1 && (
             <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
-              {ordered.map((photo, index) => (
+              {photos.map((photo, index) => (
                 <button
                   key={photo.id}
                   type="button"
@@ -327,8 +112,6 @@ export function PhotoStrip({
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
-
-export default PhotoStrip;
