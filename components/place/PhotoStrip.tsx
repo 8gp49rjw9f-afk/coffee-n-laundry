@@ -14,9 +14,8 @@ import {
 import type { PlacePhoto } from "@/lib/types";
 
 /*
- * The strip scrolls sideways, as it always did. The cover photo is
- * outlined and labelled, so what you see matches what is true; the
- * per-photo actions sit underneath it.
+ * The strip scrolls sideways. The cover photo carries a quiet blue
+ * border so it can be told apart at a glance without shouting.
  *
  * The cover lives in a real column (is_primary, see 0003), not in the
  * order the photos happen to arrive in. "Set as cover" points it at a
@@ -64,6 +63,7 @@ export function PhotoStrip({
   const [cropping, setCropping] = useState<File | null>(null);
 
   const fileInput = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const ordered = [...photos].sort((a, b) => {
     if (a.is_primary === b.is_primary) return 0;
@@ -96,6 +96,25 @@ export function PhotoStrip({
       document.body.style.overflow = "";
     };
   }, [openIndex, ordered.length]);
+
+  /*
+   * One card at a time. The card is a fraction of the rail's width, so
+   * its own width is what to move by — measured rather than assumed,
+   * since a phone and a desktop show different fractions.
+   */
+  function scrollBy(direction: -1 | 1) {
+    const rail = scrollRef.current;
+
+    if (!rail) return;
+
+    const card = rail.querySelector("li");
+
+    const step = card
+      ? card.getBoundingClientRect().width + 12
+      : rail.clientWidth * 0.8;
+
+    rail.scrollBy({ left: direction * step, behavior: "smooth" });
+  }
 
   function pickReplacement(photoId: string) {
     setError("");
@@ -202,6 +221,9 @@ export function PhotoStrip({
 
   if (ordered.length === 0) return null;
 
+  /* Under four photos everything already fits; arrows would be noise. */
+  const scrollable = ordered.length > 3;
+
   return (
     <div className="space-y-2">
       {signedIn && (
@@ -214,79 +236,107 @@ export function PhotoStrip({
         />
       )}
 
-      <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        <ul className="flex snap-x snap-mandatory gap-3">
-          {ordered.map((photo, index) => (
-            <li
-              key={photo.id}
-              className="w-[62%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
-            >
-              <button
-                type="button"
-                onClick={() => setOpenIndex(index)}
-                /* A light blue ring marks the cover: enough to read at
-                   a glance, quiet enough not to fight the photo. */
-                className={`block w-full overflow-hidden rounded-xl transition ${
-                  photo.is_primary
-                    ? "ring-2 ring-sky-400 ring-offset-2"
-                    : "ring-0"
-                }`}
-                aria-label={
-                  photo.is_primary
-                    ? "Cover photo — open full size"
-                    : "Open this photo"
-                }
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+        >
+          <ul className="flex snap-x snap-mandatory gap-3">
+            {ordered.map((photo, index) => (
+              <li
+                key={photo.id}
+                className="w-[62%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`${bucketUrl}/${photo.storage_path}`}
-                  alt={photo.caption ?? "Photo of this place"}
-                  loading="lazy"
-                  className="aspect-square w-full border border-slate-200 object-cover"
-                />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenIndex(index)}
+                  /* A pale blue edge marks the cover: visible, quiet. */
+                  className={`block w-full overflow-hidden rounded-xl transition ${
+                    photo.is_primary
+                      ? "border-2 border-sky-200"
+                      : "border-2 border-transparent"
+                  }`}
+                  aria-label={
+                    photo.is_primary
+                      ? "Cover photo — open full size"
+                      : "Open this photo"
+                  }
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`${bucketUrl}/${photo.storage_path}`}
+                    alt={photo.caption ?? "Photo of this place"}
+                    loading="lazy"
+                    className="aspect-square w-full object-cover"
+                  />
+                </button>
 
-              {photo.is_primary && (
-                <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-wide text-sky-600">
-                  Cover
-                </p>
-              )}
+                {photo.is_primary && (
+                  <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-wide text-sky-600">
+                    Cover
+                  </p>
+                )}
 
-              {signedIn && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => pickReplacement(photo.id)}
-                    disabled={pending}
-                    className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Modify
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => remove(photo.id)}
-                    disabled={pending}
-                    className="min-h-9 flex-1 rounded-lg border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
-                  >
-                    Delete
-                  </button>
-
-                  {!photo.is_primary && (
+                {signedIn && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
                     <button
                       type="button"
-                      onClick={() => makeCover(photo.id)}
+                      onClick={() => pickReplacement(photo.id)}
                       disabled={pending}
-                      className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                      className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                     >
-                      Set as cover
+                      Modify
                     </button>
-                  )}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+
+                    <button
+                      type="button"
+                      onClick={() => remove(photo.id)}
+                      disabled={pending}
+                      className="min-h-9 flex-1 rounded-lg border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+
+                    {!photo.is_primary && (
+                      <button
+                        type="button"
+                        onClick={() => makeCover(photo.id)}
+                        disabled={pending}
+                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Set as cover
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Arrows ride on top of the rail, half transparent until
+            touched — they must not compete with the photos. */}
+        {scrollable && (
+          <>
+            <button
+              type="button"
+              onClick={() => scrollBy(-1)}
+              aria-label="Scroll photos left"
+              className="absolute left-0 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/70 text-lg font-bold text-slate-700 shadow backdrop-blur transition hover:bg-white sm:flex"
+            >
+              ‹
+            </button>
+
+            <button
+              type="button"
+              onClick={() => scrollBy(1)}
+              aria-label="Scroll photos right"
+              className="absolute right-0 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/70 text-lg font-bold text-slate-700 shadow backdrop-blur transition hover:bg-white sm:flex"
+            >
+              ›
+            </button>
+          </>
+        )}
       </div>
 
       {error && (
