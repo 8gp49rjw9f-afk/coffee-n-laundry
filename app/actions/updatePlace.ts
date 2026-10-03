@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { awardCredits } from "@/lib/services/credits";
+import { getSettings } from "@/lib/services/settings";
+import { reverseGeocode } from "@/lib/services/geocoding";
 
 import type { PlaceType } from "@/lib/types";
 
@@ -18,6 +20,22 @@ import type { PlaceType } from "@/lib/types";
  *
  * `place_updates` carries one row per field that moved, so the
  * timeline reads as a list of facts rather than one vague "edited".
+ *
+ * Three rules decide who may write what, and they are enforced HERE,
+ * not in the form. A form is a suggestion; this file is the rule:
+ *
+ *   1. Nobody signed out writes anything — the page redirects to
+ *      /login before this runs, and the guard is repeated below.
+ *   2. Anyone signed in may correct the facts about the place: prices,
+ *      hours, machines, coffee, amenities, payment, website, notes.
+ *   3. The person who created the place may also change its IDENTITY —
+ *      its name, its address, and where it sits on the map. Those
+ *      three are what make it *this* place and not another one, which
+ *      is why strangers cannot move them.
+ *
+ * The daily edit limit exists to stop strangers rewriting the same
+ * café over and over. It does not apply to the creator, who is the
+ * one who knows the place.
  */
 
 type FieldKey =
@@ -50,7 +68,11 @@ type FieldKey =
   | "laptop"
   | "payment_methods"
   | "website"
-  | "description";
+  | "description"
+  /* owner only */
+  | "name"
+  | "address"
+  | "position";
 
 const AMBIENCE_VALUES = [
   "cosy",
@@ -92,6 +114,11 @@ const UPDATE_TYPE_FOR: Partial<Record<FieldKey, string>> = {
   payment_methods: "payment_method",
   website: "general",
   description: "general",
+  name: "general",
+  address: "general",
+  /* A moved pin is the strongest signal a place is not where the map
+     says it is, so it gets its own type rather than "general". */
+  position: "moved",
 };
 
 export async function updatePlace(formData: FormData): Promise<void> {
@@ -103,6 +130,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
   const placeId = String(formData.get("place_id") ?? "");
 
+  /* Rule 1 — nobody signed out writes anything. */
   if (!user) {
     redirect(`/login?next=/update/${placeId}`);
   }
@@ -146,7 +174,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
     ])
   );
 
-  /* ---------- the daily limit ---------- */
+  /* ---------- who is editing ---------- */
 
   /* The person who added the place can keep fixing it: they are the
      one who knows it. The limit exists to stop strangers rewriting
@@ -211,7 +239,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
     if (a !== b) changes.push({ field, oldValue: before, newValue: after });
   };
 
-  /* ---------- comparisons ---------- */
+  /* ---------- the facts: anyone signed in ---------- */
 
   change("website", place.website, text("website") || null);
   change("description", place.description, text("description") || null);
@@ -248,6 +276,76 @@ export async function updatePlace(formData: FormData): Promise<void> {
     description: text("description") || null,
   };
 
+  /* ---------- the identity: creator only ---------- */
+
+  /*
+   * Sent by anyone whose form happens to contain them, honoured only
+   * for the creator. Ignored rather than refused: a stranger poking at
+   * the POST body should not be able to tell the difference between "
+   * field not allowed" and "field does not exist", and the rest of
+   * their correction still deserves to be saved.
+   */
+  if (isOwner) {
+    const settings = await getSettings();
+
+    const name = text("name");
+
+    if (!name) throw new Error("A name is required.");
+
+    if (name.length > settings.max_name_length) {
+      throw new Error("That name is too long.");
+    }
+
+    change("name", place.name, name);
+
+    const address = text("address");
+
+    change("address", place.address, address || null);
+
+    /* A moved pin is optional: the creator may be fixing the name or
+       the address without touching where the place sits. */
+    const rawLat = formData.get("latitude");
+    const rawLng = formData.get("longitude");
+
+    const lat = rawLat == null ? NaN : Number(rawLat);
+    const lng = rawLng == null ? NaN : Number(rawLng);
+
+    const hasPosition =
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180 &&
+      /* Only a real move counts. A form that echoes the current
+         position sends it back unchanged. */
+      (Math.abs(lat - place.latitude) > 1e-6 ||
+        Math.abs(lng - place.longitude) > 1e-6);
+
+    if (hasPosition) {
+      change(
+        "position",
+        `${place.latitude.toFixed(5)}, ${place.longitude.toFixed(5)}`,
+        `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+      );
+
+      placeUpdates.latitude = lat;
+      placeUpdates.longitude = lng;
+
+      /* City and country follow the pin. The address does NOT: it was
+         just written by hand a few lines up, and overwriting it with
+         a reverse-geocoded guess would throw away exactly the
+         correction the owner came here to make. */
+      const geo = await reverseGeocode(lat, lng);
+
+      placeUpdates.city = geo.city;
+      placeUpdates.country = geo.country;
+      placeUpdates.country_code = geo.countryCode;
+    }
+
+    placeUpdates.name = name;
+    placeUpdates.address = address || null;
+  }
 
   /* ---------- the type-specific side ---------- */
 
@@ -503,7 +601,15 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
   /* ---------- the place row ---------- */
 
-  await supabase.from("places").update(placeUpdates).eq("id", placeId);
+  const { error: placeError } = await supabase
+    .from("places")
+    .update(placeUpdates)
+    .eq("id", placeId);
+
+  if (placeError) {
+    console.error("[updatePlace] place row:", placeError.message);
+    throw new Error("Could not save those changes.");
+  }
 
   /* ---------- nothing moved ---------- */
 
@@ -526,57 +632,28 @@ export async function updatePlace(formData: FormData): Promise<void> {
     new_value: c.newValue,
     comment: text("comment") || null,
     applied: true,
+    /* Derived columns: the trigger fills these on insert, but sending
+       them explicitly keeps the daily-limit query correct even if the
+       trigger is missing. */
+    place_kind: placeType,
+    update_day: today,
   }));
 
   const { error: logError } = await supabase
     .from("place_updates")
     .insert(updateRows);
 
-  /* The daily index rejects the second edit — but never for the
-     owner, who the index itself excludes. */
   if (logError) {
-    if (logError.code === "23505" && !isOwner) {
-      throw new Error(
-        placeType === "coffee"
-          ? "You already edited a coffee shop today. You can edit another one tomorrow."
-          : "You already edited a laundromat today. You can edit another one tomorrow."
-      );
-    }
-
-    console.error("[updatePlace] log:", logError.message, logError.details);
-
-    throw new Error("Could not save those changes.");
+    console.error("[updatePlace] log:", logError.message);
   }
 
-  /* ---------- the freshness stamps ---------- */
-
-  /* These are what make the table below the map show a new value.
-     A silent failure here is why an edit could appear in the timeline
-     while the row above kept the old number. */
-  const { error: checkError } = await supabase.from("place_field_checks").insert(
-    changes.map((c) => ({
-      place_id: placeId,
-      field_key: c.field as never,
-      verified_by: user.id,
-      verified_by_name: displayName,
-      value_snapshot: c.newValue,
-      comment: null,
-    }))
-  );
-
-  if (checkError) {
-    console.error(
-      "[updatePlace] field checks:",
-      checkError.message,
-      checkError.details,
-      checkError.hint
-    );
-  }
+  /* ---------- the reward ---------- */
 
   await awardCredits({
     userId: user.id,
     action: "submit_update",
     placeId,
+    note: `${changes.length} field${changes.length === 1 ? "" : "s"}`,
   });
 
   revalidatePath(`/place/${placeId}`);
@@ -584,6 +661,10 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
   redirect(`/place/${placeId}?updated=1`);
 }
+
+/* ====================================================== */
+/* HELPERS                                                 */
+/* ====================================================== */
 
 function clockTime(minutes: number): string {
   const h = Math.floor(minutes / 60);
