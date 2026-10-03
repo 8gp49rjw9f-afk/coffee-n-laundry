@@ -4,79 +4,148 @@ import { redirect } from "next/navigation";
 import { Card, Badge } from "@/components/ui";
 
 import { createClient } from "@/lib/supabase/server";
-import { isAdmin } from "@/lib/services/settings";
+import { currentAdmin, isMaster } from "@/lib/services/admin";
+import { getSettings } from "@/lib/services/settings";
 import { describeDays } from "@/lib/services/freshness";
 
-export default async function AdminPage() {
-  const admin = await isAdmin();
+import { SettingsPanel } from "@/components/admin/SettingsPanel";
+import { CreditRulesPanel } from "@/components/admin/CreditRulesPanel";
+import { ReportsPanel } from "@/components/admin/ReportsPanel";
+import { AdminsPanel } from "@/components/admin/AdminsPanel";
+
+/*
+ * Four sections, one page. They are all short, and an admin who has
+ * to navigate between four routes to flip a switch will stop
+ * bothering.
+ *
+ * Which tabs exist depends on the level: the Master tab appears only
+ * for the account that decides who the admins are. The server actions
+ * check the same thing again — this is presentation, not protection.
+ */
+
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const admin = await currentAdmin();
 
   if (!admin) {
     redirect("/");
   }
 
+  const query = await searchParams;
+
+  const master = await isMaster();
+
+  const tabs = [
+    { key: "settings", label: "Site", emoji: "⚙️" },
+    { key: "rewards", label: "Rewards", emoji: "🏅" },
+    { key: "moderation", label: "Moderation", emoji: "🚩" },
+    ...(master ? [{ key: "admins", label: "Admins", emoji: "🔑" }] : []),
+  ];
+
+  const active = tabs.some((t) => t.key === query.tab)
+    ? (query.tab as string)
+    : "settings";
+
   const supabase = await createClient();
+
+  /* ---------- what the active section needs ---------- */
+
+  const settings = await getSettings();
+
+  const { data: rules } = await supabase
+    .from("credit_rules")
+    .select("action_key, credits, daily_cap, description, active")
+    .order("credits", { ascending: false });
+
+  /* ---------- moderation: open reports, grouped by place ---------- */
 
   const { data: reports } = await supabase
     .from("place_reports")
-    .select("id, place_id, reason, created_at, resolved")
+    .select("id, place_id, reason, created_at")
     .eq("resolved", false)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(200);
 
   const reportList = reports ?? [];
+
   const placeIds = [...new Set(reportList.map((r) => r.place_id))];
 
   const { data: places } = placeIds.length
-    ? await supabase.from("places").select("id, name").in("id", placeIds)
+    ? await supabase
+        .from("places")
+        .select("id, name, status, place_type, city, country")
+        .in("id", placeIds)
     : { data: [] };
 
-  const nameById = new Map((places ?? []).map((p) => [p.id, p.name]));
+  const placeById = new Map((places ?? []).map((p) => [p.id, p]));
+
+  /* One card per place, with every report against it listed inside. */
+  const grouped = placeIds
+    .map((id) => ({
+      place: placeById.get(id) ?? null,
+      placeId: id,
+      reports: reportList.filter((r) => r.place_id === id),
+    }))
+    .sort((a, b) => b.reports.length - a.reports.length);
+
+  /* ---------- admins: master only ---------- */
+
+  const { data: adminRows } = master
+    ? await supabase.from("admins").select("email, is_master, created_at")
+    : { data: null };
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-8">
-      <h1 className="text-2xl font-bold text-slate-900">Reports</h1>
+    <main className="mx-auto max-w-3xl space-y-4 px-4 py-6 sm:px-8">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Admin</h1>
 
-      <p className="text-sm text-slate-600">
-        {reportList.length} open {reportList.length === 1 ? "report" : "reports"}.
-      </p>
+        <p className="mt-1 text-sm text-slate-600">
+          Signed in as <span className="font-semibold">{admin.email}</span>
+          {master && " · master account"}
+        </p>
+      </div>
 
-      {reportList.length === 0 ? (
-        <Card>
-          <p className="text-sm text-slate-500">
-            Nothing waiting. The map is holding up.
-          </p>
-        </Card>
-      ) : (
-        <ul className="space-y-2">
-          {reportList.map((report) => (
-            <li key={report.id}>
-              <Card padding="sm">
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    href={`/place/${report.place_id}`}
-                    className="font-semibold text-slate-900 underline"
-                  >
-                    {nameById.get(report.place_id) ?? "Unknown place"}
-                  </Link>
+      <nav className="flex flex-wrap gap-2">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.key}
+            href={`/admin?tab=${tab.key}`}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 font-semibold transition ${
+              active === tab.key
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            {tab.emoji} {tab.label}
+          </Link>
+        ))}
+      </nav>
 
-                  <Badge className="bg-amber-100 text-amber-800">
-                    {describeDays(daysSince(report.created_at))}
-                  </Badge>
-                </div>
+      {active === "settings" && <SettingsPanel settings={settings} />}
 
-                <p className="mt-2 text-sm text-slate-700">{report.reason}</p>
-              </Card>
-            </li>
-          ))}
-        </ul>
+      {active === "rewards" && <CreditRulesPanel rules={rules ?? []} />}
+
+      {active === "moderation" && <ReportsPanel groups={grouped} />}
+
+      {active === "admins" && master && (
+        <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} self={admin.email} />
       )}
+
+      <p className="pb-8 text-center text-xs text-slate-400">
+        Settings are read by the app once a minute. A change lands within that
+        window.
+      </p>
     </main>
   );
 }
 
-function daysSince(iso: string) {
-  return Math.max(
-    0,
-    Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24))
-  );
+interface AdminRow {
+  email: string;
+  is_master: boolean;
+  created_at: string;
 }
+
+export { describeDays };
