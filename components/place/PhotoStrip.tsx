@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import imageCompression from "browser-image-compression";
 
 import { SquareCrop } from "@/components/place/SquareCrop";
@@ -14,7 +15,7 @@ import {
 import type { PlacePhoto } from "@/lib/types";
 
 /*
- * The strip scrolls sideways. The cover photo carries a quiet blue
+ * The strip scrolls sideways. The cover photo carries a light blue
  * border so it can be told apart at a glance without shouting.
  *
  * The cover lives in a real column (is_primary, see 0003), not in the
@@ -54,6 +55,8 @@ export function PhotoStrip({
   placeId: string;
   signedIn?: boolean;
 }) {
+  const router = useRouter();
+
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -155,6 +158,10 @@ export function PhotoStrip({
       startTransition(async () => {
         try {
           await replacePlacePhoto(formData);
+
+          /* The image on screen is browser-cached under the same URL,
+             so the new bytes need a server re-render to appear. */
+          router.refresh();
         } catch (err) {
           setError(
             err instanceof Error && err.message
@@ -177,6 +184,12 @@ export function PhotoStrip({
     startTransition(async () => {
       try {
         await setPrimaryPhoto(placeId, photoId);
+
+        /* The map's panel on the home page reads the cover from data
+           fetched at its own first render, so it keeps the old photo
+           until this component's tree is re-rendered. Loading the home
+           page later then finds the new one. */
+        router.refresh();
       } catch (err) {
         setError(
           err instanceof Error && err.message
@@ -195,6 +208,8 @@ export function PhotoStrip({
     startTransition(async () => {
       try {
         await deletePlacePhoto(placeId, photoId);
+
+        router.refresh();
       } catch (err) {
         setError(
           err instanceof Error && err.message
@@ -250,10 +265,10 @@ export function PhotoStrip({
                 <button
                   type="button"
                   onClick={() => setOpenIndex(index)}
-                  /* A pale blue edge marks the cover: visible, quiet. */
+                  /* A light blue edge marks the cover: visible, quiet. */
                   className={`block w-full overflow-hidden rounded-xl transition ${
                     photo.is_primary
-                      ? "border-2 border-sky-200"
+                      ? "border-2 border-sky-300"
                       : "border-2 border-transparent"
                   }`}
                   aria-label={
