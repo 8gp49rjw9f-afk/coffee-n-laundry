@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { Button, Card, ErrorBanner } from "@/components/ui";
+import { IdentityBlock } from "@/components/place/IdentityBlock";
 
 import { updatePlace } from "@/app/actions/updatePlace";
 
@@ -76,6 +77,7 @@ export function UpdateForm({
   place,
   canEdit,
   blockedMessage,
+  isOwner,
 }: {
   place: {
     id: string;
@@ -120,6 +122,7 @@ export function UpdateForm({
   };
   canEdit: boolean;
   blockedMessage: string;
+  isOwner: boolean;
 }) {
   const isCoffee = place.place_type === "coffee";
 
@@ -133,6 +136,12 @@ export function UpdateForm({
   const [website, setWebsite] = useState(place.website ?? "");
   const [description, setDescription] = useState(place.description ?? "");
   const [comment, setComment] = useState("");
+
+  /* owner-only: the place's identity */
+  const [name, setName] = useState(place.name);
+  const [address, setAddress] = useState(place.address ?? "");
+  const [latitude, setLatitude] = useState(place.latitude);
+  const [longitude, setLongitude] = useState(place.longitude);
 
   const [payments, setPayments] = useState<string[]>(
     place.accepted_payments ?? []
@@ -214,6 +223,15 @@ export function UpdateForm({
     formData.set("website", website.trim());
     formData.set("description", description.trim());
     formData.set("comment", comment.trim());
+
+    /* The identity fields travel with the form only for the creator;
+       the server honours them on the same condition. */
+    if (isOwner) {
+      formData.set("name", name.trim());
+      formData.set("address", address.trim());
+      formData.set("latitude", String(latitude));
+      formData.set("longitude", String(longitude));
+    }
 
     formData.set("has_wifi", String(wifi));
     formData.set("has_power", String(power));
@@ -298,31 +316,47 @@ export function UpdateForm({
 
   return (
     <div className="space-y-4">
-      {/* What the place IS is not editable: a moved pin or a renamed
-          shop is a different place, and letting anyone edit those
-          turns the map into guesswork. */}
+      {/* The identity — name, address, pin — belongs to the creator
+          alone; everyone else sees it read-only. The server enforces
+          the same rule, so a stranger's form cannot slip past it. */}
 
-      <Card>
-        <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">
-          What it is
-        </h2>
+      {isOwner ? (
+        <IdentityBlock
+          placeId={place.id}
+          name={name}
+          address={address}
+          latitude={latitude}
+          longitude={longitude}
+          onNameChange={setName}
+          onAddressChange={setAddress}
+          onPositionChange={(lat, lng) => {
+            setLatitude(lat);
+            setLongitude(lng);
+          }}
+        />
+      ) : (
+        <Card>
+          <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">
+            What it is
+          </h2>
 
-        <p className="mb-3 text-xs text-slate-400">
-          Name, address and position are fixed. If this place moved or changed
-          name, report it instead.
-        </p>
+          <p className="mb-3 text-xs text-slate-400">
+            Name, address and position are fixed. If this place moved or changed
+            name, report it instead.
+          </p>
 
-        <p className="text-lg font-bold text-slate-900">{place.name}</p>
+          <p className="text-lg font-bold text-slate-900">{place.name}</p>
 
-        <p className="mt-1 text-sm text-slate-600">
-          {[place.address, place.city, place.country].filter(Boolean).join(" · ") ||
-            "No address recorded"}
-        </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {[place.address, place.city, place.country].filter(Boolean).join(" · ") ||
+              "No address recorded"}
+          </p>
 
-        <p className="mt-1 text-xs text-slate-400">
-          {place.latitude.toFixed(5)}, {place.longitude.toFixed(5)}
-        </p>
-      </Card>
+          <p className="mt-1 text-xs text-slate-400">
+            {place.latitude.toFixed(5)}, {place.longitude.toFixed(5)}
+          </p>
+        </Card>
+      )}
 
       {isCoffee ? (
         <Card>
@@ -494,20 +528,90 @@ export function UpdateForm({
             </label>
           </div>
 
-          {currency && (
-            <p className="mt-2 text-xs text-slate-500">
-              Prices shown in {currency}.
-            </p>
-          )}
-
           <div className="mt-4 grid grid-cols-3 gap-2">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Wash minutes
+              </span>
+
+              <select
+                value={washMinutes}
+                onChange={(e) => setWashMinutes(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">—</option>
+                {DURATIONS.map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Dryer minutes
+              </span>
+
+              <select
+                value={dryerMinutes}
+                onChange={(e) => setDryerMinutes(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">—</option>
+                {DURATIONS.map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Last entry
+              </span>
+
+              <select
+                value={lastEntry}
+                onChange={(e) => setLastEntry(e.target.value)}
+                disabled={open24h}
+                className={`${selectClass} disabled:opacity-50`}
+              >
+                <option value="">—</option>
+                {ENTRY_TIMES.map((time) => (
+                  <option key={time.value} value={time.value}>
+                    {time.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Toggle label="🕛 Open 24h" value={open24h} onChange={setOpen24h} />
+
+            <Toggle
+              label="🧴 Detergent included"
+              value={detergentIncluded}
+              onChange={setDetergentIncluded}
+            />
+
+            <Toggle
+              label="🛒 Detergent for sale"
+              value={detergentPurchasable}
+              onChange={setDetergentPurchasable}
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
             {MACHINE_SIZES.map((option) => (
               <button
                 key={option.key}
                 type="button"
                 onClick={() => toggleIn(machineSizes, setMachineSizes, option.key)}
                 aria-pressed={machineSizes.includes(option.key)}
-                className={`min-h-11 rounded-xl border text-sm font-bold transition ${
+                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
                   machineSizes.includes(option.key)
                     ? "border-slate-900 bg-slate-900 text-white"
                     : "border-slate-300 bg-white text-slate-700"
@@ -517,114 +621,28 @@ export function UpdateForm({
               </button>
             ))}
           </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Wash takes
-              </span>
-
-              <select
-                value={washMinutes}
-                onChange={(e) => setWashMinutes(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">—</option>
-
-                {DURATIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {d} min
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Dryer takes
-              </span>
-
-              <select
-                value={dryerMinutes}
-                onChange={(e) => setDryerMinutes(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">—</option>
-
-                {DURATIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {d} min
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="mt-3">
-            <Toggle
-              label="🕛 Open 24 hours"
-              value={open24h}
-              onChange={setOpen24h}
-            />
-          </div>
-
-          {!open24h && (
-            <label className="mt-3 block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Last entry
-              </span>
-
-              <select
-                value={lastEntry}
-                onChange={(e) => setLastEntry(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">—</option>
-
-                {ENTRY_TIMES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Toggle
-              label="🧼 Detergent included"
-              value={detergentIncluded}
-              onChange={setDetergentIncluded}
-            />
-
-            <Toggle
-              label="🛒 Can buy it there"
-              value={detergentPurchasable}
-              onChange={setDetergentPurchasable}
-            />
-          </div>
         </Card>
       )}
 
       <Card>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-          Payment
+          How you pay
         </h2>
 
         <div className="flex flex-wrap gap-2">
-          {PAYMENT_KEYS.map((key) => (
+          {PAYMENT_KEYS.map((option) => (
             <button
-              key={key.value}
+              key={option.value}
               type="button"
-              onClick={() => toggleIn(payments, setPayments, key.value)}
-              aria-pressed={payments.includes(key.value)}
+              onClick={() => toggleIn(payments, setPayments, option.value)}
+              aria-pressed={payments.includes(option.value)}
               className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                payments.includes(key.value)
+                payments.includes(option.value)
                   ? "border-slate-900 bg-slate-900 text-white"
                   : "border-slate-300 bg-white text-slate-700"
               }`}
             >
-              {key.label}
+              {option.label}
             </button>
           ))}
         </div>
@@ -632,37 +650,18 @@ export function UpdateForm({
 
       <Card>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-          Amenities
+          Good to know
         </h2>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2">
           <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
-          <Toggle label="🔌 Power" value={power} onChange={setPower} />
+          <Toggle label="🔌 Power sockets" value={power} onChange={setPower} />
           <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
           <Toggle label="🪑 Seating" value={seating} onChange={setSeating} />
           <Toggle label="🚻 Toilets" value={toilets} onChange={setToilets} />
         </div>
-      </Card>
 
-      <Card>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-          Notes and links
-        </h2>
-
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Description
-          </span>
-
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
-          />
-        </label>
-
-        <label className="mt-3 block">
+        <label className="mt-4 block">
           <span className="mb-1.5 block text-sm font-semibold text-slate-700">
             Website
           </span>
@@ -670,20 +669,40 @@ export function UpdateForm({
           <input
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://…"
             className={selectClass}
           />
         </label>
 
         <label className="mt-3 block">
           <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Why the change?{" "}
-            <span className="font-normal text-slate-400">(optional)</span>
+            Anything else worth knowing
           </span>
 
-          <input
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className={selectClass}
+          />
+        </label>
+      </Card>
+
+      <Card>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+          Why?
+        </h2>
+
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+            Leave a note <span className="font-normal text-slate-400">(optional)</span>
+          </span>
+
+          <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="The machines only take coins now."
+            rows={2}
+            placeholder="Prices went up in June, the dryer on the left is broken…"
             className={selectClass}
           />
         </label>
@@ -691,14 +710,15 @@ export function UpdateForm({
 
       {error && <ErrorBanner message={error} />}
 
-      <p className="text-center text-xs text-slate-500">
-        Only what you actually changed will be logged, and your name goes on
-        each line.
-      </p>
-
       <Button onClick={submit} disabled={pending} className="w-full">
         {pending ? "Saving…" : "Save changes"}
       </Button>
+
+      <p className="pb-6 text-center text-xs text-slate-400">
+        Everything you correct is logged, with your name on it.
+      </p>
     </div>
   );
 }
+
+export default UpdateForm;
