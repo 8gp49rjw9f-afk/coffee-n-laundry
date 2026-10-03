@@ -17,6 +17,10 @@ import { Button } from "@/components/ui";
  * own toolbar is not part of 100vh, so a full-height panel puts its
  * controls underneath the toolbar where they cannot be tapped. That
  * is what hid the confirm button on a phone.
+ *
+ * The frame is capped by the shorter of the two available sides. On a
+ * laptop the width is generous and the height is not, so a square
+ * sized from the width alone would run off the bottom of the screen.
  */
 
 const OUTPUT = 1400; // the square side, in pixels
@@ -47,6 +51,7 @@ export function SquareCrop({
 
   const frameRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   /* Every finger down, by pointer id. */
   const pointers = useRef(new Map<number, Point>());
@@ -73,15 +78,21 @@ export function SquareCrop({
 
   /*
    * The frame is measured rather than assumed — it is a square sized
-   * by CSS — and it is measured again whenever it changes, because a
-   * rotate or a keyboard opening resizes it.
+   * by CSS — and it is measured again whenever either dimension
+   * changes, because a rotate or a window resize resizes it.
    */
   useEffect(() => {
-    const node = frameRef.current;
+    const node = stageRef.current;
 
     if (!node) return;
 
-    const measure = () => setFrameSide(node.clientWidth);
+    const measure = () => {
+      const side = Math.min(node.clientWidth, node.clientHeight);
+
+      /* A definite ceiling as well: on a very tall window the square
+         would otherwise fill the whole height and dwarf the controls. */
+      setFrameSide(Math.max(0, Math.min(side, 520)));
+    };
 
     measure();
 
@@ -190,7 +201,7 @@ export function SquareCrop({
          pinched stays where your fingers are. */
       const centreNow = midpoint(list);
 
-      const scaleChange = (nextZoom * baseScale) / (start.zoom * baseScale);
+      const scaleChange = nextZoom / start.zoom;
 
       const anchor = {
         x: start.center.x - start.offset.x,
@@ -250,7 +261,18 @@ export function SquareCrop({
     }
   }
 
-  /* Double-tap cycles between the frame filled and a closer look. */
+  /* Wheel zooms on a desktop, where there is no pinch. */
+  function onWheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+
+    const step = event.deltaY > 0 ? -0.08 : 0.08;
+
+    setZoom((current) =>
+      Math.min(MAX_ZOOM, Math.max(1, Number((current + step).toFixed(2))))
+    );
+  }
+
+  /* Double-click alternates between the frame filled and a closer look. */
   function onDoubleClick() {
     setZoom((current) => (current >= 2 ? 1 : 2));
   }
@@ -332,10 +354,18 @@ export function SquareCrop({
         <span className="w-16" />
       </div>
 
-      {/* The frame is given a definite size rather than "all the space
-          left over": flex-1 on iOS can grow past the viewport and push
-          the controls off the bottom of the screen. */}
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4">
+      {/*
+       * The stage is whatever is left between the header and the
+       * controls, and the square is sized from the SHORTER side of it.
+       * On a laptop that is the height, which is what keeps the photo
+       * from filling the screen and hiding the button below. On a
+       * phone it is the width, so the square still fills the screen
+       * edge to edge.
+       */}
+      <div
+        ref={stageRef}
+        className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4"
+      >
         <div
           ref={frameRef}
           onPointerDown={onPointerDown}
@@ -343,7 +373,9 @@ export function SquareCrop({
           onPointerUp={endPointer}
           onPointerCancel={endPointer}
           onDoubleClick={onDoubleClick}
-          className="relative aspect-square max-h-full w-full max-w-md touch-none select-none overflow-hidden rounded-2xl bg-white/10"
+          onWheel={onWheel}
+          className="relative touch-none select-none overflow-hidden rounded-2xl bg-white/10"
+          style={{ width: frameSide || undefined, height: frameSide || undefined }}
         >
           {url && (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -396,7 +428,7 @@ export function SquareCrop({
         </label>
 
         <p className="text-center text-xs text-white/60">
-          Drag to move, pinch to zoom, or double-tap.
+          Drag to move, pinch or scroll to zoom, or double-click.
         </p>
 
         <Button onClick={apply} disabled={busy} className="w-full">
