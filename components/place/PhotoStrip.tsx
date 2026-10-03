@@ -59,6 +59,7 @@ export function PhotoStrip({
 
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [choosing, setChoosing] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   /* The photo being replaced, and the one waiting to be cropped. */
@@ -159,8 +160,6 @@ export function PhotoStrip({
         try {
           await replacePlacePhoto(formData);
 
-          /* The image on screen is browser-cached under the same URL,
-             so the new bytes need a server re-render to appear. */
           router.refresh();
         } catch (err) {
           setError(
@@ -178,17 +177,20 @@ export function PhotoStrip({
     }
   }
 
+  /*
+   * The cover is chosen optimistically: the ring moves the moment the
+   * button is pressed, then the server call settles it. A control that
+   * gives no sign of having been pressed is indistinguishable from a
+   * broken one, and this one cannot be allowed to feel broken.
+   */
   function makeCover(photoId: string) {
     setError("");
+    setChoosing(photoId);
 
     startTransition(async () => {
       try {
         await setPrimaryPhoto(placeId, photoId);
 
-        /* The map's panel on the home page reads the cover from data
-           fetched at its own first render, so it keeps the old photo
-           until this component's tree is re-rendered. Loading the home
-           page later then finds the new one. */
         router.refresh();
       } catch (err) {
         setError(
@@ -196,6 +198,8 @@ export function PhotoStrip({
             ? err.message
             : "Could not change the cover photo."
         );
+      } finally {
+        setChoosing(null);
       }
     });
   }
@@ -257,75 +261,81 @@ export function PhotoStrip({
           className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
         >
           <ul className="flex snap-x snap-mandatory gap-3">
-            {ordered.map((photo, index) => (
-              <li
-                key={photo.id}
-                className="w-[62%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenIndex(index)}
-                  /* A light blue edge marks the cover: visible, quiet. */
-                  className={`block w-full overflow-hidden rounded-xl transition ${
-                    photo.is_primary
-                      ? "border-2 border-sky-300"
-                      : "border-2 border-transparent"
-                  }`}
-                  aria-label={
-                    photo.is_primary
-                      ? "Cover photo — open full size"
-                      : "Open this photo"
-                  }
+            {ordered.map((photo, index) => {
+              /* While the server confirms, the ring already sits on the
+                 photo that was clicked. */
+              const isCover =
+                choosing != null ? photo.id === choosing : photo.is_primary;
+
+              return (
+                <li
+                  key={photo.id}
+                  className="w-[62%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`${bucketUrl}/${photo.storage_path}`}
-                    alt={photo.caption ?? "Photo of this place"}
-                    loading="lazy"
-                    className="aspect-square w-full object-cover"
-                  />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpenIndex(index)}
+                    className={`block w-full overflow-hidden rounded-xl transition ${
+                      isCover
+                        ? "border-2 border-sky-300"
+                        : "border-2 border-transparent"
+                    }`}
+                    aria-label={
+                      isCover
+                        ? "Cover photo — open full size"
+                        : "Open this photo"
+                    }
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`${bucketUrl}/${photo.storage_path}`}
+                      alt={photo.caption ?? "Photo of this place"}
+                      loading="lazy"
+                      className="aspect-square w-full object-cover"
+                    />
+                  </button>
 
-                {photo.is_primary && (
-                  <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-wide text-sky-600">
-                    Cover
-                  </p>
-                )}
+                  {isCover && (
+                    <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-wide text-sky-600">
+                      Cover
+                    </p>
+                  )}
 
-                {signedIn && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => pickReplacement(photo.id)}
-                      disabled={pending}
-                      className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Modify
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => remove(photo.id)}
-                      disabled={pending}
-                      className="min-h-9 flex-1 rounded-lg border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-
-                    {!photo.is_primary && (
+                  {signedIn && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
                       <button
                         type="button"
-                        onClick={() => makeCover(photo.id)}
+                        onClick={() => pickReplacement(photo.id)}
                         disabled={pending}
-                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                        className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                       >
-                        Set as cover
+                        Modify
                       </button>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
+
+                      <button
+                        type="button"
+                        onClick={() => remove(photo.id)}
+                        disabled={pending}
+                        className="min-h-9 flex-1 rounded-lg border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+
+                      {!isCover && (
+                        <button
+                          type="button"
+                          onClick={() => makeCover(photo.id)}
+                          disabled={pending}
+                          className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Set as cover
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
 
