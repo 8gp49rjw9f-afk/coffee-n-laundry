@@ -21,6 +21,7 @@ export default async function UpdatePlacePage({
     data: { user },
   } = await supabase.auth.getUser();
 
+  /* Rule 1 — nobody signed out writes anything. */
   if (!user) {
     redirect(`/login?next=/update/${placeId}`);
   }
@@ -33,8 +34,17 @@ export default async function UpdatePlacePage({
 
   const placeType = place.place_type as PlaceType;
 
+  /* Only the person who created the place may change its name, its
+     address, or where it sits. */
+  const isOwner = place.created_by === user.id;
+
   /* One edit per day, per type, per person. Checked here so the form
-   * is replaced by the reason rather than failing at the end. */
+   * is replaced by the reason rather than failing at the end.
+   *
+   * The creator is exempt: they are the one who knows the place, and
+   * the limit exists to stop strangers rewriting the same café over
+   * and over. The server applies the same exemption, so without this
+   * the form would block an edit the server would have accepted. */
   const today = new Date().toISOString().slice(0, 10);
 
   const { count: editsToday } = await supabase
@@ -45,7 +55,7 @@ export default async function UpdatePlacePage({
     .eq("update_day", today)
     .neq("update_type", "photo");
 
-  const canEdit = (editsToday ?? 0) === 0;
+  const canEdit = isOwner || (editsToday ?? 0) === 0;
 
   const blockedMessage =
     placeType === "coffee"
@@ -113,6 +123,7 @@ export default async function UpdatePlacePage({
           }}
           canEdit={canEdit}
           blockedMessage={blockedMessage}
+          isOwner={isOwner}
         />
       </section>
     </main>
