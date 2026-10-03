@@ -86,19 +86,19 @@ export function PlacePanel({
 
   return (
     <div>
-      {/* The cover photo is the place's face. A square, because the
-          photo was cropped as one — a 16:9 frame would trim away the
-          very part someone chose to show. */}
-      <div className="flex justify-center bg-slate-100 px-5 pt-5">
+      {/* The cover photo fills the top of the card, edge to edge. It is
+          already square (the upload crops it so), so it does not need
+          a square frame around it — the card's own width is the frame. */}
+      <div className="w-full overflow-hidden bg-slate-100">
         {place.primary_photo_path ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={`${bucketUrl}/${place.primary_photo_path}`}
             alt={place.name}
-            className="aspect-square w-full max-w-[200px] rounded-2xl border border-slate-200 object-cover shadow-sm"
+            className="aspect-square w-full object-cover"
           />
         ) : (
-          <div className="flex aspect-square w-full max-w-[200px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-5xl shadow-sm">
+          <div className="flex aspect-square w-full items-center justify-center bg-white text-6xl">
             {isCoffee ? "☕" : "🧺"}
           </div>
         )}
