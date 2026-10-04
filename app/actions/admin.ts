@@ -26,6 +26,16 @@ import { clearSettingsCache } from "@/lib/services/settings";
  * The form sends only what it shows. Each field is read with a
  * fallback to the value already in the row, so a form that covers
  * part of the settings can never blank out the rest.
+ *
+ * That fallback is why the list below and the list of fields on the
+ * form have to stay in step. A field the form sends but this function
+ * never reads is simply ignored; a field this function writes but the
+ * form never sends becomes its fallback — which for a number is 0.
+ *
+ * The three subscription values are read here, right after they were
+ * added to the form. Before that they had no reader and no writer:
+ * the pricing page showed a price that only the database's default
+ * seed had ever set.
  */
 
 export async function saveSettings(formData: FormData): Promise<void> {
@@ -51,7 +61,9 @@ export async function saveSettings(formData: FormData): Promise<void> {
     const raw = formData.get(key);
     const n = Number(raw);
 
-    return raw != null && Number.isFinite(n) ? n : fallback;
+    return raw != null && String(raw).trim() !== "" && Number.isFinite(n)
+      ? n
+      : fallback;
   };
 
   const bool = (key: string, fallback: boolean) => {
@@ -65,6 +77,19 @@ export async function saveSettings(formData: FormData): Promise<void> {
     .update({
       site_name: str("site_name", current.site_name),
       tagline: str("tagline", current.tagline),
+
+      /* Subscription. The threshold is what decides when a month is
+         free — it applies to what comes next, and a balance already
+         earned is never touched. */
+      subscription_price_usd: num(
+        "subscription_price_usd",
+        current.subscription_price_usd
+      ),
+      free_period_days: num("free_period_days", current.free_period_days),
+      credits_per_free_month: num(
+        "credits_per_free_month",
+        current.credits_per_free_month
+      ),
 
       maintenance_mode: bool("maintenance_mode", current.maintenance_mode),
       maintenance_message:
@@ -132,6 +157,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
 
   revalidatePath("/admin");
   revalidatePath("/");
+  revalidatePath("/pricing");
 }
 
 /* ---------- credit rules ---------- */
@@ -178,6 +204,11 @@ export async function saveCreditRule(formData: FormData): Promise<void> {
  *   flag    — the information is doubtful. The place stays on the
  *             map with a warning on it ('unverified').
  *   close   — the place is gone. It disappears from the map ('closed').
+ *
+ * Closing also takes back the credits the place paid. That is the
+ * half of the anti-farming rule that was missing: without it, adding
+ * ten invented places, letting two of them be confirmed by distracted
+ * strangers, and keeping the points was a profitable afternoon.
  */
 
 export async function resolveReport(formData: FormData): Promise<void> {
@@ -199,6 +230,17 @@ export async function resolveReport(formData: FormData): Promise<void> {
     if (error) {
       throw new Error(`Could not change the place: ${error.message}`);
     }
+  }
+
+  /* Taking the credits back, on a close. The ledger is append-only,
+     so this writes a negative row rather than deleting anything — the
+     history stays honest about what happened.
+
+     revokePlaceCredits finds the owner itself, from the award rows
+     already in the ledger, so nothing has to be passed in but the id
+     and a reason. */
+  if (outcome === "close") {
+    await revokePlaceCredits(placeId, "Place closed by an admin");
   }
 
   /* Every open report on this place closes together: leaving the rest
