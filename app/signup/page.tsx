@@ -9,6 +9,9 @@ const MESSAGES: Record<string, string> = {
   short: "Use at least 8 characters for your password.",
   failed: "Could not create that account. It may already exist.",
   closed: "Registrations are closed right now.",
+  username_shape:
+    "The username needs three to ten characters: letters, numbers, hyphen or underscore.",
+  username_taken: "That username is taken. Try another one.",
 };
 
 export default async function SignupPage({
@@ -20,6 +23,12 @@ export default async function SignupPage({
   const settings = await getSettings();
 
   const error = typeof query.error === "string" ? MESSAGES[query.error] : undefined;
+
+  /* A name that was rejected is handed back so the field is not empty
+     when the form reloads — retyping a username because it was taken
+     is a small insult. */
+  const keptUsername =
+    typeof query.username === "string" ? query.username : "";
 
   return (
     <main className="mx-auto max-w-md px-4 py-10 sm:px-8">
@@ -42,6 +51,16 @@ export default async function SignupPage({
               minLength={8}
               hint="At least 8 characters"
               required
+            />
+
+            <Input
+              label="Username"
+              name="username"
+              defaultValue={keptUsername}
+              autoComplete="off"
+              maxLength={10}
+              placeholder="simon"
+              hint="Three to ten characters, letters and numbers. This is what others see — your email stays private. You can leave it blank and pick one later."
             />
 
             {error && <ErrorBanner message={error} />}
