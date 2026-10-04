@@ -1,12 +1,7 @@
 import { redirect } from "next/navigation";
 
-/*
- * The brief and About were saying the same thing twice. The content
- * lives on /about now, and this keeps the old address working — it is
- * linked from the menu, from the README, and from links already
- * shared.
- */
+/* Kept for the same reason as /about: old links, and the README. */
 
 export default function BriefPage() {
-  redirect("/about");
+  redirect("/goal");
 }
