@@ -11,7 +11,9 @@ export type PriceKind =
   | "service"
   | "espresso"
   | "filter"
-  | "flat_white";
+  | "flat_white"
+  | "detergent";
+export type FoodKind = "full_meals" | "vegan" | "sandwich" | "pastries";
 export type PhotoType = "exterior" | "interior" | "machines" | "prices" | "detail";
 export type UpdateType =
   | "price"
@@ -115,6 +117,9 @@ export interface CoffeeDetails {
   has_coconut_milk: boolean | null;
   has_almond_milk: boolean | null;
   ambience: string[];
+
+  /* what it serves besides coffee: full_meals, vegan, sandwich, pastries */
+  food: string[];
 }
 
 export interface LaundryDetails {
