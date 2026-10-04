@@ -11,7 +11,9 @@ import { AMBIENCE, COFFEE_KINDS, FOOD } from "@/lib/coffee";
 
 import type { PlaceType } from "@/lib/types";
 
-const DURATIONS = [15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90];
+/* Duration steps of five minutes, from 5 to 90. A short cycle exists
+   and so does a long one; the old list started at 15 and skipped 55. */
+const DURATIONS = Array.from({ length: 18 }, (_, i) => (i + 1) * 5);
 
 const ENTRY_TIMES = Array.from({ length: 48 }, (_, i) => {
   const minutes = i * 30;
