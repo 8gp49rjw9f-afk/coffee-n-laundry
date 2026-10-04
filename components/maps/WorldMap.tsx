@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  CircleMarker,
+  useMap,
+} from "react-leaflet";
 
 import "leaflet/dist/leaflet.css";
 
@@ -23,9 +29,7 @@ export interface MePoint {
 /*
  * Anything that calls useMap() has to be a CHILD of MapContainer.
  * React-Leaflet provides the map through context, and context only
- * flows downwards — a sibling of the container never sees it. That
- * is why MapState lives inside TheMap below, and why there is one
- * copy per breakpoint rather than one shared above them.
+ * flows downwards — a sibling of the container never sees it.
  */
 
 function MapState({
@@ -75,11 +79,16 @@ function FlyToSelected({ place }: { place: PlaceWithFreshness | null }) {
  * flyTo — not changing a prop.
  *
  * `request` is a counter, not the point: pressing the button twice
- * with the same coordinates has to fly twice. A point alone would be
- * an unchanged prop and React would do nothing the second time.
+ * with the same coordinates has to fly twice.
  */
 
-function FlyToMe({ target, request }: { target: MePoint | null; request: number }) {
+function FlyToMe({
+  target,
+  request,
+}: {
+  target: MePoint | null;
+  request: number;
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -92,14 +101,14 @@ function FlyToMe({ target, request }: { target: MePoint | null; request: number 
 }
 
 /*
- * The map. World bounds are enforced, and pins are budgeted by zoom so
- * the whole world stays readable when zoomed out.
+ * The map. Two MapContainers, one per breakpoint: React cannot mount
+ * the same element in two places, so a shared instance would
+ * initialise inside whichever one was hidden — Leaflet renders into a
+ * 0px box and the visible map stays grey.
  *
- * Two separate MapContainers, one per breakpoint: React cannot mount
- * the same element in two places, so a single instance shared between
- * the mobile and desktop containers would initialise inside whichever
- * one was hidden — Leaflet renders into a 0px box and the visible map
- * stays grey.
+ * `breakpoint` decides which controls belong to this instance. Without
+ * it both copies render their own button and badge, and both are in
+ * the DOM at once — which is why "Where am I?" appeared twice.
  */
 
 function TheMap({
@@ -109,6 +118,7 @@ function TheMap({
   me,
   request,
   locating,
+  breakpoint,
   onSelect,
   onWhereAmI,
   panelOpen,
@@ -121,12 +131,17 @@ function TheMap({
   me: MePoint | null;
   request: number;
   locating: boolean;
+  breakpoint: "phone" | "desktop";
   onSelect: (id: string) => void;
   onWhereAmI: () => void;
   panelOpen: boolean;
   onZoom: (z: number) => void;
   onBounds: (b: BoundsLike) => void;
 }) {
+  /* Each copy hides its controls at the breakpoint where its twin is
+     shown, so only one set is ever on screen. */
+  const ownBreakpoint = breakpoint === "phone" ? "md:hidden" : "hidden md:flex";
+
   return (
     /* The wrapper is relative so the overlays can sit over the map
        without being invalid children of MapContainer. */
@@ -162,6 +177,36 @@ function TheMap({
             eventHandlers={{ click: () => onSelect(place.id) }}
           />
         ))}
+
+        {/* Where you are, exactly: a dot with a soft ring around it, the
+            way every map app draws it. The ring says "somewhere around
+            here"; the dot says where. */}
+        {me && (
+          <>
+            <CircleMarker
+              center={[me.latitude, me.longitude]}
+              radius={22}
+              pathOptions={{
+                color: "#0ea5e9",
+                weight: 1,
+                opacity: 0.35,
+                fillColor: "#0ea5e9",
+                fillOpacity: 0.15,
+              }}
+            />
+
+            <CircleMarker
+              center={[me.latitude, me.longitude]}
+              radius={7}
+              pathOptions={{
+                color: "#ffffff",
+                weight: 3,
+                fillColor: "#0ea5e9",
+                fillOpacity: 1,
+              }}
+            />
+          </>
+        )}
       </MapContainer>
 
       {/* "Where am I" sits on the map rather than under it: it is a
@@ -171,14 +216,13 @@ function TheMap({
 
           z-[500] is deliberate: globals.css pins Leaflet's panes at
           400 with !important, so anything below that is drawn under
-          the tiles and disappears — present in the DOM, invisible on
-          screen. */}
+          the tiles and disappears. */}
       <button
         type="button"
         onClick={onWhereAmI}
         disabled={locating}
         aria-label="Zoom to where I am"
-        className="absolute bottom-3 left-3 z-[500] flex min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70"
+        className={`${ownBreakpoint} absolute bottom-3 left-3 z-[500] min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70`}
       >
         <span className="text-base">{locating ? "⏳" : "📍"}</span>
         <span className="hidden sm:inline">
@@ -186,18 +230,19 @@ function TheMap({
         </span>
       </button>
 
-      {/* Two different jobs, so two different badges: how many pins are
-          drawn, and where you are. They never overlap — one is bottom
-          right, the other top right. Both need the same z-[500] for the
-          same reason as the button above. */}
+      {/* How many pins are drawn — the counter for a zoomed-out view. */}
       {visible.length < places.length && (
-        <div className="pointer-events-none absolute bottom-3 right-3 z-[500] rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow">
+        <div
+          className={`${ownBreakpoint} pointer-events-none absolute bottom-3 right-3 z-[500] rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow`}
+        >
           {visible.length} of {places.length} pins · zoom in
         </div>
       )}
 
       {me && (
-        <div className="pointer-events-none absolute right-3 top-3 z-[500] rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-semibold text-white shadow">
+        <div
+          className={`${ownBreakpoint} pointer-events-none absolute right-3 top-3 z-[500] rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-semibold text-white shadow`}
+        >
           📍 you are here
         </div>
       )}
@@ -270,6 +315,7 @@ export default function WorldMap({
             me={me ?? null}
             request={request}
             locating={locating}
+            breakpoint="phone"
             onSelect={onSelect}
             onWhereAmI={whereAmI}
             panelOpen={panelOpen}
@@ -299,6 +345,7 @@ export default function WorldMap({
             me={me ?? null}
             request={request}
             locating={locating}
+            breakpoint="desktop"
             onSelect={onSelect}
             onWhereAmI={whereAmI}
             panelOpen={panelOpen}
