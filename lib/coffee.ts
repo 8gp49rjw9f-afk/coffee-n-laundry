@@ -25,3 +25,23 @@ export const COFFEE_KINDS = [
   { key: "barista", label: "Specialty / Barista" },
   { key: "both", label: "Both" },
 ] as const;
+
+/*
+ * What a coffee shop serves besides coffee. Four choices, deliberately
+ * coarse: the point is to answer "can I eat something here?", not to
+ * reproduce a menu that changes every week.
+ */
+export const FOOD = [
+  { key: "full_meals", label: "Full meals", emoji: "🍽️" },
+  { key: "vegan", label: "Vegan", emoji: "🌱" },
+  { key: "sandwich", label: "Sandwich", emoji: "🥪" },
+  { key: "pastries", label: "Pastries", emoji: "🥐" },
+] as const;
+
+export const FOOD_LABEL: Record<string, string> = Object.fromEntries(
+  FOOD.map((f) => [f.key, f.label])
+);
+
+export const FOOD_EMOJI: Record<string, string> = Object.fromEntries(
+  FOOD.map((f) => [f.key, f.emoji])
+);
