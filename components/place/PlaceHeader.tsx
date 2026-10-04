@@ -11,11 +11,13 @@ export function PlaceHeader({
   freshness,
   signedIn,
   confirmedThisWeek,
+  creatorName,
 }: {
   place: PlaceWithFreshness;
   freshness: Freshness;
   signedIn: boolean;
   confirmedThisWeek: boolean;
+  creatorName?: string | null;
 }) {
   const isCoffee = place.place_type === "coffee";
 
@@ -47,6 +49,15 @@ export function PlaceHeader({
           </p>
 
           <p className="mt-1 text-sm text-slate-600">📍 {where}</p>
+
+          {/* Who put this on the map. Shown as a username, never as an
+              email — the address is personal data and this line is
+              public. */}
+          {creatorName && (
+            <p className="mt-0.5 text-sm text-slate-500">
+              Added by @{creatorName}
+            </p>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
