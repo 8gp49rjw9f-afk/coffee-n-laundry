@@ -15,6 +15,11 @@ interface BoundsLike {
   contains: (point: [number, number]) => boolean;
 }
 
+export interface MePoint {
+  latitude: number;
+  longitude: number;
+}
+
 /*
  * Anything that calls useMap() has to be a CHILD of MapContainer.
  * React-Leaflet provides the map through context, and context only
@@ -65,26 +70,23 @@ function FlyToSelected({ place }: { place: PlaceWithFreshness | null }) {
 }
 
 /*
- * "Near me" asks two things at once: rank the places by distance, and
- * fly the map to where the person actually is. Ranking is done above;
- * this is the second half.
+ * Flying to the viewer's own position. The map only reads its `center`
+ * prop at creation, so recentring an already-mounted map means calling
+ * flyTo — not changing a prop.
  *
- * The map only reads its `center` prop at creation, so recentring an
- * already-mounted map means calling flyTo — not changing a prop.
+ * `request` is a counter, not the point: pressing the button twice
+ * with the same coordinates has to fly twice. A point alone would be
+ * an unchanged prop and React would do nothing the second time.
  */
 
-function FlyToMe({
-  target,
-}: {
-  target: { latitude: number; longitude: number } | null;
-}) {
+function FlyToMe({ target, request }: { target: MePoint | null; request: number }) {
   const map = useMap();
 
   useEffect(() => {
     if (!target) return;
 
-    map.flyTo([target.latitude, target.longitude], 12, { animate: true });
-  }, [map, target]);
+    map.flyTo([target.latitude, target.longitude], 14, { animate: true });
+  }, [map, target, request]);
 
   return null;
 }
@@ -105,7 +107,10 @@ function TheMap({
   visible,
   selected,
   me,
+  request,
+  locating,
   onSelect,
+  onWhereAmI,
   panelOpen,
   onZoom,
   onBounds,
@@ -113,15 +118,18 @@ function TheMap({
   places: PlaceWithFreshness[];
   visible: PlaceWithFreshness[];
   selected: PlaceWithFreshness | null;
-  me: { latitude: number; longitude: number } | null;
+  me: MePoint | null;
+  request: number;
+  locating: boolean;
   onSelect: (id: string) => void;
+  onWhereAmI: () => void;
   panelOpen: boolean;
   onZoom: (z: number) => void;
   onBounds: (b: BoundsLike) => void;
 }) {
   return (
-    /* The wrapper is relative so the pin counter can sit over the map
-       without being an invalid child of MapContainer. */
+    /* The wrapper is relative so the overlays can sit over the map
+       without being invalid children of MapContainer. */
     <div className="relative h-full w-full">
       <MapContainer
         center={[20, 0]}
@@ -139,7 +147,7 @@ function TheMap({
         <MapState onZoom={onZoom} onBounds={onBounds} />
         <MapResizeFix trigger={panelOpen} />
         <FlyToSelected place={selected} />
-        <FlyToMe target={me} />
+        <FlyToMe target={me} request={request} />
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -155,6 +163,23 @@ function TheMap({
           />
         ))}
       </MapContainer>
+
+      {/* "Where am I" sits on the map rather than under it: it is a
+          thing you do TO the map, and your thumb already knows where
+          the map is. Bottom left, because the pin counter owns the
+          bottom right and the position badge owns the top right. */}
+      <button
+        type="button"
+        onClick={onWhereAmI}
+        disabled={locating}
+        aria-label="Zoom to where I am"
+        className="absolute bottom-3 left-3 z-10 flex min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70"
+      >
+        <span className="text-base">{locating ? "⏳" : "📍"}</span>
+        <span className="hidden sm:inline">
+          {locating ? "Locating…" : "Where am I?"}
+        </span>
+      </button>
 
       {/* Two different jobs, so two different badges: how many pins are
           drawn, and where you are. They never overlap — one is bottom
@@ -178,12 +203,18 @@ export default function WorldMap({
   places,
   selectedId,
   me,
+  request = 0,
+  locating = false,
+  onWhereAmI,
   onSelect,
   panel,
 }: {
   places: PlaceWithFreshness[];
   selectedId: string | null;
-  me?: { latitude: number; longitude: number } | null;
+  me?: MePoint | null;
+  request?: number;
+  locating?: boolean;
+  onWhereAmI?: () => void;
   onSelect: (id: string | null) => void;
   panel?: React.ReactNode;
 }) {
@@ -207,6 +238,10 @@ export default function WorldMap({
     return inBounds.slice(0, max);
   }, [places, zoom, bounds]);
 
+  /* Without a handler the button would do nothing, which is worse than
+     not being there. */
+  const whereAmI = onWhereAmI ?? (() => {});
+
   return (
     <>
       {/* ---------- phone: panel first, map below ---------- */}
@@ -227,7 +262,10 @@ export default function WorldMap({
             visible={visible}
             selected={selected}
             me={me ?? null}
+            request={request}
+            locating={locating}
             onSelect={onSelect}
+            onWhereAmI={whereAmI}
             panelOpen={panelOpen}
             onZoom={setZoom}
             onBounds={setBounds}
@@ -253,7 +291,10 @@ export default function WorldMap({
             visible={visible}
             selected={selected}
             me={me ?? null}
+            request={request}
+            locating={locating}
             onSelect={onSelect}
+            onWhereAmI={whereAmI}
             panelOpen={panelOpen}
             onZoom={setZoom}
             onBounds={setBounds}
