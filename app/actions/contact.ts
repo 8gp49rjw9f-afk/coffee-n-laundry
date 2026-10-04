@@ -3,9 +3,13 @@
 import { createClient } from "@/lib/supabase/server";
 
 /*
- * Contact, and report a bad listing. Both go to the admins' inbox as a
- * plain email through Resend — no queue, no table. If the key is not
- * configured the action says so instead of pretending it worked.
+ * Bug reports and messages, both sent to the admins as a plain email
+ * through Resend — no queue, no table.
+ *
+ * The subject opens with the kind, so an inbox sorts itself:
+ *
+ *   Bug : <first words of the message>
+ *   Reach Us : <first words of the message>
  *
  * The sender's address goes in `reply_to`, never in `from`: Resend
  * only sends from a domain you have verified, and a forged From would
@@ -17,11 +21,20 @@ export interface ContactResult {
   message?: string;
 }
 
-const SUBJECTS: Record<string, string> = {
-  bug: "Bug report",
+const PREFIX: Record<string, string> = {
+  bug: "Bug",
+  reach: "Reach Us",
   place: "Bad or fake place",
   other: "Message",
 };
+
+/* The first few words, so the subject says something. Enough to
+   recognise the message, short enough not to wrap in a list view. */
+function opening(message: string): string {
+  const firstLine = message.split("\n")[0].trim();
+
+  return firstLine.length > 60 ? `${firstLine.slice(0, 57)}…` : firstLine;
+}
 
 export async function sendContact(formData: FormData): Promise<ContactResult> {
   const kind = String(formData.get("kind") ?? "other");
@@ -50,29 +63,23 @@ export async function sendContact(formData: FormData): Promise<ContactResult> {
     };
   }
 
-  /* The admins are the recipients. Read with the visitor's own client:
-     a signed-out person sees nothing, so a message from them would
-     have nowhere to go — hence the fallback below. */
-  const supabase = await createClient();
-
-  const { data: admins } = await supabase
-    .from("admins")
-    .select("email")
-    .limit(20);
-
-  const recipients = (admins ?? [])
-    .map((row) => row.email)
-    .filter((value): value is string => Boolean(value));
+  /*
+   * The recipients are the admins, read with the service key when it
+   * is available. Through the visitor's own session it would return
+   * nothing: RLS reserves `admins` for admins, so a signed-out person
+   * could never send anything at all.
+   */
+  const recipients = await adminEmails();
 
   if (recipients.length === 0) {
     return {
       ok: false,
-      message:
-        "Could not find an admin address. Try again once you are signed in.",
+      message: "There is no admin address configured for this site yet.",
     };
   }
 
-  const subject = SUBJECTS[kind] ?? SUBJECTS.other;
+  const prefix = PREFIX[kind] ?? PREFIX.other;
+  const subject = `${prefix} : ${opening(message)}`;
 
   const body = [
     message,
@@ -113,4 +120,53 @@ export async function sendContact(formData: FormData): Promise<ContactResult> {
 
     return { ok: false, message: "Could not send that. Try again later." };
   }
+}
+
+/*
+ * Who the message goes to.
+ *
+ * A service key is the plain way to read a table RLS keeps closed,
+ * and it is what runs in production. Without one, the fallback is the
+ * visitor's own session — which only works for an admin testing the
+ * form, and returns nothing for everyone else. That is why the reply
+ * above names the missing configuration instead of staying silent.
+ */
+async function adminEmails(): Promise<string[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (url && serviceKey) {
+    try {
+      const response = await fetch(
+        `${url}/rest/v1/admins?select=email&limit=20`,
+        {
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          cache: "no-store",
+        }
+      );
+
+      if (response.ok) {
+        const rows = (await response.json()) as { email?: string }[];
+
+        return rows
+          .map((row) => row.email)
+          .filter((value): value is string => Boolean(value));
+      }
+
+      console.error("[adminEmails]", response.status, await response.text());
+    } catch (error) {
+      console.error("[adminEmails]", error);
+    }
+  }
+
+  const supabase = await createClient();
+
+  const { data } = await supabase.from("admins").select("email").limit(20);
+
+  return (data ?? [])
+    .map((row) => row.email)
+    .filter((value): value is string => Boolean(value));
 }
