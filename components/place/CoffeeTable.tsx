@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 
 import { Card } from "@/components/ui";
 
-import { FOOD_EMOJI, FOOD_LABEL } from "@/lib/coffee";
+import {
+  AMBIENCE_EMOJI,
+  AMBIENCE_LABEL,
+  FOOD_EMOJI,
+  FOOD_LABEL,
+} from "@/lib/coffee";
 
 import type { PriceHistoryRow } from "@/lib/database/places";
 
