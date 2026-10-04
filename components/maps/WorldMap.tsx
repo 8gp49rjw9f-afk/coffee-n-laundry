@@ -65,6 +65,31 @@ function FlyToSelected({ place }: { place: PlaceWithFreshness | null }) {
 }
 
 /*
+ * "Near me" asks two things at once: rank the places by distance, and
+ * fly the map to where the person actually is. Ranking is done above;
+ * this is the second half.
+ *
+ * The map only reads its `center` prop at creation, so recentring an
+ * already-mounted map means calling flyTo — not changing a prop.
+ */
+
+function FlyToMe({
+  target,
+}: {
+  target: { latitude: number; longitude: number } | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!target) return;
+
+    map.flyTo([target.latitude, target.longitude], 12, { animate: true });
+  }, [map, target]);
+
+  return null;
+}
+
+/*
  * The map. World bounds are enforced, and pins are budgeted by zoom so
  * the whole world stays readable when zoomed out.
  *
@@ -79,6 +104,7 @@ function TheMap({
   places,
   visible,
   selected,
+  me,
   onSelect,
   panelOpen,
   onZoom,
@@ -87,6 +113,7 @@ function TheMap({
   places: PlaceWithFreshness[];
   visible: PlaceWithFreshness[];
   selected: PlaceWithFreshness | null;
+  me: { latitude: number; longitude: number } | null;
   onSelect: (id: string) => void;
   panelOpen: boolean;
   onZoom: (z: number) => void;
@@ -112,6 +139,7 @@ function TheMap({
         <MapState onZoom={onZoom} onBounds={onBounds} />
         <MapResizeFix trigger={panelOpen} />
         <FlyToSelected place={selected} />
+        <FlyToMe target={me} />
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -128,9 +156,18 @@ function TheMap({
         ))}
       </MapContainer>
 
+      {/* Two different jobs, so two different badges: how many pins are
+          drawn, and where you are. They never overlap — one is bottom
+          right, the other top right. */}
       {visible.length < places.length && (
         <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow">
           {visible.length} of {places.length} pins · zoom in
+        </div>
+      )}
+
+      {me && (
+        <div className="pointer-events-none absolute right-3 top-3 z-10 rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-semibold text-white shadow">
+          📍 you are here
         </div>
       )}
     </div>
@@ -140,11 +177,13 @@ function TheMap({
 export default function WorldMap({
   places,
   selectedId,
+  me,
   onSelect,
   panel,
 }: {
   places: PlaceWithFreshness[];
   selectedId: string | null;
+  me?: { latitude: number; longitude: number } | null;
   onSelect: (id: string | null) => void;
   panel?: React.ReactNode;
 }) {
@@ -187,6 +226,7 @@ export default function WorldMap({
             places={places}
             visible={visible}
             selected={selected}
+            me={me ?? null}
             onSelect={onSelect}
             panelOpen={panelOpen}
             onZoom={setZoom}
@@ -212,6 +252,7 @@ export default function WorldMap({
             places={places}
             visible={visible}
             selected={selected}
+            me={me ?? null}
             onSelect={onSelect}
             panelOpen={panelOpen}
             onZoom={setZoom}
