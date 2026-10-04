@@ -76,6 +76,38 @@ function Toggle({
   );
 }
 
+/* The currency picker, above the amounts it applies to: you choose
+   what money you are about to write, then write it. */
+function CurrencyPicker({
+  value,
+  onChange,
+  selectClass,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  selectClass: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+        Currency
+      </span>
+
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={selectClass}
+      >
+        {CURRENCIES.map((c) => (
+          <option key={c.code} value={c.code}>
+            {c.country} — {c.code}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function UpdateForm({
   place,
   canEdit,
@@ -395,7 +427,15 @@ export function UpdateForm({
             ))}
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4">
+            <CurrencyPicker
+              value={currency}
+              onChange={setCurrency}
+              selectClass={selectClass}
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-slate-700">
                 Espresso
@@ -436,24 +476,6 @@ export function UpdateForm({
             </label>
           </div>
 
-          <label className="mt-3 block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Currency
-            </span>
-
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className={selectClass}
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.country} — {c.code}
-                </option>
-              ))}
-            </select>
-          </label>
-
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Toggle
               label="🫘 Beans for sale"
@@ -467,13 +489,9 @@ export function UpdateForm({
               onChange={setHasRoaster}
             />
 
-            <Toggle
-              label="🌙 Decaf"
-              value={hasDecaf}
-              onChange={setHasDecaf}
-            />
+            <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
             <Toggle label="🌾 Oat milk" value={hasOat} onChange={setHasOat} />
-            <Toggle label="🛫 Soy milk" value={hasSoy} onChange={setHasSoy} />
+            <Toggle label="🫛 Soy milk" value={hasSoy} onChange={setHasSoy} />
             <Toggle
               label="🥥 Coconut milk"
               value={hasCoconut}
@@ -551,7 +569,13 @@ export function UpdateForm({
             The machines
           </h2>
 
-          <div className="grid grid-cols-2 gap-2">
+          <CurrencyPicker
+            value={currency}
+            onChange={setCurrency}
+            selectClass={selectClass}
+          />
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-slate-700">
                 Wash
@@ -578,24 +602,6 @@ export function UpdateForm({
               />
             </label>
           </div>
-
-          <label className="mt-3 block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Currency
-            </span>
-
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className={selectClass}
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.country} — {c.code}
-                </option>
-              ))}
-            </select>
-          </label>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
             <label className="block">
