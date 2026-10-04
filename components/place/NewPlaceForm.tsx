@@ -8,7 +8,7 @@ import { LocationPicker } from "@/components/location/LocationPicker";
 import { SquareCrop } from "@/components/place/SquareCrop";
 
 import { matchesChain } from "@/lib/chainFlags";
-import { AMBIENCE, COFFEE_KINDS } from "@/lib/coffee";
+import { AMBIENCE, COFFEE_KINDS, FOOD } from "@/lib/coffee";
 
 import type { PlaceType } from "@/lib/types";
 
@@ -114,7 +114,13 @@ export function NewPlaceForm({
   currencyHint?: string;
   chainPatterns?: string[];
 }) {
-  const [step, setStep] = useState<"choose" | "form">("choose");
+  /*
+   * Three steps, not two. Between choosing Coffee or Laundry and
+   * filling the form, there is one thing worth saying: what this map
+   * keeps and what it refuses. A form that only warns AFTER someone
+   * has written everything is a form that wastes their time.
+   */
+  const [step, setStep] = useState<"choose" | "notice" | "form">("choose");
   const [type, setType] = useState<PlaceType | null>(null);
 
   /* ---------- essential ---------- */
@@ -147,12 +153,14 @@ export function NewPlaceForm({
   const [laptop, setLaptop] = useState(false);
 
   const [ambience, setAmbience] = useState<string[]>([]);
+  const [food, setFood] = useState<string[]>([]);
 
   /* ---------- optional: laundry ---------- */
 
   const [machineSizes, setMachineSizes] = useState<string[]>([]);
   const [detergentIncluded, setDetergentIncluded] = useState(false);
   const [detergentPurchasable, setDetergentPurchasable] = useState(false);
+  const [detergentPrice, setDetergentPrice] = useState("");
   const [open24h, setOpen24h] = useState(false);
   const [washMinutes, setWashMinutes] = useState("");
   const [dryerMinutes, setDryerMinutes] = useState("");
@@ -287,6 +295,7 @@ export function NewPlaceForm({
         formData.set("laptop_friendly", String(laptop));
 
         ambience.forEach((a) => formData.append("ambience", a));
+        food.forEach((f) => formData.append("food", f));
       }
 
       if (type === "laundry") {
@@ -294,6 +303,7 @@ export function NewPlaceForm({
         formData.set("dryer_amount", dryerAmount);
         formData.set("detergent_included", String(detergentIncluded));
         formData.set("detergent_purchasable", String(detergentPurchasable));
+        formData.set("detergent_price", detergentPrice);
         formData.set("open_24h", String(open24h));
         formData.set("wash_minutes", washMinutes);
         formData.set("dryer_minutes", dryerMinutes);
@@ -326,13 +336,16 @@ export function NewPlaceForm({
     );
   }
 
+  /* ---------- what this map keeps ---------- */
+
   if (step === "choose") {
     return (
       <div className="grid gap-3 sm:grid-cols-2">
         <button
+          type="button"
           onClick={() => {
             setType("coffee");
-            setStep("form");
+            setStep("notice");
           }}
           className="flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-white p-8 transition hover:border-[#6f4e37] hover:shadow-lg"
         >
@@ -344,9 +357,10 @@ export function NewPlaceForm({
         </button>
 
         <button
+          type="button"
           onClick={() => {
             setType("laundry");
-            setStep("form");
+            setStep("notice");
           }}
           className="flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-white p-8 transition hover:border-sky-600 hover:shadow-lg"
         >
@@ -356,6 +370,55 @@ export function NewPlaceForm({
             Somewhere to wash and dry
           </span>
         </button>
+      </div>
+    );
+  }
+
+  if (step === "notice") {
+    const isCoffee = type === "coffee";
+
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setStep("choose")}
+          className="text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Choose again
+        </button>
+
+        <Card>
+          <div className="text-center text-4xl">
+            {isCoffee ? "☕" : "🧺"}
+          </div>
+
+          <h2 className="mt-3 text-center text-lg font-bold text-slate-900">
+            {isCoffee ? "Coffee shops" : "Laundromats"}
+          </h2>
+
+          <p className="mt-3 text-center text-base leading-relaxed text-slate-700">
+            {isCoffee
+              ? "No big brands. Only a proper barista or a respected coffee shop."
+              : "Laundromats only. No dry cleaners or laundry services."}
+          </p>
+
+          {isCoffee && (
+            <p className="mt-2 text-center text-sm leading-relaxed text-slate-500">
+              Starbucks and Tim Hortons are not barista.
+            </p>
+          )}
+
+          <p className="mt-4 text-center text-xs text-slate-400">
+            If a place does not fit, it will be reported and taken off the map.
+          </p>
+
+          <Button
+            onClick={() => setStep("form")}
+            className="mt-5 w-full"
+          >
+            I accept
+          </Button>
+        </Card>
       </div>
     );
   }
@@ -466,7 +529,7 @@ export function NewPlaceForm({
                 value={washAmount}
                 onChange={(e) => setWashAmount(e.target.value)}
                 inputMode="decimal"
-                placeholder="4.00"
+                placeholder="8.00"
                 className={selectClass}
               />
             </label>
@@ -480,7 +543,7 @@ export function NewPlaceForm({
                 value={dryerAmount}
                 onChange={(e) => setDryerAmount(e.target.value)}
                 inputMode="decimal"
-                placeholder="2.00"
+                placeholder="1.00"
                 className={selectClass}
               />
             </label>
@@ -495,7 +558,7 @@ export function NewPlaceForm({
                 onChange={(e) =>
                   setCurrency(e.target.value.toUpperCase().slice(0, 3))
                 }
-                placeholder="EUR"
+                placeholder="SGD"
                 className={`${selectClass} uppercase`}
               />
             </label>
@@ -569,6 +632,37 @@ export function NewPlaceForm({
               className={`${selectClass} uppercase`}
             />
           </label>
+        </Card>
+      )}
+
+      {isCoffee && (
+        <Card>
+          <h3 className="mb-3 text-sm font-semibold text-slate-700">
+            Food
+          </h3>
+
+          <p className="mb-3 text-xs text-slate-500">
+            Only what you actually saw on the menu. Leaving all of it empty is
+            a fine answer — someone else can add it later.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {FOOD.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => toggleIn(food, setFood, option.key)}
+                aria-pressed={food.includes(option.key)}
+                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
+                  food.includes(option.key)
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-300 bg-white text-slate-700"
+                }`}
+              >
+                {option.emoji} {option.label}
+              </button>
+            ))}
+          </div>
         </Card>
       )}
 
@@ -789,6 +883,26 @@ export function NewPlaceForm({
               onChange={setDetergentPurchasable}
             />
           </div>
+
+          {detergentPurchasable && !detergentIncluded && (
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Detergent price
+              </span>
+
+              <input
+                value={detergentPrice}
+                onChange={(e) => setDetergentPrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="0.50"
+                className={selectClass}
+              />
+
+              <span className="mt-1 block text-xs text-slate-500">
+                In {currency || "the same currency as the wash"}.
+              </span>
+            </label>
+          )}
         </Card>
       )}
 
