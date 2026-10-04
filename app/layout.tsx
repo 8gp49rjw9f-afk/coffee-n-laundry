@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import HomeHeader from "@/components/home/HomeHeader";
+import SiteFooter from "@/components/home/SiteFooter";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,13 +37,17 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-slate-100">
-
         {/* GLOBAL HEADER — present on every page */}
 
         <HomeHeader />
 
         <div className="flex-1">{children}</div>
 
+        {/* GLOBAL FOOTER — the two ways to tell us something, plus
+            the parts of the site a visitor might not think to look
+            for in the hamburger menu. */}
+
+        <SiteFooter />
       </body>
     </html>
   );
