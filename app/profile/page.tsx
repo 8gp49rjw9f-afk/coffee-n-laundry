@@ -30,6 +30,28 @@ const ACTION_LABEL: Record<string, string> = {
   place_demoted: "Place removed — credits taken back",
 };
 
+/*
+ * `contributor_stats` is a view, and a view is not in the generated
+ * types — so Supabase answers with `any`, the property access is not
+ * checked, and the build fails on it. Declaring the shape here is not
+ * a workaround: it is the only place that says what this view is
+ * assumed to return. If the view changes, this is what breaks, which
+ * is where the change should surface.
+ */
+interface ContributorStats {
+  user_id: string;
+  places_added: number;
+  verified_places: number;
+  confirmations_made: number;
+}
+
+interface ProfileRow {
+  username: string | null;
+  username_changed_at: string | null;
+  is_founder: boolean | null;
+  founder_places: number | null;
+}
+
 export default async function ProfilePage() {
   const supabase = await createClient();
 
@@ -41,7 +63,7 @@ export default async function ProfilePage() {
     redirect("/login?next=/profile");
   }
 
-  const [summary, settings, myPlaces, subscription, profile, stats] =
+  const [summary, settings, myPlaces, subscription, profileResult, statsResult] =
     await Promise.all([
       getCreditSummary(user.id),
       getSettings(),
@@ -57,19 +79,23 @@ export default async function ProfilePage() {
       supabase
         .from("profiles")
         .select(
-          "username, username_changed_at, is_founder, founder_places, created_at"
+          "username, username_changed_at, is_founder, founder_places"
         )
         .eq("id", user.id)
         .maybeSingle(),
 
-      /* Counted in the database, not in the browser. Counting here
-         would download every contribution to display two numbers. */
+      /* Counted in the database, not in the browser. */
       supabase
         .from("contributor_stats")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle(),
     ]);
+
+  /* Cast to the declared shape. Without this the view's columns are
+     untyped and the property access below does not compile. */
+  const profile = profileResult.data as ProfileRow | null;
+  const stats = statsResult.data as ContributorStats | null;
 
   const status = subscription.data?.status ?? "free_trial";
   const canRedeem = summary.balance >= settings.credits_per_free_month;
@@ -91,7 +117,7 @@ export default async function ProfilePage() {
           {profile?.is_founder && (
             <div className="mt-2">
               <Badge className="bg-amber-100 text-amber-900">
-                🏅 Founder · {profile.founder_places} places verified
+                🏅 Founder · {profile.founder_places ?? 0} places verified
               </Badge>
             </div>
           )}
