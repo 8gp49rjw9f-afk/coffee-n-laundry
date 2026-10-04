@@ -47,6 +47,14 @@ export default function MapView({
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
 
+  /*
+   * Every press of "Where am I?" should fly, even when the position
+   * has not changed since the last one. A counter is what makes that
+   * a new event: the coordinates alone would be an unchanged prop and
+   * the map would sit still the second time.
+   */
+  const [flyRequest, setFlyRequest] = useState(0);
+
   const withDistance = useMemo(() => {
     if (!nearMe) return places;
 
@@ -72,15 +80,13 @@ export default function MapView({
   );
 
   /*
-   * Two things happen on one press: the list orders itself by distance,
-   * and the map flies to where you are. "Near me" that only sorted a
-   * list would leave the map showing the whole world, which is not what
-   * anyone means by the phrase.
-   *
-   * A refusal is worth showing. The browser asks for permission, and a
-   * person who taps no is left wondering why nothing moved.
+   * One geolocation call, two callers. "Near me" under the map wants
+   * the distance list as well; the button on the map wants only to
+   * move. Sharing the lookup keeps the permission prompt to one, and
+   * a refusal is worth showing — a person who taps no is left
+   * wondering why nothing moved.
    */
-  function locate() {
+  function locate(thenFly: boolean) {
     if (!navigator.geolocation) {
       setLocationError("This device cannot give us a position.");
       return;
@@ -96,6 +102,8 @@ export default function MapView({
           longitude: position.coords.longitude,
         });
         setLocating(false);
+
+        if (thenFly) setFlyRequest((current) => current + 1);
       },
       () => {
         setLocating(false);
@@ -117,6 +125,9 @@ export default function MapView({
         places={visible}
         selectedId={selectedId}
         me={nearMe}
+        request={flyRequest}
+        locating={locating}
+        onWhereAmI={() => locate(true)}
         onSelect={setSelectedId}
         panel={
           selected ? (
@@ -136,12 +147,13 @@ export default function MapView({
       />
 
       {/* "Near me" sits directly under the map: it belongs to what you
-          do with the map, not to the filters above it. */}
+          do with the map, not to the filters above it. It sorts the
+          list by distance; the map's own button just moves. */}
 
       <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
         <button
           type="button"
-          onClick={nearMe ? () => setNearMe(null) : locate}
+          onClick={nearMe ? () => setNearMe(null) : () => locate(false)}
           className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-5 font-semibold transition sm:w-auto ${
             nearMe
               ? "border-slate-900 bg-slate-900 text-white"
