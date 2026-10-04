@@ -9,6 +9,7 @@ import { SquareCrop } from "@/components/place/SquareCrop";
 
 import { matchesChain } from "@/lib/chainFlags";
 import { AMBIENCE, COFFEE_KINDS, FOOD } from "@/lib/coffee";
+import { CURRENCIES } from "@/lib/currencies";
 
 import type { PlaceType } from "@/lib/types";
 
@@ -29,7 +30,9 @@ const PHOTO_OPTIONS = {
 
 const MAX_INPUT_MB = 10;
 
-const DURATIONS = [15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90];
+/* Duration steps of five minutes, from 5 to 90. A short cycle exists
+   and so does a long one; the old list started at 15 and skipped 55. */
+const DURATIONS = Array.from({ length: 18 }, (_, i) => (i + 1) * 5);
 
 /* Half-hour steps across the whole day, so 22:30 is possible and
    00:00 is not a dead end. */
@@ -48,6 +51,7 @@ function clockTime(minutes: number) {
 
 const PAYMENT_KEYS = [
   { value: "cash", label: "💵 Cash" },
+  { value: "coins", label: "🪙 Coins" },
   { value: "card", label: "💳 Card" },
   { value: "visa", label: "💳 Visa" },
   { value: "mastercard", label: "💳 Mastercard" },
@@ -58,7 +62,6 @@ const PAYMENT_KEYS = [
   { value: "apple_pay", label: "🍎 Apple Pay" },
   { value: "google_pay", label: "🟢 Google Pay" },
   { value: "laundry_card", label: "🎟️ Laundry card" },
-  { value: "coins", label: "🪙 Coins" },
   { value: "other", label: "➖ Other" },
 ];
 
@@ -105,9 +108,42 @@ function Toggle({
   );
 }
 
+/* The currency picker, shared by both branches of the form. A code
+   typed by hand invites typos, and the price table stores exactly
+   three letters — the list is what keeps them honest. */
+function CurrencyPicker({
+  value,
+  onChange,
+  selectClass,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  selectClass: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+        Currency
+      </span>
+
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={selectClass}
+      >
+        {CURRENCIES.map((c) => (
+          <option key={c.code} value={c.code}>
+            {c.country} — {c.code}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function NewPlaceForm({
   submit,
-  currencyHint = "EUR",
+  currencyHint = "SGD",
   chainPatterns = [],
 }: {
   submit: (formData: FormData) => Promise<void>;
@@ -412,10 +448,7 @@ export function NewPlaceForm({
             If a place does not fit, it will be reported and taken off the map.
           </p>
 
-          <Button
-            onClick={() => setStep("form")}
-            className="mt-5 w-full"
-          >
+          <Button onClick={() => setStep("form")} className="mt-5 w-full">
             I accept
           </Button>
         </Card>
@@ -519,7 +552,7 @@ export function NewPlaceForm({
         <Card>
           <h3 className="mb-3 text-sm font-semibold text-slate-700">Prices</h3>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-slate-700">
                 Wash
@@ -547,21 +580,14 @@ export function NewPlaceForm({
                 className={selectClass}
               />
             </label>
+          </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Currency
-              </span>
-
-              <input
-                value={currency}
-                onChange={(e) =>
-                  setCurrency(e.target.value.toUpperCase().slice(0, 3))
-                }
-                placeholder="SGD"
-                className={`${selectClass} uppercase`}
-              />
-            </label>
+          <div className="mt-3">
+            <CurrencyPicker
+              value={currency}
+              onChange={setCurrency}
+              selectClass={selectClass}
+            />
           </div>
         </Card>
       )}
@@ -618,28 +644,19 @@ export function NewPlaceForm({
             </label>
           </div>
 
-          <label className="mt-3 block">
-            <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-              Currency for these prices
-            </span>
-
-            <input
+          <div className="mt-3">
+            <CurrencyPicker
               value={currency}
-              onChange={(e) =>
-                setCurrency(e.target.value.toUpperCase().slice(0, 3))
-              }
-              placeholder="EUR"
-              className={`${selectClass} uppercase`}
+              onChange={setCurrency}
+              selectClass={selectClass}
             />
-          </label>
+          </div>
         </Card>
       )}
 
       {isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
-            Food
-          </h3>
+          <h3 className="mb-3 text-sm font-semibold text-slate-700">Food</h3>
 
           <p className="mb-3 text-xs text-slate-500">
             Only what you actually saw on the menu. Leaving all of it empty is
@@ -687,7 +704,7 @@ export function NewPlaceForm({
 
             <Toggle label="🌾 Oat milk" value={hasOat} onChange={setHasOat} />
 
-            <Toggle label="🫛 Soy milk" value={hasSoy} onChange={setHasSoy} />
+            <Toggle label="🛫 Soy milk" value={hasSoy} onChange={setHasSoy} />
 
             <Toggle
               label="🥥 Coconut milk"
@@ -897,10 +914,6 @@ export function NewPlaceForm({
                 placeholder="0.50"
                 className={selectClass}
               />
-
-              <span className="mt-1 block text-xs text-slate-500">
-                In {currency || "the same currency as the wash"}.
-              </span>
             </label>
           )}
         </Card>
