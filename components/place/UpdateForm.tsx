@@ -8,6 +8,7 @@ import { IdentityBlock } from "@/components/place/IdentityBlock";
 import { updatePlace } from "@/app/actions/updatePlace";
 
 import { AMBIENCE, COFFEE_KINDS, FOOD } from "@/lib/coffee";
+import { CURRENCIES } from "@/lib/currencies";
 
 import type { PlaceType } from "@/lib/types";
 
@@ -132,7 +133,9 @@ export function UpdateForm({
   const priceOf = (kind: string) =>
     place.prices.find((p) => p.kind === kind)?.amount?.toString() ?? "";
 
-  const currency = place.prices[0]?.currency ?? "";
+  /* The currency comes from the place's own prices: a place with none
+     has no currency yet, and the picker opens on the site default. */
+  const [currency, setCurrency] = useState(place.prices[0]?.currency ?? "SGD");
 
   /* ---------- state, seeded from the place ---------- */
 
@@ -314,7 +317,7 @@ export function UpdateForm({
 
         <a
           href={`/place/${place.id}`}
-          className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-5 font-semibold text-slate-800 hover:bg-slate-50"
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 font-semibold text-slate-800 hover:bg-slate-50"
         >
           ← Back to {place.name}
         </a>
@@ -433,12 +436,23 @@ export function UpdateForm({
             </label>
           </div>
 
-          {currency && (
-            <p className="mt-2 text-xs text-slate-500">
-              Prices shown in {currency}. Someone else can correct the currency
-              later.
-            </p>
-          )}
+          <label className="mt-3 block">
+            <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Currency
+            </span>
+
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className={selectClass}
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.country} — {c.code}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Toggle
@@ -453,9 +467,13 @@ export function UpdateForm({
               onChange={setHasRoaster}
             />
 
-            <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
+            <Toggle
+              label="🌙 Decaf"
+              value={hasDecaf}
+              onChange={setHasDecaf}
+            />
             <Toggle label="🌾 Oat milk" value={hasOat} onChange={setHasOat} />
-            <Toggle label="🫛 Soy milk" value={hasSoy} onChange={setHasSoy} />
+            <Toggle label="🛫 Soy milk" value={hasSoy} onChange={setHasSoy} />
             <Toggle
               label="🥥 Coconut milk"
               value={hasCoconut}
@@ -533,7 +551,7 @@ export function UpdateForm({
             The machines
           </h2>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1.5 block text-sm font-semibold text-slate-700">
                 Wash
@@ -559,21 +577,25 @@ export function UpdateForm({
                 className={selectClass}
               />
             </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Total?
-              </span>
-
-              <input
-                value={
-                  Number(washAmount || 0) + Number(dryerAmount || 0) || ""
-                }
-                readOnly
-                className={`${selectClass} bg-slate-50 text-slate-500`}
-              />
-            </label>
           </div>
+
+          <label className="mt-3 block">
+            <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Currency
+            </span>
+
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className={selectClass}
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.country} — {c.code}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
             <label className="block">
@@ -776,7 +798,7 @@ export function UpdateForm({
         {pending ? "Saving…" : "Save changes"}
       </Button>
 
-      <p className="pb-6 text-center text-xs text-slate-400">
+      <p className="pb-6 text-center text-xs text-slate-600">
         Everything you correct is logged, with your name on it.
       </p>
     </div>
