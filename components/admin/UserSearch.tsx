@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 import { Card, Badge } from "@/components/ui";
 
@@ -13,76 +10,78 @@ import { searchUsers, type UserSearchRow } from "@/lib/database/users";
  * username — asking either one to translate into the other would make
  * this screen useless for half its purpose.
  *
- * The query waits for a pause rather than firing on every keystroke:
- * each one is a database round trip, and typing "simon" would spend
- * five of them to answer one question.
+ * THIS IS A SERVER COMPONENT, and that is not an accident.
+ *
+ * It was written as a client component first, and the build rejected
+ * it: searching reads `lib/database/users.ts`, which reads
+ * `lib/supabase/server.ts`, which needs next/headers — none of which
+ * a browser can have. Client-side search would have meant shipping a
+ * browser Supabase client and doing the query with the anon key, and
+ * the emails in the results cannot be fetched that way at all.
+ *
+ * So the term travels in the URL and the query runs on the server.
+ * Two things fall out of that which a client component could not
+ * give: the search is linkable (`/admin?tab=users&q=simon` can be
+ * sent to the other admin), and the field still works with
+ * JavaScript off — the results are already in the HTML.
  */
 
-export function UserSearch() {
-  const [term, setTerm] = useState("");
-  const [rows, setRows] = useState<UserSearchRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [touched, setTouched] = useState(false);
+export async function UserSearch({ term }: { term: string }) {
+  const clean = term.trim();
 
-  useEffect(() => {
-    const clean = term.trim();
+  /* One letter matches most of the table, which is a list, not an
+     answer. Below two characters the page stays quiet. */
+  const rows: UserSearchRow[] = clean.length >= 2 ? await searchUsers(clean) : [];
 
-    if (clean.length < 2) {
-      setRows([]);
-      setTouched(false);
-      return;
-    }
-
-    setLoading(true);
-
-    const timer = setTimeout(async () => {
-      const results = await searchUsers(clean);
-
-      setRows(results);
-      setLoading(false);
-      setTouched(true);
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [term]);
+  const searched = clean.length >= 2;
 
   return (
     <div className="space-y-3">
       <Card>
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Find a user
-          </span>
+        {/* A GET form: the browser puts the term in the query string
+            itself, so there is no state to keep in sync. */}
+        <form action="/admin" method="get" className="block">
+          <input type="hidden" name="tab" value="users" />
 
-          <input
-            value={term}
-            onChange={(event) => setTerm(event.target.value)}
-            placeholder="Username or email"
-            autoComplete="off"
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-slate-500"
-          />
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Find a user
+            </span>
 
-          <span className="mt-1 block text-xs text-slate-500">
-            Two letters or more. {loading && "Searching…"}
-          </span>
-        </label>
+            <input
+              name="q"
+              defaultValue={clean}
+              placeholder="Username or email"
+              autoComplete="off"
+              enterKeyHint="search"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-slate-500"
+            />
+
+            <span className="mt-1 block text-xs text-slate-500">
+              Two letters or more. Press enter to search.
+            </span>
+          </label>
+
+          <button
+            type="submit"
+            className="mt-3 min-h-11 w-full rounded-xl bg-slate-900 px-4 font-semibold text-white transition hover:bg-slate-800"
+          >
+            Search
+          </button>
+        </form>
       </Card>
 
-      {touched && rows.length === 0 && !loading && (
+      {searched && rows.length === 0 && (
         <Card>
           <p className="text-sm text-slate-500">
-            Nobody matches “{term.trim()}”.
+            Nobody matches “{clean}”.
           </p>
         </Card>
       )}
 
       {rows.map((row) => (
-        <Link
-          key={row.id}
-          href={`/admin/user/${row.id}`}
-          className="block"
-        >
-          <Card padding="sm" hover>
+        <Link key={row.id} href={`/admin/user/${row.id}`} className="block">
+          <Card padding="sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-slate-900">
