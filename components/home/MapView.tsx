@@ -45,6 +45,7 @@ export default function MapView({
     longitude: number;
   } | null>(null);
   const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
   const withDistance = useMemo(() => {
     if (!nearMe) return places;
@@ -70,10 +71,23 @@ export default function MapView({
     [visible, selectedId]
   );
 
+  /*
+   * Two things happen on one press: the list orders itself by distance,
+   * and the map flies to where you are. "Near me" that only sorted a
+   * list would leave the map showing the whole world, which is not what
+   * anyone means by the phrase.
+   *
+   * A refusal is worth showing. The browser asks for permission, and a
+   * person who taps no is left wondering why nothing moved.
+   */
   function locate() {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setLocationError("This device cannot give us a position.");
+      return;
+    }
 
     setLocating(true);
+    setLocationError("");
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -83,7 +97,12 @@ export default function MapView({
         });
         setLocating(false);
       },
-      () => setLocating(false),
+      () => {
+        setLocating(false);
+        setLocationError(
+          "Could not get your position. Check the browser's permission for this site."
+        );
+      },
       { enableHighAccuracy: true, timeout: 10_000 }
     );
   }
@@ -97,6 +116,7 @@ export default function MapView({
       <WorldMap
         places={visible}
         selectedId={selectedId}
+        me={nearMe}
         onSelect={setSelectedId}
         panel={
           selected ? (
@@ -135,6 +155,12 @@ export default function MapView({
               : "📍 Near me"}
         </button>
       </div>
+
+      {locationError && (
+        <p className="text-center text-sm font-medium text-rose-700">
+          {locationError}
+        </p>
+      )}
 
       <p className="text-center text-sm text-slate-500">
         {visible.length} {visible.length === 1 ? "place" : "places"} shown
