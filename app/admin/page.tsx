@@ -30,7 +30,7 @@ import type { AdminRow } from "@/components/admin/AdminsPanel";
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string }>;
 }) {
   const admin = await currentAdmin();
 
@@ -53,6 +53,10 @@ export default async function AdminPage({
   const active = tabs.some((t) => t.key === query.tab)
     ? (query.tab as string)
     : "settings";
+
+  /* The search term lives in the URL, which is what lets the field
+     work without JavaScript and lets a result page be shared. */
+  const term = typeof query.q === "string" ? query.q : "";
 
   const supabase = await createClient();
 
@@ -150,7 +154,7 @@ export default async function AdminPage({
 
       {active === "moderation" && <ReportsPanel groups={groups} />}
 
-      {active === "users" && <UserSearch />}
+      {active === "users" && <UserSearch term={term} />}
 
       {active === "admins" && master && (
         <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} self={admin.email} />
