@@ -24,6 +24,7 @@ type FieldKey =
   | "last_entry"
   | "detergent"
   | "detergent_purchase"
+  | "detergent_price"
   | "machines"
   | "wifi"
   | "power"
@@ -37,9 +38,11 @@ type FieldKey =
   | "beans"
   | "roaster_available"
   | "ambience"
+  | "food"
   | "oat_milk"
   | "soy_milk"
   | "coconut_milk"
+  | "almond_milk"
   | "decaf"
   | "laptop"
   | "payment_methods";
@@ -52,6 +55,10 @@ const AMBIENCE_VALUES = [
   "work-friendly",
   "outdoor-seating",
 ];
+
+/* The same four the form offers. A stray string must not reach the
+   column, which is why this list is checked rather than trusted. */
+const FOOD_VALUES = ["full_meals", "vegan", "sandwich", "pastries"];
 
 export async function createPlace(formData: FormData): Promise<void> {
   const supabase = await createClient();
@@ -129,6 +136,8 @@ export async function createPlace(formData: FormData): Promise<void> {
     AMBIENCE_VALUES.includes(value)
   );
 
+  const food = list("food").filter((value) => FOOD_VALUES.includes(value));
+
   const hasWifi = readBool(formData.get("has_wifi"));
   const hasPower = readBool(formData.get("has_power"));
   const hasParking = readBool(formData.get("has_parking"));
@@ -199,6 +208,15 @@ export async function createPlace(formData: FormData): Promise<void> {
     if (placeType === "laundry") {
       add("wash", formData.get("wash_amount"));
       add("dryer", formData.get("dryer_amount"));
+
+      /* Detergent is only priced when it is bought there and not
+         already part of the wash price. */
+      if (
+        readBool(formData.get("detergent_purchasable")) &&
+        !readBool(formData.get("detergent_included"))
+      ) {
+        add("detergent", formData.get("detergent_price"));
+      }
     } else {
       add("espresso", formData.get("espresso_price"));
       add("filter", formData.get("filter_price"));
@@ -223,29 +241,46 @@ export async function createPlace(formData: FormData): Promise<void> {
     const sellsBeans = readBool(formData.get("sells_beans"));
     const hasRoaster = readBool(formData.get("has_roaster"));
 
-    await supabase.from("place_coffee_details").insert({
-      place_id: place.id,
-      coffee_kind: kind,
-      roaster: roasterName || null,
-      sells_beans: sellsBeans,
-      has_roaster: hasRoaster || Boolean(roasterName),
-      has_decaf: readBool(formData.get("has_decaf")),
-      has_oat_milk: readBool(formData.get("has_oat_milk")),
-      has_soy_milk: readBool(formData.get("has_soy_milk")),
-      has_coconut_milk: readBool(formData.get("has_coconut_milk")),
-      laptop_friendly: readBool(formData.get("laptop_friendly")),
-      ambience,
-    });
+    const { error: coffeeError } = await supabase
+      .from("place_coffee_details")
+      .insert({
+        place_id: place.id,
+        coffee_kind: kind,
+        roaster: roasterName || null,
+        sells_beans: sellsBeans,
+        has_roaster: hasRoaster || Boolean(roasterName),
+        has_decaf: readBool(formData.get("has_decaf")),
+        has_oat_milk: readBool(formData.get("has_oat_milk")),
+        has_soy_milk: readBool(formData.get("has_soy_milk")),
+        has_coconut_milk: readBool(formData.get("has_coconut_milk")),
+        has_almond_milk: readBool(formData.get("has_almond_milk")),
+        laptop_friendly: readBool(formData.get("laptop_friendly")),
+        ambience,
+        food,
+      });
+
+    /* The place itself is saved; losing the details would leave a pin
+       with no coffee facts and no explanation. Say so. */
+    if (coffeeError) {
+      console.error("[createPlace] coffee details:", coffeeError.message);
+    }
   } else {
-    await supabase.from("place_laundry_details").insert({
-      place_id: place.id,
-      machine_sizes: machineSizes,
-      detergent_included: readBool(formData.get("detergent_included")),
-      detergent_purchasable: readBool(formData.get("detergent_purchasable")),
-      wash_minutes: numberOrNull(formData.get("wash_minutes")),
-      dryer_minutes: numberOrNull(formData.get("dryer_minutes")),
-      last_entry_minutes: numberOrNull(formData.get("last_entry_minutes")),
-    });
+    const { error: laundryError } = await supabase
+      .from("place_laundry_details")
+      .insert({
+        place_id: place.id,
+        machine_sizes: machineSizes,
+        detergent_included: readBool(formData.get("detergent_included")),
+        detergent_purchasable: readBool(formData.get("detergent_purchasable")),
+        open_24h: readBool(formData.get("open_24h")),
+        wash_minutes: numberOrNull(formData.get("wash_minutes")),
+        dryer_minutes: numberOrNull(formData.get("dryer_minutes")),
+        last_entry_minutes: numberOrNull(formData.get("last_entry_minutes")),
+      });
+
+    if (laundryError) {
+      console.error("[createPlace] laundry details:", laundryError.message);
+    }
   }
 
   /* ---------- photos ---------- */
@@ -321,10 +356,12 @@ export async function createPlace(formData: FormData): Promise<void> {
     }
 
     if (ambience.length > 0) push("ambience", ambience.join(", "));
+    if (food.length > 0) push("food", food.join(", "));
     if (readBool(formData.get("has_decaf"))) push("decaf", "yes");
     if (readBool(formData.get("has_oat_milk"))) push("oat_milk", "yes");
     if (readBool(formData.get("has_soy_milk"))) push("soy_milk", "yes");
     if (readBool(formData.get("has_coconut_milk"))) push("coconut_milk", "yes");
+    if (readBool(formData.get("has_almond_milk"))) push("almond_milk", "yes");
     if (readBool(formData.get("laptop_friendly"))) push("laptop", "yes");
   } else {
     const wash = formData.get("wash_amount");
@@ -352,6 +389,14 @@ export async function createPlace(formData: FormData): Promise<void> {
 
     if (readBool(formData.get("detergent_purchasable"))) {
       push("detergent_purchase", "yes");
+
+      const detergentPrice = String(
+        formData.get("detergent_price") ?? ""
+      ).trim();
+
+      if (detergentPrice && !readBool(formData.get("detergent_included"))) {
+        push("detergent_price", `${detergentPrice} ${currency}`.trim());
+      }
     }
   }
 
