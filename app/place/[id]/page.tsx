@@ -125,6 +125,7 @@ export default async function PlacePage({
         freshness={freshness}
         signedIn={Boolean(user)}
         confirmedThisWeek={confirmedThisWeek}
+        creatorName={place.creator_name}
       />
 
       <PhotoStrip
