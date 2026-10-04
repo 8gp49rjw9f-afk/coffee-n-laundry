@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 
 import { Card } from "@/components/ui";
 
-import { AMBIENCE_EMOJI, AMBIENCE_LABEL } from "@/lib/coffee";
+import { FOOD_EMOJI, FOOD_LABEL } from "@/lib/coffee";
 
 import type { PriceHistoryRow } from "@/lib/database/places";
 
@@ -27,6 +27,7 @@ export interface CoffeeFacts {
   has_coconut_milk: boolean | null;
   has_almond_milk: boolean | null;
   ambience: string[];
+  food: string[];
   laptop_friendly: boolean | null;
   has_wifi: boolean | null;
   has_power: boolean | null;
@@ -95,6 +96,17 @@ const ROWS: {
     label: "Flat white",
     emoji: "🥛",
     fallback: (p) => price(p, "flat_white"),
+  },
+  {
+    key: "food",
+    label: "Food",
+    emoji: "🍽️",
+    fallback: (p) =>
+      p.food && p.food.length > 0
+        ? p.food
+            .map((f) => `${FOOD_EMOJI[f] ?? ""} ${FOOD_LABEL[f] ?? f}`.trim())
+            .join(", ")
+        : null,
   },
   {
     key: "beans",
