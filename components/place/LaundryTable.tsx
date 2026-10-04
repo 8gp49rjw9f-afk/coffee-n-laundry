@@ -35,23 +35,21 @@ function price(p: LaundryFacts, kind: string) {
   return row ? `${row.amount} ${row.currency.toUpperCase()}` : null;
 }
 
-function yesNo(value: boolean | null) {
-  return value == null ? null : value ? "yes" : "no";
-}
+/*
+ * "8.00 SGD / 40 min" — one line, because the two facts are asked in
+ * one breath. Either half stands alone when the other is missing: a
+ * price without a duration still tells you something.
+ */
+function priceAndTime(
+  amount: string | null,
+  minutes: number | null
+): string | null {
+  const parts: string[] = [];
 
-/* Minutes from midnight → "22:00". Built by hand: toLocaleTimeString
-   differs between server and browser. */
-function clockTime(minutes: number | null) {
-  if (minutes == null) return null;
+  if (amount) parts.push(amount);
+  if (minutes != null) parts.push(`${minutes} min`);
 
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function duration(minutes: number | null) {
-  return minutes == null ? null : `~${minutes} min`;
+  return parts.length > 0 ? parts.join(" / ") : null;
 }
 
 const MONTHS = [
@@ -65,72 +63,95 @@ function formatDate(iso: string) {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
+/* Minutes from midnight → "22:00". Built by hand: toLocaleTimeString
+   differs between server and browser. */
+function clockTime(minutes: number | null) {
+  if (minutes == null) return null;
+
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/*
+ * Six rows, not eleven. The wash price and its duration are one
+ * question, and so are the dryer's — four rows became two. Detergent
+ * is one row now instead of two, because "included" and "what it
+ * costs" are the same fact told two ways.
+ */
 const ROWS: {
   key: string;
   label: string;
   emoji: string;
-  fallback: (place: LaundryFacts) => string | null;
+  produces: (place: LaundryFacts) => {
+    value: string | null;
+    /* A row may cover more than one verifiable field — the wash price
+       and the wash duration are stamped together. */
+    alsoKeys?: string[];
+  };
 }[] = [
-  { key: "wash_price", label: "Wash", emoji: "🧺", fallback: (p) => price(p, "wash") },
   {
-    key: "wash_minutes",
-    label: "Wash takes",
-    emoji: "⏱️",
-    fallback: (p) => duration(p.wash_minutes),
+    key: "payment",
+    label: "Payment",
+    emoji: "💳",
+    produces: () => ({ value: null }),
   },
-  { key: "dryer_price", label: "Dryer", emoji: "🔥", fallback: (p) => price(p, "dryer") },
   {
-    key: "dryer_minutes",
-    label: "Dryer takes",
-    emoji: "⏳",
-    fallback: (p) => duration(p.dryer_minutes),
+    key: "wash_price",
+    label: "Wash",
+    emoji: "🧺",
+    produces: (p) => ({
+      value: priceAndTime(price(p, "wash"), p.wash_minutes),
+      alsoKeys: ["wash_minutes"],
+    }),
+  },
+  {
+    key: "dryer_price",
+    label: "Dryer",
+    emoji: "🔥",
+    produces: (p) => ({
+      value: priceAndTime(price(p, "dryer"), p.dryer_minutes),
+      alsoKeys: ["dryer_minutes"],
+    }),
   },
   {
     key: "detergent",
     label: "Detergent",
     emoji: "🧼",
-    fallback: (p) =>
-      p.detergent_included == null
-        ? null
-        : p.detergent_included
-          ? "included"
-          : "not included",
-  },
-  {
-    key: "detergent_purchase",
-    label: "Buy detergent",
-    emoji: "🛒",
-    fallback: (p) =>
-      p.detergent_purchasable == null
-        ? null
-        : p.detergent_purchasable
-          ? "yes"
-          : "no",
+    produces: (p) => {
+      if (p.detergent_included) return { value: "included" };
+
+      const cost = price(p, "detergent");
+
+      if (cost) return { value: cost, alsoKeys: ["detergent_price"] };
+
+      if (p.detergent_purchasable) return { value: "for sale" };
+
+      return { value: "not included" };
+    },
   },
   {
     key: "machines",
     label: "Machines",
     emoji: "📏",
-    fallback: (p) =>
-      p.machine_sizes.length > 0 ? p.machine_sizes.join(", ") : null,
-  },
-  {
-    key: "open_24h",
-    label: "Open 24 hours",
-    emoji: "🕛",
-    fallback: (p) => (p.open_24h ? "yes" : null),
+    produces: (p) => ({
+      value: p.machine_sizes.length > 0 ? p.machine_sizes.join(", ") : null,
+    }),
   },
   {
     key: "last_entry",
     label: "Last entry",
     emoji: "🔒",
-    fallback: (p) => (p.open_24h ? null : clockTime(p.last_entry_minutes)),
+    produces: (p) => ({
+      value: p.open_24h ? "24 hours" : clockTime(p.last_entry_minutes),
+    }),
   },
   {
     key: "amenities",
     label: "Others",
     emoji: "•",
-    fallback: (p) => {
+    produces: (p) => {
       /* Icons only, and only the ones that are there. */
       const icons: string[] = [];
 
@@ -140,7 +161,7 @@ const ROWS: {
       if (p.has_parking) icons.push("🅿️");
       if (p.has_toilets) icons.push("🚻");
 
-      return icons.length > 0 ? icons.join("  ") : null;
+      return { value: icons.length > 0 ? icons.join("  ") : null };
     },
   },
 ];
@@ -193,12 +214,13 @@ export function LaundryTable({
 
       <ul className="divide-y divide-slate-100">
         {ROWS.map((row) => {
+          const { value, alsoKeys = [] } = row.produces(facts);
+
+          if (!value) return null;
+
           const check = byField.get(row.key);
-          const value = check?.value_snapshot ?? row.fallback(facts);
           const already = doneThisWeek.includes(row.key);
           const history = historyFor(row.key);
-
-          if (!value && !check) return null;
 
           return (
             <li
@@ -212,7 +234,7 @@ export function LaundryTable({
 
               <span className="col-span-4 min-w-0">
                 <span className="block truncate text-sm font-bold text-slate-900">
-                  {value ?? "—"}
+                  {value}
                 </span>
 
                 {history?.old_value && history.old_value !== value && (
