@@ -150,6 +150,7 @@ export default async function PlacePage({
             has_coconut_milk: place.coffee?.has_coconut_milk ?? null,
             has_almond_milk: place.coffee?.has_almond_milk ?? null,
             ambience: place.coffee?.ambience ?? [],
+            food: place.coffee?.food ?? [],
             laptop_friendly: place.coffee?.laptop_friendly ?? null,
             has_wifi: place.has_wifi,
             has_power: place.has_power,
