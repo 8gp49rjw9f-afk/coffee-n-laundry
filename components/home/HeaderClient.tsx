@@ -51,11 +51,21 @@ export function Logo({
   );
 }
 
-const ALWAYS = [
+/*
+ * Three groups, divided by rules: where you go, what you can tell us,
+ * and who you are. The order matters — the map and adding a place come
+ * first because they are what the site is for.
+ */
+
+const GO_PLACES = [
   { href: "/new", label: "Add a place", emoji: "➕" },
   { href: "/", label: "Map", emoji: "🗺️" },
-  { href: "/about", label: "About", emoji: "📖" },
-  { href: "/brief", label: "The brief", emoji: "📄" },
+  { href: "/goal", label: "The goal", emoji: "🎯" },
+];
+
+const TALK_TO_US = [
+  { href: "/report-bug", label: "Report a bug", emoji: "🐞" },
+  { href: "/reach-us", label: "Reach us", emoji: "✉️" },
 ];
 
 /* Log out clears the session twice on purpose: the browser client
@@ -128,10 +138,26 @@ export default function HeaderClient({
   const item =
     "flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60";
 
-  /* The account block sits below a heavier rule, so the menu reads
-     as two groups: where you can go, and who you are. */
-
   const divider = "my-2 border-t border-slate-300";
+
+  const group = (label: string, links: typeof GO_PLACES) => (
+    <>
+      <p className="px-4 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+
+      {links.map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          onClick={() => setOpen(false)}
+          className={item}
+        >
+          {link.emoji} {link.label}
+        </Link>
+      ))}
+    </>
+  );
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
@@ -164,21 +190,12 @@ export default function HeaderClient({
             </button>
 
             {open && (
-              <div className="absolute right-0 top-full mt-1 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white py-2 shadow-lg">
-                <p className="px-4 pb-2 pt-1 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Menu
-                </p>
+              <div className="absolute right-0 top-full mt-1 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-2 shadow-lg">
+                {group("Menu", GO_PLACES)}
 
-                {ALWAYS.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setOpen(false)}
-                    className={item}
-                  >
-                    {link.emoji} {link.label}
-                  </Link>
-                ))}
+                <div className={divider} />
+
+                {group("Tell us", TALK_TO_US)}
 
                 <div className={divider} />
 
