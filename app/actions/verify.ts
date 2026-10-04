@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
-import { awardCredits } from "@/lib/services/credits";
+import { awardCredits, awardPlaceCreditsOnce } from "@/lib/services/credits";
 
 /* Postgres refuses the second insert in the same week. Turn that into
    something a person can read. */
@@ -52,6 +52,11 @@ export async function verifyField(
     placeId,
   });
 
+  /* The person who added this place earns its credits now — but only
+     because somebody else has just confirmed it. That is the whole
+     defence against adding empty pins for the reward. */
+  await awardPlaceCreditsOnce(placeId, user.id);
+
   revalidatePath(`/place/${placeId}`);
 }
 
@@ -81,6 +86,8 @@ export async function confirmStillOpen(placeId: string): Promise<void> {
     action: "confirm_place",
     placeId,
   });
+
+  await awardPlaceCreditsOnce(placeId, user.id);
 
   revalidatePath(`/place/${placeId}`);
 }
