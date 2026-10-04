@@ -167,13 +167,18 @@ function TheMap({
       {/* "Where am I" sits on the map rather than under it: it is a
           thing you do TO the map, and your thumb already knows where
           the map is. Bottom left, because the pin counter owns the
-          bottom right and the position badge owns the top right. */}
+          bottom right and the position badge owns the top right.
+
+          z-[500] is deliberate: globals.css pins Leaflet's panes at
+          400 with !important, so anything below that is drawn under
+          the tiles and disappears — present in the DOM, invisible on
+          screen. */}
       <button
         type="button"
         onClick={onWhereAmI}
         disabled={locating}
         aria-label="Zoom to where I am"
-        className="absolute bottom-3 left-3 z-10 flex min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70"
+        className="absolute bottom-3 left-3 z-[500] flex min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70"
       >
         <span className="text-base">{locating ? "⏳" : "📍"}</span>
         <span className="hidden sm:inline">
@@ -183,15 +188,16 @@ function TheMap({
 
       {/* Two different jobs, so two different badges: how many pins are
           drawn, and where you are. They never overlap — one is bottom
-          right, the other top right. */}
+          right, the other top right. Both need the same z-[500] for the
+          same reason as the button above. */}
       {visible.length < places.length && (
-        <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow">
+        <div className="pointer-events-none absolute bottom-3 right-3 z-[500] rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow">
           {visible.length} of {places.length} pins · zoom in
         </div>
       )}
 
       {me && (
-        <div className="pointer-events-none absolute right-3 top-3 z-10 rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-semibold text-white shadow">
+        <div className="pointer-events-none absolute right-3 top-3 z-[500] rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-semibold text-white shadow">
           📍 you are here
         </div>
       )}
