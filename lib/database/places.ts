@@ -18,7 +18,7 @@ import type {
 const PHOTO_BUCKET = "place-photos";
 
 /*
- * Who added a place, named as a person rather than a UUID.
+ * Who did something, named as a person rather than a UUID.
  *
  * `places.created_by` holds an id, which means nothing to somebody
  * reading the page. The username is what they can recognise, search
@@ -28,23 +28,16 @@ const PHOTO_BUCKET = "place-photos";
  * under a place name is a leak. An account with no name yet reads as
  * "someone", which is honest and does no harm.
  */
- async function creatorNames(userIds: string[]): Promise<Map<string, string>> {
-  const unique = [...new Set(userIds.filter(Boolean))];
-
-  if (unique.length === 0) return new Map();
-
+async function displayNameFor(userId: string): Promise<string> {
   const supabase = await createClient();
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, username")
-    .in("id", unique);
+    .select("username")
+    .eq("id", userId)
+    .maybeSingle();
 
-  return new Map(
-    (data ?? [])
-      .filter((row) => row.username)
-      .map((row) => [row.id, row.username as string])
-  );
+  return data?.username ?? "someone";
 }
 
 export interface MapPlaces {
@@ -149,7 +142,7 @@ export async function getPlace(id: string): Promise<
      where it came from. */
   const owner = (place as { created_by?: string | null }).created_by;
 
-  const names = await creatorNames(owner ? [owner] : []);
+  const creatorName = owner ? await displayNameFor(owner) : null;
 
   const { data: publicUrl } = supabase.storage
     .from(PHOTO_BUCKET)
@@ -164,7 +157,7 @@ export async function getPlace(id: string): Promise<
     photo_bucket_url: publicUrl.publicUrl.replace(/\/$/, ""),
     recent_updates: updates.data ?? [],
     field_checks: (checks.data ?? []) as FieldCheckRow[],
-    creator_name: owner ? (names.get(owner) ?? null) : null,
+    creator_name: creatorName,
   };
 }
 
