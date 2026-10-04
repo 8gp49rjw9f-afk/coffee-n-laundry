@@ -7,7 +7,7 @@ import { IdentityBlock } from "@/components/place/IdentityBlock";
 
 import { updatePlace } from "@/app/actions/updatePlace";
 
-import { AMBIENCE, COFFEE_KINDS } from "@/lib/coffee";
+import { AMBIENCE, COFFEE_KINDS, FOOD } from "@/lib/coffee";
 
 import type { PlaceType } from "@/lib/types";
 
@@ -28,6 +28,7 @@ function clockTime(minutes: number) {
 
 const PAYMENT_KEYS = [
   { value: "cash", label: "💵 Cash" },
+  { value: "coins", label: "🪙 Coins" },
   { value: "card", label: "💳 Card" },
   { value: "visa", label: "💳 Visa" },
   { value: "mastercard", label: "💳 Mastercard" },
@@ -38,7 +39,6 @@ const PAYMENT_KEYS = [
   { value: "apple_pay", label: "🍎 Apple Pay" },
   { value: "google_pay", label: "🟢 Google Pay" },
   { value: "laundry_card", label: "🎟️ Laundry card" },
-  { value: "coins", label: "🪙 Coins" },
   { value: "other", label: "➖ Other" },
 ];
 
@@ -108,6 +108,7 @@ export function UpdateForm({
       has_almond_milk: boolean | null;
       laptop_friendly: boolean | null;
       ambience: string[];
+      food: string[];
     } | null;
     laundry: {
       machine_sizes: string[];
@@ -184,6 +185,8 @@ export function UpdateForm({
     place.coffee?.ambience ?? []
   );
 
+  const [food, setFood] = useState<string[]>(place.coffee?.food ?? []);
+
   /* laundry */
   const [washAmount, setWashAmount] = useState(priceOf("wash"));
   const [dryerAmount, setDryerAmount] = useState(priceOf("dryer"));
@@ -206,6 +209,7 @@ export function UpdateForm({
   const [detergentPurchasable, setDetergentPurchasable] = useState(
     Boolean(place.laundry?.detergent_purchasable)
   );
+  const [detergentPrice, setDetergentPrice] = useState(priceOf("detergent"));
 
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -224,8 +228,8 @@ export function UpdateForm({
     formData.set("description", description.trim());
     formData.set("comment", comment.trim());
 
-    /* The identity fields travel with the form only for the creator;
-       the server honours them on the same condition. */
+    /* The identity fields travel with the form either way; the server
+       honours them only for the creator. */
     if (isOwner) {
       formData.set("name", name.trim());
       formData.set("address", address.trim());
@@ -262,6 +266,7 @@ export function UpdateForm({
       formData.set("laptop_friendly", String(laptop));
 
       ambience.forEach((a) => formData.append("ambience", a));
+      food.forEach((f) => formData.append("food", f));
     } else {
       formData.set("wash_amount", washAmount);
       formData.set("dryer_amount", dryerAmount);
@@ -271,6 +276,10 @@ export function UpdateForm({
       formData.set("last_entry_minutes", open24h ? "" : lastEntry);
       formData.set("detergent_included", String(detergentIncluded));
       formData.set("detergent_purchasable", String(detergentPurchasable));
+      formData.set(
+        "detergent_price",
+        detergentIncluded ? "" : detergentPrice
+      );
     }
 
     startTransition(async () => {
@@ -493,6 +502,28 @@ export function UpdateForm({
               </button>
             ))}
           </div>
+
+          <div className="mt-4">
+            <p className="mb-2 text-sm font-semibold text-slate-700">Food</p>
+
+            <div className="flex flex-wrap gap-2">
+              {FOOD.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => toggleIn(food, setFood, option.key)}
+                  aria-pressed={food.includes(option.key)}
+                  className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
+                    food.includes(option.key)
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  {option.emoji} {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </Card>
       ) : (
         <Card>
@@ -617,6 +648,21 @@ export function UpdateForm({
               onChange={setDetergentPurchasable}
             />
           </div>
+
+          {detergentPurchasable && !detergentIncluded && (
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Detergent price
+              </span>
+
+              <input
+                value={detergentPrice}
+                onChange={(e) => setDetergentPrice(e.target.value)}
+                inputMode="decimal"
+                className={selectClass}
+              />
+            </label>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-2">
             {MACHINE_SIZES.map((option) => (
