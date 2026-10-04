@@ -11,14 +11,15 @@ import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { CreditRulesPanel } from "@/components/admin/CreditRulesPanel";
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { AdminsPanel } from "@/components/admin/AdminsPanel";
+import { UserSearch } from "@/components/admin/UserSearch";
 
 import type { CreditRuleRow } from "@/components/admin/CreditRulesPanel";
 import type { ReportGroup } from "@/components/admin/ReportsPanel";
 import type { AdminRow } from "@/components/admin/AdminsPanel";
 
 /*
- * Four sections, one page. They are all short, and an admin who has
- * to navigate between four routes to flip a switch will stop
+ * Five sections, one page. They are all short, and an admin who has
+ * to navigate between five routes to flip a switch will stop
  * bothering.
  *
  * Which tabs exist depends on the level: the Master tab appears only
@@ -45,6 +46,7 @@ export default async function AdminPage({
     { key: "settings", label: "Site", emoji: "⚙️" },
     { key: "rewards", label: "Rewards", emoji: "🏅" },
     { key: "moderation", label: "Moderation", emoji: "🚩" },
+    { key: "users", label: "Users", emoji: "👤" },
     ...(master ? [{ key: "admins", label: "Admins", emoji: "🔑" }] : []),
   ];
 
@@ -147,6 +149,8 @@ export default async function AdminPage({
       )}
 
       {active === "moderation" && <ReportsPanel groups={groups} />}
+
+      {active === "users" && <UserSearch />}
 
       {active === "admins" && master && (
         <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} self={admin.email} />
