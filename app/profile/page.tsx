@@ -9,6 +9,7 @@ import { getSettings } from "@/lib/services/settings";
 import { getPlacesByUser } from "@/lib/database/places";
 
 import { RedeemButton } from "@/components/profile/RedeemButton";
+import { UsernameForm } from "@/components/profile/UsernameForm";
 
 const STATUS_LABEL: Record<string, string> = {
   free_trial: "Free year",
@@ -26,6 +27,7 @@ const ACTION_LABEL: Record<string, string> = {
   confirm_place: "Confirmed a place",
   report_closed: "Reported a place closed",
   submit_update: "Submitted an update",
+  place_demoted: "Place removed — credits taken back",
 };
 
 export default async function ProfilePage() {
@@ -39,33 +41,74 @@ export default async function ProfilePage() {
     redirect("/login?next=/profile");
   }
 
-  const [summary, settings, myPlaces, subscription] = await Promise.all([
-    getCreditSummary(user.id),
-    getSettings(),
-    getPlacesByUser(user.id),
-    supabase
-      .from("subscriptions")
-      .select("status, current_period_end")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-  ]);
+  const [summary, settings, myPlaces, subscription, profile, stats] =
+    await Promise.all([
+      getCreditSummary(user.id),
+      getSettings(),
+      getPlacesByUser(user.id),
+      supabase
+        .from("subscriptions")
+        .select("status, current_period_end")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+
+      /* The username and Founder status live on the profile, which the
+         page never read before — it showed only credits and places. */
+      supabase
+        .from("profiles")
+        .select(
+          "username, username_changed_at, is_founder, founder_places, created_at"
+        )
+        .eq("id", user.id)
+        .maybeSingle(),
+
+      /* Counted in the database, not in the browser. Counting here
+         would download every contribution to display two numbers. */
+      supabase
+        .from("contributor_stats")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
 
   const status = subscription.data?.status ?? "free_trial";
   const canRedeem = summary.balance >= settings.credits_per_free_month;
 
+  const placesAdded = stats?.places_added ?? myPlaces.length;
+  const verifiedByOthers = stats?.verified_places ?? 0;
+
   return (
     <main className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-8">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Me</h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold text-slate-900">
+            @{profile?.username ?? "unnamed"}
+          </h1>
 
-          <p className="mt-1 text-sm text-slate-600">{user.email}</p>
+          {/* The address is shown to its owner, and only to its owner. */}
+          <p className="mt-1 truncate text-sm text-slate-600">{user.email}</p>
+
+          {profile?.is_founder && (
+            <div className="mt-2">
+              <Badge className="bg-amber-100 text-amber-900">
+                🏅 Founder · {profile.founder_places} places verified
+              </Badge>
+            </div>
+          )}
         </div>
 
-        <Link href="/signout" className="text-sm font-semibold text-slate-500 underline">
+        <Link
+          href="/signout"
+          className="shrink-0 text-sm font-semibold text-slate-500 underline"
+        >
           Sign out
         </Link>
       </div>
+
+      <UsernameForm
+        current={profile?.username ?? null}
+        changedAt={profile?.username_changed_at ?? null}
+      />
 
       <Card>
         <div className="flex items-center justify-between gap-4">
@@ -74,7 +117,9 @@ export default async function ProfilePage() {
               Your credits
             </p>
 
-            <p className="text-4xl font-bold text-slate-900">{summary.balance}</p>
+            <p className="text-4xl font-bold text-slate-900">
+              {summary.balance}
+            </p>
           </div>
 
           <Badge className="bg-slate-100 text-slate-700">
@@ -82,10 +127,39 @@ export default async function ProfilePage() {
           </Badge>
         </div>
 
+        <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-xl bg-slate-50 p-3">
+            <dt className="text-xs font-semibold uppercase text-slate-500">
+              Added
+            </dt>
+            <dd className="text-xl font-bold text-slate-900">{placesAdded}</dd>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-3">
+            <dt className="text-xs font-semibold uppercase text-slate-500">
+              Verified
+            </dt>
+            <dd className="text-xl font-bold text-slate-900">
+              {verifiedByOthers}
+            </dd>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-3">
+            <dt className="text-xs font-semibold uppercase text-slate-500">
+              Checks
+            </dt>
+            <dd className="text-xl font-bold text-slate-900">
+              {stats?.confirmations_made ?? 0}
+            </dd>
+          </div>
+        </dl>
+
         <p className="mt-3 text-sm text-slate-600">
           {settings.credits_per_free_month} credits = one free month. Credits
           are a thank-you for keeping the map accurate — there is no ranking,
-          and nobody else can see your balance.
+          and nobody else can see your balance. “Verified” counts your places
+          that someone else has confirmed, which is when the credit is
+          released to you.
         </p>
 
         <div className="mt-4">
