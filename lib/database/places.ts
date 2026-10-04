@@ -17,6 +17,36 @@ import type {
 
 const PHOTO_BUCKET = "place-photos";
 
+/*
+ * Who added a place, named as a person rather than a UUID.
+ *
+ * `places.created_by` holds an id, which means nothing to somebody
+ * reading the page. The username is what they can recognise, search
+ * for, and say out loud — and it is public, so this is safe to show.
+ *
+ * The email is deliberately not the fallback: an address printed
+ * under a place name is a leak. An account with no name yet reads as
+ * "someone", which is honest and does no harm.
+ */
+ async function creatorNames(userIds: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(userIds.filter(Boolean))];
+
+  if (unique.length === 0) return new Map();
+
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, username")
+    .in("id", unique);
+
+  return new Map(
+    (data ?? [])
+      .filter((row) => row.username)
+      .map((row) => [row.id, row.username as string])
+  );
+}
+
 export interface MapPlaces {
   places: PlaceWithFreshness[];
   bucketUrl: string;
@@ -66,6 +96,7 @@ export async function getPlace(id: string): Promise<
       photo_bucket_url: string;
       recent_updates: unknown[];
       field_checks: FieldCheckRow[];
+      creator_name: string | null;
     })
   | null
 > {
@@ -114,6 +145,12 @@ export async function getPlace(id: string): Promise<
       .limit(12),
   ]);
 
+  /* Resolved here, so the page renders a name and never has to know
+     where it came from. */
+  const owner = (place as { created_by?: string | null }).created_by;
+
+  const names = await creatorNames(owner ? [owner] : []);
+
   const { data: publicUrl } = supabase.storage
     .from(PHOTO_BUCKET)
     .getPublicUrl("");
@@ -127,6 +164,7 @@ export async function getPlace(id: string): Promise<
     photo_bucket_url: publicUrl.publicUrl.replace(/\/$/, ""),
     recent_updates: updates.data ?? [],
     field_checks: (checks.data ?? []) as FieldCheckRow[],
+    creator_name: owner ? (names.get(owner) ?? null) : null,
   };
 }
 
