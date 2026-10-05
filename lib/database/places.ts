@@ -28,7 +28,7 @@ const PHOTO_BUCKET = "place-photos";
  * under a place name is a leak. An account with no name yet reads as
  * "someone", which is honest and does no harm.
  */
-async function displayNameFor(userId: string): Promise<string> {
+export async function displayNameFor(userId: string): Promise<string> {
   const supabase = await createClient();
 
   const { data } = await supabase
