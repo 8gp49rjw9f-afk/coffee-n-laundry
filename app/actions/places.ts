@@ -9,11 +9,20 @@ import { awardCredits } from "@/lib/services/credits";
 import { reverseGeocode } from "@/lib/services/geocoding";
 import { uploadPlacePhoto } from "@/lib/services/upload";
 
+import { displayNameFor } from "@/lib/database/places";
+
 import type { PlaceType } from "@/lib/types";
 
 /*
  * Which field each answer belongs to, so every filled-in value gets
  * its own "verified by" row in the table below it.
+ *
+ * This list and the `place_field` enum in the database have to agree.
+ * They did not: `food` and `detergent_price` were written here for
+ * months while the enum had never heard of them, and because the
+ * insert below had no error handling, ticking a single Food option
+ * took the whole action down with an opaque production error.
+ * Migration 0014 added the two missing values.
  */
 
 type FieldKey =
@@ -170,8 +179,12 @@ export async function createPlace(formData: FormData): Promise<void> {
     .select("id")
     .single();
 
+  /* This one is fatal, and says so. A place that was not saved has
+     nothing to redirect to, and the person needs to know why. */
   if (error || !place) {
-    throw new Error("Could not save that place.");
+    throw new Error(
+      error ? `Could not save that place: ${error.message}` : "Could not save that place."
+    );
   }
 
   /* ---------- prices, for either type ---------- */
@@ -224,7 +237,15 @@ export async function createPlace(formData: FormData): Promise<void> {
     }
 
     if (priceRows.length > 0) {
-      await supabase.from("place_prices").insert(priceRows);
+      const { error: priceError } = await supabase
+        .from("place_prices")
+        .insert(priceRows);
+
+      /* The place is real and saved; losing its prices would leave it
+         silently useless to the person who drives there. */
+      if (priceError) {
+        console.error("[createPlace] prices:", priceError.message);
+      }
     }
   }
 
@@ -259,10 +280,19 @@ export async function createPlace(formData: FormData): Promise<void> {
         food,
       });
 
-    /* The place itself is saved; losing the details would leave a pin
-       with no coffee facts and no explanation. Say so. */
+    /*
+     * This used to be a console.error and nothing else.
+     *
+     * That is how the missing `food` enum value stayed invisible for
+     * months: the coffee row failed, the action carried on, and the
+     * page came up without the coffee facts that were just typed in.
+     * A place with no details and no explanation is worse than an
+     * error message, so this now stops and says what went wrong.
+     */
     if (coffeeError) {
-      console.error("[createPlace] coffee details:", coffeeError.message);
+      throw new Error(
+        `Saved the place, but its coffee details were refused: ${coffeeError.message}`
+      );
     }
   } else {
     const { error: laundryError } = await supabase
@@ -279,7 +309,9 @@ export async function createPlace(formData: FormData): Promise<void> {
       });
 
     if (laundryError) {
-      console.error("[createPlace] laundry details:", laundryError.message);
+      throw new Error(
+        `Saved the place, but its laundry details were refused: ${laundryError.message}`
+      );
     }
   }
 
@@ -315,7 +347,18 @@ export async function createPlace(formData: FormData): Promise<void> {
 
   /* ---------- who verified what ---------- */
 
-  const displayName = (user.email ?? "").split("@")[0] || "someone";
+  /*
+   * The username, not the part of the email before the @.
+   *
+   * `user.email.split("@")[0]` made `simon@gmail.com` and
+   * `simon@hotmail.fr` both read as "simon" on the page — two people
+   * wearing one name, and no way to tell which of them filled in a
+   * wrong price. The username is unique, so it names one person.
+   *
+   * The email is not a fallback: an address printed under a place's
+   * details is a leak. An account with no name yet reads as "someone".
+   */
+  const displayName = await displayNameFor(user.id);
 
   const checks: {
     place_id: string;
@@ -409,7 +452,24 @@ export async function createPlace(formData: FormData): Promise<void> {
   if (payments.length > 0) push("payment_methods", payments.join(", "));
 
   if (checks.length > 0) {
-    await supabase.from("place_field_checks").insert(checks);
+    const { error: checkError } = await supabase
+      .from("place_field_checks")
+      .insert(checks);
+
+    /*
+     * This is the line that used to be missing entirely, and it is
+     * why the `food` bug was so hard to find.
+     *
+     * The insert had no error handling at all. One value the database
+     * did not recognise in `field_key` took the whole action down, and
+     * Next.js reported it as an opaque digest. With this in place the
+     * next missing enum value names itself in the message.
+     */
+    if (checkError) {
+      throw new Error(
+        `Saved the place, but its verification rows were refused: ${checkError.message}`
+      );
+    }
   }
 
   /*
