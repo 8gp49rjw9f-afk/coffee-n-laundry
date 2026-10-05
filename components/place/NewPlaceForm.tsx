@@ -181,6 +181,7 @@ export function NewPlaceForm({
   const [hasRoaster, setHasRoaster] = useState(false);
   const [roasterName, setRoasterName] = useState("");
 
+  const [hasMilk, setHasMilk] = useState(false);
   const [hasOat, setHasOat] = useState(false);
   const [hasSoy, setHasSoy] = useState(false);
   const [hasCoconut, setHasCoconut] = useState(false);
@@ -323,6 +324,7 @@ export function NewPlaceForm({
         formData.set("has_roaster", String(hasRoaster));
         formData.set("roaster_name", roasterName.trim());
 
+        formData.set("has_milk", String(hasMilk));
         formData.set("has_oat_milk", String(hasOat));
         formData.set("has_soy_milk", String(hasSoy));
         formData.set("has_coconut_milk", String(hasCoconut));
@@ -702,9 +704,10 @@ export function NewPlaceForm({
               onChange={setHasRoaster}
             />
 
+            <Toggle label="🥛 Cow milk" value={hasMilk} onChange={setHasMilk} />
             <Toggle label="🌾 Oat milk" value={hasOat} onChange={setHasOat} />
 
-            <Toggle label="🛫 Soy milk" value={hasSoy} onChange={setHasSoy} />
+            <Toggle label="🫛 Soy milk" value={hasSoy} onChange={setHasSoy} />
 
             <Toggle
               label="🥥 Coconut milk"
