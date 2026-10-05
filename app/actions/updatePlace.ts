@@ -62,6 +62,7 @@ type FieldKey =
   | "roaster_available"
   | "ambience"
   | "food"
+  | "milk"
   | "oat_milk"
   | "soy_milk"
   | "coconut_milk"
@@ -111,6 +112,7 @@ const UPDATE_TYPE_FOR: Partial<Record<FieldKey, string>> = {
   roaster_available: "coffee",
   ambience: "coffee",
   food: "coffee",
+  milk: "coffee",
   oat_milk: "coffee",
   soy_milk: "coffee",
   coconut_milk: "coffee",
@@ -367,6 +369,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
       beans: Boolean(details.sells_beans),
       hasRoaster: Boolean(details.has_roaster),
       decaf: Boolean(details.has_decaf),
+      milk: Boolean(details.has_milk),
       oat: Boolean(details.has_oat_milk),
       soy: Boolean(details.has_soy_milk),
       coconut: Boolean(details.has_coconut_milk),
@@ -397,6 +400,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
     change("beans", before.beans ? "yes" : null, bool("sells_beans") ? "yes" : null);
     change("decaf", before.decaf ? "yes" : null, bool("has_decaf") ? "yes" : null);
+    change("milk", before.milk ? "yes" : null, bool("has_milk") ? "yes" : null);
     change("oat_milk", before.oat ? "yes" : null, bool("has_oat_milk") ? "yes" : null);
     change("soy_milk", before.soy ? "yes" : null, bool("has_soy_milk") ? "yes" : null);
     change(
@@ -444,6 +448,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
         sells_beans: bool("sells_beans"),
         has_roaster: hasRoaster,
         has_decaf: bool("has_decaf"),
+        has_milk: bool("has_milk"),
         has_oat_milk: bool("has_oat_milk"),
         has_soy_milk: bool("has_soy_milk"),
         has_coconut_milk: bool("has_coconut_milk"),
