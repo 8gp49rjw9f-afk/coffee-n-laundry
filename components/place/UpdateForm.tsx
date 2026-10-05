@@ -137,6 +137,7 @@ export function UpdateForm({
       sells_beans: boolean | null;
       has_roaster: boolean | null;
       has_decaf: boolean | null;
+      has_milk: boolean | null;
       has_oat_milk: boolean | null;
       has_soy_milk: boolean | null;
       has_coconut_milk: boolean | null;
@@ -208,6 +209,11 @@ export function UpdateForm({
   const [roasterName, setRoasterName] = useState(place.coffee?.roaster ?? "");
 
   const [hasDecaf, setHasDecaf] = useState(Boolean(place.coffee?.has_decaf));
+
+  /* Cow milk sits beside the alternatives, not above them: a caf� that
+     pours dairy and a caf� that pours oat are both worth knowing
+     about, and neither is the default assumption any more. */
+  const [hasMilk, setHasMilk] = useState(Boolean(place.coffee?.has_milk));
   const [hasOat, setHasOat] = useState(Boolean(place.coffee?.has_oat_milk));
   const [hasSoy, setHasSoy] = useState(Boolean(place.coffee?.has_soy_milk));
   const [hasCoconut, setHasCoconut] = useState(
@@ -296,6 +302,7 @@ export function UpdateForm({
       formData.set("roaster_name", roasterName.trim());
 
       formData.set("has_decaf", String(hasDecaf));
+      formData.set("has_milk", String(hasMilk));
       formData.set("has_oat_milk", String(hasOat));
       formData.set("has_soy_milk", String(hasSoy));
       formData.set("has_coconut_milk", String(hasCoconut));
@@ -490,6 +497,7 @@ export function UpdateForm({
             />
 
             <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
+            <Toggle label="🥛 Cow milk" value={hasMilk} onChange={setHasMilk} />
             <Toggle label="🌾 Oat milk" value={hasOat} onChange={setHasOat} />
             <Toggle label="🫛 Soy milk" value={hasSoy} onChange={setHasSoy} />
             <Toggle
