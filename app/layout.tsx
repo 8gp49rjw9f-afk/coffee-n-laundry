@@ -4,6 +4,7 @@ import "./globals.css";
 
 import HomeHeader from "@/components/home/HomeHeader";
 import SiteFooter from "@/components/home/SiteFooter";
+import ErrorPopup from "@/components/ui/ErrorPopup";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,6 +49,16 @@ export default function RootLayout({
             for in the hamburger menu. */}
 
         <SiteFooter />
+
+        {/* ONE POPUP FOR THE WHOLE SITE.
+
+            Mounted here and nowhere else, so every failure lands in
+            the same place and looks the same. Components do not
+            render it — they call showError(), because the thing that
+            failed is often a panel inside the map or a card that has
+            already unmounted, with nowhere to draw. */}
+
+        <ErrorPopup />
       </body>
     </html>
   );
