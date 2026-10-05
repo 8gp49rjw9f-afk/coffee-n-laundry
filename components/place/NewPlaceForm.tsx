@@ -978,11 +978,33 @@ export function NewPlaceForm({
         {photos.length > 0 && (
           <ul className="mt-3 space-y-1 text-sm text-slate-600">
             {photos.map((photo, index) => (
-              <li key={index} className="flex items-center justify-between gap-3">
+              <li
+                key={`${photo.name}-${photo.size}-${index}`}
+                className="flex items-center justify-between gap-3"
+              >
                 <span className="min-w-0 truncate">{photo.name}</span>
 
-                <span className="shrink-0 text-xs text-slate-400">
-                  {Math.round(photo.size / 1024)} KB
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-xs text-slate-400">
+                    {Math.round(photo.size / 1024)} KB
+                  </span>
+
+                  {/* Removing one before sending: the file list is state,
+                      so dropping the entry is enough — nothing was
+                      uploaded yet. Named per row for screen readers. */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPhotos((current) =>
+                        current.filter((_, i) => i !== index)
+                      )
+                    }
+                    aria-label={`Remove ${photo.name}`}
+                    title="Remove this photo"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-bold text-slate-500 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+                  >
+                    ✕
+                  </button>
                 </span>
               </li>
             ))}
