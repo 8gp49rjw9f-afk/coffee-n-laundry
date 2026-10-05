@@ -106,12 +106,28 @@ export interface CoffeeDetails {
   roaster: string | null;
   brew_methods: string[];
   has_decaf: boolean | null;
+
+  /*
+   * `has_plant_milk` has no writer and no reader — a leftover from
+   * before the milks were listed one by one. Kept rather than removed
+   * because dropping a column is a migration, and this one costs
+   * nothing sitting here. If it ever gets a writer, it should mean
+   * "any plant milk at all", which is a fair summary line.
+   */
   has_plant_milk: boolean | null;
+
   notes: string | null;
 
   laptop_friendly: boolean | null;
   sells_beans: boolean | null;
   has_roaster: boolean | null;
+
+  /*
+   * Cow milk, beside the alternatives — not above them. A café that
+   * pours dairy and a café that pours oat are both worth knowing
+   * about, and neither is the default assumption any more.
+   */
+  has_milk: boolean | null;
   has_oat_milk: boolean | null;
   has_soy_milk: boolean | null;
   has_coconut_milk: boolean | null;
