@@ -7,6 +7,16 @@ import type { PlaceWithFreshness, CoffeeDetails } from "@/lib/types";
 /* PHOTOS, UPDATES, CONFIRMATIONS — read side              */
 /* ====================================================== */
 
+/*
+ * These three used to end with a bare `throw error`, which put a raw
+ * Postgres string on the path to a screen. Each one now throws a code,
+ * so the error boundary can say something a person can read and the
+ * reference leads back to the line.
+ *
+ * The message is still logged, in the standard shape, because that is
+ * where a database string is actually useful.
+ */
+
 export async function getPlacePhotos(placeId: string) {
   const supabase = await createClient();
 
@@ -16,7 +26,11 @@ export async function getPlacePhotos(placeId: string) {
     .eq("place_id", placeId)
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    console.error("[getPlacePhotos]", error.message);
+
+    throw new Error("PAGE_PLACE_FAILED");
+  }
 
   return data ?? [];
 }
@@ -31,7 +45,11 @@ export async function getPlaceUpdates(placeId: string) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) throw error;
+  if (error) {
+    console.error("[getPlaceUpdates]", error.message);
+
+    throw new Error("PAGE_PLACE_FAILED");
+  }
 
   return data ?? [];
 }
@@ -46,7 +64,11 @@ export async function getPlaceConfirmations(placeId: string) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) throw error;
+  if (error) {
+    console.error("[getPlaceConfirmations]", error.message);
+
+    throw new Error("PAGE_PLACE_FAILED");
+  }
 
   return data ?? [];
 }
