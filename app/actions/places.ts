@@ -1,14 +1,11 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/services/settings";
-import { awardCredits } from "@/lib/services/credits";
 import { reverseGeocode } from "@/lib/services/geocoding";
 import { uploadPlacePhoto } from "@/lib/services/upload";
-
 import { displayNameFor } from "@/lib/database/places";
 
 import type { FieldKey } from "@/lib/fieldKeys";
@@ -19,6 +16,10 @@ import type { PlaceType } from "@/lib/types";
  * the database enum's writer expectations. The type used to be
  * declared here, in a second copy that could not be checked against
  * the first. Migration 0014 exists because those two copies drifted.
+ *
+ * Every failure below throws a CODE. The database message still goes
+ * to the logs beside it, where it belongs; it no longer reaches a
+ * screen.
  */
 
 const AMBIENCE_VALUES = [
@@ -58,22 +59,22 @@ export async function createPlace(formData: FormData): Promise<void> {
 
   /* ---------- validation ---------- */
 
-  if (!name) throw new Error("A name is required.");
+  if (!name) throw new Error("PLACE_NAME_REQUIRED");
 
   if (name.length > settings.max_name_length) {
-    throw new Error("That name is too long.");
+    throw new Error("PLACE_NAME_TOO_LONG");
   }
 
   if (description.length > settings.max_description_length) {
-    throw new Error("That description is too long.");
+    throw new Error("PLACE_DESCRIPTION_TOO_LONG");
   }
 
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    throw new Error("A position is required. Use the location picker.");
+    throw new Error("PLACE_POSITION_REQUIRED");
   }
 
   if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    throw new Error("Those coordinates are outside the map.");
+    throw new Error("PLACE_POSITION_INVALID");
   }
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -85,12 +86,19 @@ export async function createPlace(formData: FormData): Promise<void> {
     .gte("created_at", since);
 
   if ((recentCount ?? 0) >= settings.max_places_per_user_per_day) {
-    throw new Error(
-      "You have added a lot of places today. Try again tomorrow, or update an existing one."
-    );
+    throw new Error("PLACE_DAILY_LIMIT");
   }
 
+  /*
+   * The lookup may not answer — and when it does not, the place still
+   * goes on the map with no city and no country. The flag is logged so
+   * a run of failures is visible; nothing is said to the visitor,
+   * because an empty city is the normal shape of a place in the
+   * countryside and the two are not worth telling apart on screen.
+   */
   const geo = await reverseGeocode(latitude, longitude);
+
+  if (geo.failed) console.error("[createPlace] reverse geocode failed");
 
   /* ---------- what the form sent ---------- */
 
@@ -147,11 +155,9 @@ export async function createPlace(formData: FormData): Promise<void> {
   /* This one is fatal, and says so. A place that was not saved has
      nothing to redirect to, and the person needs to know why. */
   if (error || !place) {
-    throw new Error(
-      error
-        ? `Could not save that place: ${error.message}`
-        : "Could not save that place."
-    );
+    if (error) console.error("[createPlace] place", error.message);
+
+    throw new Error("PLACE_SAVE_FAILED");
   }
 
   /* ---------- prices, for either type ---------- */
@@ -209,9 +215,13 @@ export async function createPlace(formData: FormData): Promise<void> {
         .insert(priceRows);
 
       /* The place is real and saved; losing its prices would leave it
-         silently useless to the person who drives there. */
+         silently useless to the person who drives there. This is the
+         one failure here that WARNS rather than blocks, so the place
+         is kept and the visitor is told what was lost. */
       if (priceError) {
-        console.error("[createPlace] prices:", priceError.message);
+        console.error("[createPlace] prices", priceError.message);
+
+        throw new Error("PLACE_PRICES_REFUSED");
       }
     }
   }
@@ -248,19 +258,10 @@ export async function createPlace(formData: FormData): Promise<void> {
         food,
       });
 
-    /*
-     * This used to be a console.error and nothing else.
-     *
-     * That is how the missing `food` enum value stayed invisible for
-     * months: the coffee row failed, the action carried on, and the
-     * page came up without the coffee facts that were just typed in.
-     * A place with no details and no explanation is worse than an
-     * error message, so this now stops and says what went wrong.
-     */
     if (coffeeError) {
-      throw new Error(
-        `Saved the place, but its coffee details were refused: ${coffeeError.message}`
-      );
+      console.error("[createPlace] coffee", coffeeError.message);
+
+      throw new Error("PLACE_COFFEE_DETAILS_REFUSED");
     }
   } else {
     const { error: laundryError } = await supabase
@@ -277,9 +278,9 @@ export async function createPlace(formData: FormData): Promise<void> {
       });
 
     if (laundryError) {
-      throw new Error(
-        `Saved the place, but its laundry details were refused: ${laundryError.message}`
-      );
+      console.error("[createPlace] laundry", laundryError.message);
+
+      throw new Error("PLACE_LAUNDRY_DETAILS_REFUSED");
     }
   }
 
@@ -302,14 +303,10 @@ export async function createPlace(formData: FormData): Promise<void> {
         storage_path: storagePath,
         photo_type: "detail",
       });
-
-      await awardCredits({
-        userId: user.id,
-        action: "add_photo",
-        placeId: place.id,
-      });
-    } catch {
-      /* A failed photo must never lose the place itself. */
+    } catch (photoError) {
+      /* A failed photo must never lose the place itself. It is worth a
+         line in the logs, and worth a quiet word — but not a block. */
+      console.error("[createPlace] photo", photoError);
     }
   }
 
@@ -318,13 +315,10 @@ export async function createPlace(formData: FormData): Promise<void> {
   /*
    * The username, not the part of the email before the @.
    *
-   * `user.email.split("@")[0]` made `simon@gmail.com` and
-   * `simon@hotmail.fr` both read as "simon" on the page — two people
-   * wearing one name, and no way to tell which of them filled in a
-   * wrong price. The username is unique, so it names one person.
-   *
-   * The email is not a fallback: an address printed under a place's
-   * details is a leak. An account with no name yet reads as "someone".
+   * `simon@gmail.com` and `simon@hotmail.fr` both read as "simon" on
+   * the page — two people wearing one name, and no way to tell which
+   * of them filled in a wrong price. The username is unique, so it
+   * names exactly one person.
    */
   const displayName = await displayNameFor(user.id);
 
@@ -425,19 +419,10 @@ export async function createPlace(formData: FormData): Promise<void> {
       .from("place_field_checks")
       .insert(checks);
 
-    /*
-     * This is the line that used to be missing entirely, and it is
-     * why the `food` bug was so hard to find.
-     *
-     * The insert had no error handling at all. One value the database
-     * did not recognise in `field_key` took the whole action down, and
-     * Next.js reported it as an opaque digest. With this in place the
-     * next missing enum value names itself in the message.
-     */
     if (checkError) {
-      throw new Error(
-        `Saved the place, but its verification rows were refused: ${checkError.message}`
-      );
+      console.error("[createPlace] checks", checkError.message);
+
+      throw new Error("PLACE_CHECKS_REFUSED");
     }
   }
 
