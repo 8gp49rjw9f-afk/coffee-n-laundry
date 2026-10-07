@@ -12,21 +12,22 @@ import type { PlacePhoto } from "@/lib/types";
 /*
  * The strip is a client component, and a client component cannot tell
  * the difference between "the write failed" and "the render failed".
- * In production Next replaces both with the same opaque sentence:
- *
- *   An error occurred in the Server Components render.
+ * In production Next replaces both with the same opaque sentence.
  *
  * That is fine for a crash, and useless for a rejected write. So the
  * strip calls THESE instead: they swallow nothing, but they turn any
  * thrown error into a return value, which crosses the boundary as
  * data and arrives in the browser intact.
  *
- * Same actions underneath — this is a wrapper, not a second copy.
+ * The actions underneath now throw CODES, so what comes back in
+ * `message` is a code the popup can translate. A non-Error becomes the
+ * generic photo code rather than an English sentence. The type is
+ * named `code` for that reason — `message` invited callers to print it.
  */
 
 export interface PhotoResult {
   ok: boolean;
-  message?: string;
+  code?: string;
 }
 
 export async function removePhoto(
@@ -42,10 +43,10 @@ export async function removePhoto(
 
     return {
       ok: false,
-      message:
+      code:
         error instanceof Error && error.message
           ? error.message
-          : "Could not delete that photo.",
+          : "PHOTO_UPLOAD_FAILED",
     };
   }
 }
@@ -60,10 +61,10 @@ export async function changePhoto(formData: FormData): Promise<PhotoResult> {
 
     return {
       ok: false,
-      message:
+      code:
         error instanceof Error && error.message
           ? error.message
-          : "Could not change that photo.",
+          : "PHOTO_UPLOAD_FAILED",
     };
   }
 }
