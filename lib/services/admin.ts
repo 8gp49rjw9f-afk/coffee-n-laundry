@@ -12,6 +12,10 @@ import { createClient } from "@/lib/supabase/server";
  * The database enforces the same rule through RLS, so this is the
  * second lock rather than the only one — but it is the one that
  * produces a readable error instead of a silent zero-row write.
+ *
+ * Both throw a CODE, because these are the two failures an admin can
+ * hit by following a stale link, and the popup should be able to say
+ * what happened rather than pass on a sentence.
  */
 
 export interface AdminIdentity {
@@ -43,7 +47,7 @@ export async function requireAdmin(): Promise<AdminIdentity> {
   const admin = await currentAdmin();
 
   if (!admin) {
-    throw new Error("That page is for admins only.");
+    throw new Error("ADMIN_ONLY");
   }
 
   return admin;
@@ -74,7 +78,7 @@ export async function requireMaster(): Promise<AdminIdentity> {
   const admin = await requireAdmin();
 
   if (!(await isMaster())) {
-    throw new Error("Only the master account can change the admins.");
+    throw new Error("MASTER_ONLY");
   }
 
   return admin;
