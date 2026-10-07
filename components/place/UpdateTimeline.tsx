@@ -13,22 +13,44 @@ interface TimelineUpdate {
   created_at: string;
 }
 
-/* No comments, no likes: a plain record of what changed. */
+/*
+ * No comments, no likes: a plain record of what changed.
+ *
+ * Five rows, and the title says so. The count is real rather than
+ * fixed — a place with two updates reads "2 last updates", because
+ * "5 last updates" above two lines would be a lie about a place that
+ * has barely been touched.
+ *
+ * When there are more than five, the card says how many it is not
+ * showing. On a site whose whole point is telling you whether the
+ * information is current, silently truncating a history would hide
+ * exactly the thing someone came here to judge.
+ */
 
 export function UpdateTimeline({
   updates,
   confirmations,
   lastConfirmedAt,
+  total,
 }: {
   updates: TimelineUpdate[];
   confirmations: number;
   lastConfirmedAt: string | null;
+  /*
+   * How many updates exist in all. The list holds at most five; this
+   * is what lets the card say so rather than pretending the five it
+   * shows are the whole story. The place page already reads this for
+   * the line at the bottom, so it costs no extra query.
+   */
+  total: number;
 }) {
+  const hidden = Math.max(0, total - updates.length);
+
   return (
     <Card>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-          Recent updates
+          {total > 5 ? "5 last updates" : `${total} last updates`}
         </h2>
 
         {confirmations > 0 && (
@@ -84,6 +106,12 @@ export function UpdateTimeline({
             </li>
           ))}
         </ul>
+      )}
+
+      {hidden > 0 && (
+        <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-400">
+          {hidden} earlier {hidden === 1 ? "update" : "updates"} not shown.
+        </p>
       )}
     </Card>
   );
