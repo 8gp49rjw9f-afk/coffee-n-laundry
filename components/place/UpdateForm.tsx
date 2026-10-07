@@ -10,7 +10,11 @@ import { updatePlace } from "@/app/actions/updatePlace";
 import { AMBIENCE, COFFEE_KINDS, FOOD } from "@/lib/coffee";
 import { CURRENCIES } from "@/lib/currencies";
 
-import type { PlaceType } from "@/lib/types";
+import type {
+  CoffeeDetails,
+  LaundryDetails,
+  PlaceType,
+} from "@/lib/types";
 
 /* Duration steps of five minutes, from 5 to 90. A short cycle exists
    and so does a long one; the old list started at 15 and skipped 55. */
@@ -131,30 +135,19 @@ export function UpdateForm({
     has_parking: boolean | null;
     has_seating: boolean | null;
     has_toilets: boolean | null;
-    coffee: {
-      coffee_kind: string;
-      roaster: string | null;
-      sells_beans: boolean | null;
-      has_roaster: boolean | null;
-      has_decaf: boolean | null;
-      has_milk: boolean | null;
-      has_oat_milk: boolean | null;
-      has_soy_milk: boolean | null;
-      has_coconut_milk: boolean | null;
-      has_almond_milk: boolean | null;
-      laptop_friendly: boolean | null;
-      ambience: string[];
-      food: string[];
-    } | null;
-    laundry: {
-      machine_sizes: string[];
-      detergent_included: boolean | null;
-      detergent_purchasable: boolean | null;
-      open_24h: boolean;
-      wash_minutes: number | null;
-      dryer_minutes: number | null;
-      last_entry_minutes: number | null;
-    } | null;
+
+    /*
+     * The two detail rows come from lib/types.ts, NOT from a second
+     * copy written out here.
+     *
+     * This file used to spell out both shapes inline. The inline copy
+     * and the real interface disagreed the moment a column was added:
+     * `has_milk` existed in one and not the other, and the build failed
+     * on a type that had nothing to do with the change. One declaration,
+     * imported, is the only version that cannot drift.
+     */
+    coffee: CoffeeDetails | null;
+    laundry: LaundryDetails | null;
     prices: { kind: string; amount: number; currency: string }[];
   };
   canEdit: boolean;
@@ -210,8 +203,8 @@ export function UpdateForm({
 
   const [hasDecaf, setHasDecaf] = useState(Boolean(place.coffee?.has_decaf));
 
-  /* Cow milk sits beside the alternatives, not above them: a caf� that
-     pours dairy and a caf� that pours oat are both worth knowing
+  /* Cow milk sits beside the alternatives, not above them: a cafe that
+     pours dairy and a cafe that pours oat are both worth knowing
      about, and neither is the default assumption any more. */
   const [hasMilk, setHasMilk] = useState(Boolean(place.coffee?.has_milk));
   const [hasOat, setHasOat] = useState(Boolean(place.coffee?.has_oat_milk));
@@ -485,33 +478,33 @@ export function UpdateForm({
 
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Toggle
-              label="🫘 Beans for sale"
+              label="Beans for sale"
               value={sellsBeans}
               onChange={setSellsBeans}
             />
 
             <Toggle
-              label="🔥 Has a roaster"
+              label="Has a roaster"
               value={hasRoaster}
               onChange={setHasRoaster}
             />
 
-            <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
-            <Toggle label="🥛 Cow milk" value={hasMilk} onChange={setHasMilk} />
-            <Toggle label="🌾 Oat milk" value={hasOat} onChange={setHasOat} />
-            <Toggle label="🫛 Soy milk" value={hasSoy} onChange={setHasSoy} />
+            <Toggle label="Decaf" value={hasDecaf} onChange={setHasDecaf} />
+            <Toggle label="Cow milk" value={hasMilk} onChange={setHasMilk} />
+            <Toggle label="Oat milk" value={hasOat} onChange={setHasOat} />
+            <Toggle label="Soy milk" value={hasSoy} onChange={setHasSoy} />
             <Toggle
-              label="🥥 Coconut milk"
+              label="Coconut milk"
               value={hasCoconut}
               onChange={setHasCoconut}
             />
             <Toggle
-              label="🌰 Almond milk"
+              label="Almond milk"
               value={hasAlmond}
               onChange={setHasAlmond}
             />
             <Toggle
-              label="💻 Laptop-friendly"
+              label="Laptop-friendly"
               value={laptop}
               onChange={setLaptop}
             />
@@ -672,16 +665,16 @@ export function UpdateForm({
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Toggle label="🕛 Open 24h" value={open24h} onChange={setOpen24h} />
+            <Toggle label="Open 24h" value={open24h} onChange={setOpen24h} />
 
             <Toggle
-              label="🧴 Detergent included"
+              label="Detergent included"
               value={detergentIncluded}
               onChange={setDetergentIncluded}
             />
 
             <Toggle
-              label="🛒 Detergent for sale"
+              label="Detergent for sale"
               value={detergentPurchasable}
               onChange={setDetergentPurchasable}
             />
@@ -752,11 +745,11 @@ export function UpdateForm({
         </h2>
 
         <div className="grid grid-cols-2 gap-2">
-          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
-          <Toggle label="🔌 Power sockets" value={power} onChange={setPower} />
-          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
-          <Toggle label="🪑 Seating" value={seating} onChange={setSeating} />
-          <Toggle label="🚻 Toilets" value={toilets} onChange={setToilets} />
+          <Toggle label="Wi-Fi" value={wifi} onChange={setWifi} />
+          <Toggle label="Power sockets" value={power} onChange={setPower} />
+          <Toggle label="Parking" value={parking} onChange={setParking} />
+          <Toggle label="Seating" value={seating} onChange={setSeating} />
+          <Toggle label="Toilets" value={toilets} onChange={setToilets} />
         </div>
 
         <label className="mt-4 block">
@@ -793,7 +786,7 @@ export function UpdateForm({
 
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Leave a note <span className="font-normal text-slate-400">(optional)</span>
+            Leave a note
           </span>
 
           <textarea
