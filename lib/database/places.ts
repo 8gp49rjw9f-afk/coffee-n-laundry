@@ -125,7 +125,9 @@ export async function getPlace(id: string): Promise<
       )
       .eq("place_id", id)
       .order("created_at", { ascending: false })
-      .limit(20),
+      /* Five. The card says how many exist in all underneath, so a
+         long history is summarised rather than hidden. */
+      .limit(5),
 
     /* One row per field: who last verified it, and when. */
     supabase.from("place_latest_checks").select("*").eq("place_id", id),
