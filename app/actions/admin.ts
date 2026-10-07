@@ -19,6 +19,12 @@ import { revokePlaceCredits } from "@/lib/services/credits";
  *
  * The database repeats the check through RLS. Two locks, because the
  * cost of being wrong is an open admin panel.
+ *
+ * Every failure throws a CODE, never a sentence with a database
+ * message inside it. Six places here used to end with
+ * `\`...: ${error.message}\``, which put constraint names and table
+ * names in front of an admin. The raw text still goes to the logs;
+ * the code goes to the popup.
  */
 
 /* ---------- site settings ---------- */
@@ -32,11 +38,6 @@ import { revokePlaceCredits } from "@/lib/services/credits";
  * form have to stay in step. A field the form sends but this function
  * never reads is simply ignored; a field this function writes but the
  * form never sends becomes its fallback — which for a number is 0.
- *
- * The three subscription values are read here, right after they were
- * added to the form. Before that they had no reader and no writer:
- * the pricing page showed a price that only the database's default
- * seed had ever set.
  */
 
 export async function saveSettings(formData: FormData): Promise<void> {
@@ -50,7 +51,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
     .eq("id", 1)
     .maybeSingle();
 
-  if (!current) throw new Error("Site settings are missing.");
+  if (!current) throw new Error("ADMIN_SETTINGS_MISSING");
 
   const str = (key: string, fallback: string) => {
     const raw = formData.get(key);
@@ -149,7 +150,9 @@ export async function saveSettings(formData: FormData): Promise<void> {
     .eq("id", 1);
 
   if (error) {
-    throw new Error(`Could not save the settings: ${error.message}`);
+    console.error("[saveSettings]", error.message);
+
+    throw new Error("ADMIN_SETTINGS_SAVE_FAILED");
   }
 
   /* The service caches for a minute; without this the admin would
@@ -170,7 +173,7 @@ export async function saveCreditRule(formData: FormData): Promise<void> {
 
   const actionKey = String(formData.get("action_key") ?? "");
 
-  if (!actionKey) throw new Error("Which rule?");
+  if (!actionKey) throw new Error("ADMIN_RULE_SAVE_FAILED");
 
   const rawCap = formData.get("daily_cap");
 
@@ -190,7 +193,9 @@ export async function saveCreditRule(formData: FormData): Promise<void> {
     .eq("action_key", actionKey);
 
   if (error) {
-    throw new Error(`Could not save that rule: ${error.message}`);
+    console.error("[saveCreditRule]", error.message);
+
+    throw new Error("ADMIN_RULE_SAVE_FAILED");
   }
 
   revalidatePath("/admin");
@@ -220,7 +225,7 @@ export async function resolveReport(formData: FormData): Promise<void> {
   const placeId = String(formData.get("place_id") ?? "");
   const outcome = String(formData.get("outcome") ?? "reject");
 
-  if (!placeId) throw new Error("That place is gone.");
+  if (!placeId) throw new Error("PLACE_NOT_FOUND");
 
   if (outcome === "flag" || outcome === "close") {
     const { error } = await supabase
@@ -229,17 +234,15 @@ export async function resolveReport(formData: FormData): Promise<void> {
       .eq("id", placeId);
 
     if (error) {
-      throw new Error(`Could not change the place: ${error.message}`);
+      console.error("[resolveReport] place", error.message);
+
+      throw new Error("ADMIN_PLACE_UPDATE_FAILED");
     }
   }
 
   /* Taking the credits back, on a close. The ledger is append-only,
      so this writes a negative row rather than deleting anything — the
-     history stays honest about what happened.
-
-     revokePlaceCredits finds the owner itself, from the award rows
-     already in the ledger, so nothing has to be passed in but the id
-     and a reason. */
+     history stays honest about what happened. */
   if (outcome === "close") {
     await revokePlaceCredits(placeId, "Place closed by an admin");
   }
@@ -253,7 +256,9 @@ export async function resolveReport(formData: FormData): Promise<void> {
     .eq("resolved", false);
 
   if (error) {
-    throw new Error(`Could not close the reports: ${error.message}`);
+    console.error("[resolveReport] reports", error.message);
+
+    throw new Error("ADMIN_REPORTS_CLOSE_FAILED");
   }
 
   revalidatePath("/admin");
@@ -274,7 +279,9 @@ export async function restorePlace(placeId: string): Promise<void> {
     .eq("id", placeId);
 
   if (error) {
-    throw new Error(`Could not restore that place: ${error.message}`);
+    console.error("[restorePlace]", error.message);
+
+    throw new Error("ADMIN_RESTORE_FAILED");
   }
 
   revalidatePath("/admin");
@@ -294,16 +301,16 @@ export async function addAdmin(formData: FormData): Promise<void> {
     .toLowerCase();
 
   if (!email || !email.includes("@")) {
-    throw new Error("That does not look like an email address.");
+    throw new Error("ADMIN_EMAIL_INVALID");
   }
 
   const { error } = await supabase.from("admins").insert({ email });
 
   if (error) {
+    console.error("[addAdmin]", error.message);
+
     throw new Error(
-      error.code === "23505"
-        ? "That address is already an admin."
-        : `Could not add that admin: ${error.message}`
+      error.code === "23505" ? "ADMIN_ALREADY_ADMIN" : "ADMIN_REMOVE_FAILED"
     );
   }
 
@@ -320,7 +327,7 @@ export async function removeAdmin(email: string): Promise<void> {
   const target = email.trim().toLowerCase();
 
   if (target === master.email.toLowerCase()) {
-    throw new Error("You cannot remove your own master account.");
+    throw new Error("ADMIN_SELF_REMOVE");
   }
 
   const supabase = await createClient();
@@ -332,7 +339,7 @@ export async function removeAdmin(email: string): Promise<void> {
     .maybeSingle();
 
   if (row?.is_master) {
-    throw new Error("A master account cannot be removed.");
+    throw new Error("ADMIN_MASTER_REMOVE");
   }
 
   const { error } = await supabase
@@ -341,7 +348,9 @@ export async function removeAdmin(email: string): Promise<void> {
     .eq("email", target);
 
   if (error) {
-    throw new Error(`Could not remove that admin: ${error.message}`);
+    console.error("[removeAdmin]", error.message);
+
+    throw new Error("ADMIN_REMOVE_FAILED");
   }
 
   revalidatePath("/admin");
