@@ -6,6 +6,17 @@ export interface ReverseGeocodeResult {
   city: string | null;
   country: string | null;
   countryCode: string | null;
+
+  /*
+   * Whether the lookup actually answered.
+   *
+   * A place with no city and a lookup that never ran look identical
+   * in the three fields above, and they are not the same thing: the
+   * first is an ocean, the second is Nominatim being down. The caller
+   * decides what to say — a missing city is silence, a failed lookup
+   * is worth a line in the logs.
+   */
+  failed: boolean;
 }
 
 export interface GeocodeHit {
@@ -14,10 +25,12 @@ export interface GeocodeHit {
   longitude: number;
 }
 
+/* The lookup did not answer. */
 const EMPTY: ReverseGeocodeResult = {
   city: null,
   country: null,
   countryCode: null,
+  failed: true,
 };
 
 interface CacheEntry {
@@ -49,11 +62,16 @@ export async function reverseGeocode(
       { headers: { "User-Agent": USER_AGENT } }
     );
 
-    if (!response.ok) return EMPTY;
+    if (!response.ok) {
+      console.error("[reverseGeocode]", response.status);
+
+      return EMPTY;
+    }
 
     const data = await response.json();
 
     const result: ReverseGeocodeResult = {
+      failed: false,
       city:
         data.address?.city ??
         data.address?.town ??
@@ -67,7 +85,9 @@ export async function reverseGeocode(
     cacheWithTTL.set(key, { result, at: Date.now() });
 
     return result;
-  } catch {
+  } catch (error) {
+    console.error("[reverseGeocode]", error);
+
     return EMPTY;
   }
 }
