@@ -36,6 +36,9 @@ import type { PlaceType } from "@/lib/types";
  * The daily edit limit exists to stop strangers rewriting the same
  * café over and over. It does not apply to the creator, who is the
  * one who knows the place.
+ *
+ * Every failure throws a CODE. The database message still goes to the
+ * logs; it no longer reaches a screen.
  */
 
 type FieldKey =
@@ -143,7 +146,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
     redirect(`/login?next=/update/${placeId}`);
   }
 
-  if (!placeId) throw new Error("That place no longer exists.");
+  if (!placeId) throw new Error("PLACE_NOT_FOUND");
 
   /* ---------- the place as it stands ---------- */
 
@@ -153,7 +156,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
     .eq("id", placeId)
     .maybeSingle();
 
-  if (!place) throw new Error("That place no longer exists.");
+  if (!place) throw new Error("PLACE_NOT_FOUND");
 
   const placeType = place.place_type as PlaceType;
 
@@ -200,8 +203,8 @@ export async function updatePlace(formData: FormData): Promise<void> {
     if ((editsToday ?? 0) > 0) {
       throw new Error(
         placeType === "coffee"
-          ? "You already edited a coffee shop today. You can edit another one tomorrow."
-          : "You already edited a laundromat today. You can edit another one tomorrow."
+          ? "UPDATE_DAILY_LIMIT_COFFEE"
+          : "UPDATE_DAILY_LIMIT_LAUNDRY"
       );
     }
   }
@@ -295,10 +298,10 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
     const name = text("name");
 
-    if (!name) throw new Error("A name is required.");
+    if (!name) throw new Error("PLACE_NAME_REQUIRED");
 
     if (name.length > settings.max_name_length) {
-      throw new Error("That name is too long.");
+      throw new Error("PLACE_NAME_TOO_LONG");
     }
 
     change("name", place.name, name);
@@ -342,6 +345,8 @@ export async function updatePlace(formData: FormData): Promise<void> {
          a reverse-geocoded guess would throw away exactly the
          correction the owner came here to make. */
       const geo = await reverseGeocode(lat, lng);
+
+      if (geo.failed) console.error("[updatePlace] reverse geocode failed");
 
       placeUpdates.city = geo.city;
       placeUpdates.country = geo.country;
@@ -461,7 +466,8 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
     if (coffeeError) {
       console.error("[updatePlace] coffee details:", coffeeError.message);
-      throw new Error("Could not save the coffee details.");
+
+      throw new Error("UPDATE_COFFEE_DETAILS_FAILED");
     }
 
     const writePrice = async (kind: string, key: string) => {
@@ -602,7 +608,8 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
     if (laundryError) {
       console.error("[updatePlace] laundry details:", laundryError.message);
-      throw new Error("Could not save the laundromat details.");
+
+      throw new Error("UPDATE_LAUNDRY_DETAILS_FAILED");
     }
 
     const writePrice = async (kind: string, key: string) => {
@@ -664,7 +671,8 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
   if (placeError) {
     console.error("[updatePlace] place row:", placeError.message);
-    throw new Error("Could not save those changes.");
+
+    throw new Error("UPDATE_SAVE_FAILED");
   }
 
   /* ---------- nothing moved ---------- */
@@ -698,6 +706,8 @@ export async function updatePlace(formData: FormData): Promise<void> {
     .insert(updateRows);
 
   if (logError) {
+    /* Not fatal: the change itself was saved. Worth a line in the logs
+       so a run of failures is visible. */
     console.error("[updatePlace] log:", logError.message);
   }
 
