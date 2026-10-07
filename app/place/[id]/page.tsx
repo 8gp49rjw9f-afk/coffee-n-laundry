@@ -218,6 +218,7 @@ export default async function PlacePage({
         updates={updates}
         confirmations={place.confirmations_count}
         lastConfirmedAt={lastConfirmation?.created_at ?? null}
+        total={place.updates_count}
       />
 
       <Card padding="sm">
