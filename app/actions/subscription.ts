@@ -10,9 +10,18 @@ import { getSettings } from "@/lib/services/settings";
 /* V1: the state change is real, no money moves.           */
 /* ====================================================== */
 
+/*
+ * The failures here return a code rather than a sentence. The one
+ * exception is the not-enough-credits case, which used to name the
+ * exact numbers (`You need 100 credits. You have 42.`) — useful, but
+ * it was the only place in the app that built a sentence server-side,
+ * and the caller could not translate it. The popup now carries the
+ * copy, and the numbers are on the profile page above the button.
+ */
+
 export async function redeemCreditsForMonth(): Promise<{
   ok: boolean;
-  error?: string;
+  code?: string;
   until?: string;
 }> {
   const supabase = await createClient();
@@ -22,7 +31,7 @@ export async function redeemCreditsForMonth(): Promise<{
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { ok: false, error: "You need to be signed in." };
+    return { ok: false, code: "CREDITS_SIGNED_OUT" };
   }
 
   const settings = await getSettings();
@@ -36,10 +45,7 @@ export async function redeemCreditsForMonth(): Promise<{
   const balance = profile?.credit_balance ?? 0;
 
   if (balance < settings.credits_per_free_month) {
-    return {
-      ok: false,
-      error: `You need ${settings.credits_per_free_month} credits. You have ${balance}.`,
-    };
+    return { ok: false, code: "CREDITS_NOT_ENOUGH" };
   }
 
   const { data: subscription } = await supabase
@@ -66,7 +72,9 @@ export async function redeemCreditsForMonth(): Promise<{
     });
 
   if (ledgerError) {
-    return { ok: false, error: "Could not redeem right now." };
+    console.error("[redeemCreditsForMonth]", ledgerError.message);
+
+    return { ok: false, code: "CREDITS_REDEEM_FAILED" };
   }
 
   await supabase.from("subscriptions").upsert({
