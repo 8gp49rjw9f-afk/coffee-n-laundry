@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 
-import { Button, ErrorBanner } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 import { reportPlace } from "@/app/actions/updates";
+
+import { showError } from "@/components/ui/ErrorPopup";
 
 /* Collapsed by default: it should never be the loudest thing
    on the page. */
@@ -13,7 +15,6 @@ export function ReportForm({ placeId }: { placeId: string }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   if (!open) {
     return (
@@ -37,14 +38,12 @@ export function ReportForm({ placeId }: { placeId: string }) {
         className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
       />
 
-      {error && <ErrorBanner message={error} />}
-
       <div className="flex gap-2">
         <Button
           variant="ghost"
           onClick={() => {
             setOpen(false);
-            setError("");
+            setReason("");
           }}
         >
           Cancel
@@ -56,7 +55,6 @@ export function ReportForm({ placeId }: { placeId: string }) {
           disabled={loading || reason.trim().length === 0}
           onClick={async () => {
             setLoading(true);
-            setError("");
 
             try {
               const formData = new FormData();
@@ -65,11 +63,16 @@ export function ReportForm({ placeId }: { placeId: string }) {
 
               await reportPlace(formData);
             } catch (err) {
-              setError(
-                err instanceof Error && err.message
-                  ? err.message
-                  : "Could not send that report."
-              );
+              /* The action throws a code and the popup translates it.
+                 A duplicate report is a muted notice rather than a
+                 fault, so the form closes like a success would: the
+                 person has said their piece either way. */
+              const described = showError(err);
+
+              if (described.severity === "muted") {
+                setOpen(false);
+                setReason("");
+              }
 
               setLoading(false);
             }
@@ -81,3 +84,5 @@ export function ReportForm({ placeId }: { placeId: string }) {
     </div>
   );
 }
+
+export default ReportForm;
