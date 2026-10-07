@@ -4,16 +4,19 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { awardCredits, awardPlaceCreditsOnce } from "@/lib/services/credits";
+import { displayNameFor } from "@/lib/database/places";
 
-/* Postgres refuses the second insert in the same week. Turn that into
-   something a person can read. */
+/*
+ * A Postgres code, turned into one of ours.
+ *
+ * The raw message used to be returned here, which put database text
+ * in front of a person. Now every path leads to a code the catalogue
+ * knows, and an unrecognised failure becomes VERIFY_FAILED rather
+ * than whatever Postgres happened to say.
+ */
 
-function explain(error: { code?: string; message: string }): string {
-  if (error.code === "23505") {
-    return "You already checked this week. Come back in a few days.";
-  }
-
-  return error.message;
+function explain(error: { code?: string }): string {
+  return error.code === "23505" ? "VERIFY_ALREADY_THIS_WEEK" : "VERIFY_FAILED";
 }
 
 export async function verifyField(
@@ -27,10 +30,16 @@ export async function verifyField(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("You need to be signed in to verify.");
+    throw new Error("VERIFY_SIGNED_OUT");
   }
 
-  const displayName = (user.email ?? "").split("@")[0] || "someone";
+  /*
+   * The username, not the local part of the email — the last place
+   * the old convention survived. Two people called simon were still
+   * both "simon" on their own verifications, which is exactly what
+   * the username was introduced to stop.
+   */
+  const displayName = await displayNameFor(user.id);
 
   const { error } = await supabase.from("place_field_checks").insert({
     place_id: placeId,
@@ -42,7 +51,9 @@ export async function verifyField(
   });
 
   if (error) {
+    /* The raw message stays in the logs, where it is useful. */
     console.error("[verifyField]", error.message, error.details, error.hint);
+
     throw new Error(explain(error));
   }
 
@@ -68,7 +79,7 @@ export async function confirmStillOpen(placeId: string): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("You need to be signed in to confirm.");
+    throw new Error("VERIFY_SIGNED_OUT");
   }
 
   const { error } = await supabase.from("place_confirmations").insert({
@@ -78,6 +89,7 @@ export async function confirmStillOpen(placeId: string): Promise<void> {
 
   if (error) {
     console.error("[confirmStillOpen]", error.message, error.details);
+
     throw new Error(explain(error));
   }
 
