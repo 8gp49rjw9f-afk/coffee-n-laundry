@@ -14,11 +14,15 @@ import { createClient } from "@/lib/supabase/server";
  * The sender's address goes in `reply_to`, never in `from`: Resend
  * only sends from a domain you have verified, and a forged From would
  * be rejected or land in spam.
+ *
+ * Every failure answers with a CODE. This action returns rather than
+ * throws — it is called from a client component across the boundary —
+ * so a code in the return value is what reaches the popup.
  */
 
 export interface ContactResult {
   ok: boolean;
-  message?: string;
+  code?: string;
 }
 
 const PREFIX: Record<string, string> = {
@@ -43,24 +47,21 @@ export async function sendContact(formData: FormData): Promise<ContactResult> {
   const placeUrl = String(formData.get("place_url") ?? "").trim();
 
   if (!message) {
-    return { ok: false, message: "Write something first." };
+    return { ok: false, code: "CONTACT_EMPTY" };
   }
 
   if (message.length > 2000) {
-    return { ok: false, message: "That message is too long." };
+    return { ok: false, code: "CONTACT_TOO_LONG" };
   }
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.CONTACT_FROM_EMAIL;
 
   if (!apiKey || !from) {
-    /* Deliberately explicit: a contact form that silently drops its
-       message is worse than one that admits it is not wired up. */
-    return {
-      ok: false,
-      message:
-        "The contact form is not configured on this deployment. Reach the admins another way.",
-    };
+    /* Deliberately explicit in the popup rather than silent: a contact
+       form that quietly drops its message is worse than one that
+       admits it is not wired up. */
+    return { ok: false, code: "CONTACT_NOT_CONFIGURED" };
   }
 
   /*
@@ -72,10 +73,7 @@ export async function sendContact(formData: FormData): Promise<ContactResult> {
   const recipients = await adminEmails();
 
   if (recipients.length === 0) {
-    return {
-      ok: false,
-      message: "There is no admin address configured for this site yet.",
-    };
+    return { ok: false, code: "CONTACT_NO_RECIPIENT" };
   }
 
   const prefix = PREFIX[kind] ?? PREFIX.other;
@@ -111,14 +109,14 @@ export async function sendContact(formData: FormData): Promise<ContactResult> {
 
       console.error("[sendContact]", response.status, detail);
 
-      return { ok: false, message: "Could not send that. Try again later." };
+      return { ok: false, code: "CONTACT_SEND_FAILED" };
     }
 
     return { ok: true };
   } catch (error) {
     console.error("[sendContact]", error);
 
-    return { ok: false, message: "Could not send that. Try again later." };
+    return { ok: false, code: "CONTACT_SEND_FAILED" };
   }
 }
 
