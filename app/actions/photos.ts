@@ -30,11 +30,11 @@ export async function addPlacePhotos(formData: FormData): Promise<void> {
   const placeId = String(formData.get("place_id") ?? "");
 
   if (!user) {
-    throw new Error("You need to be signed in to add photos.");
+    throw new Error("PHOTO_SIGNED_OUT");
   }
 
   if (!placeId) {
-    throw new Error("That place no longer exists.");
+    throw new Error("PLACE_NOT_FOUND");
   }
 
   const files = formData
@@ -43,7 +43,7 @@ export async function addPlacePhotos(formData: FormData): Promise<void> {
     .slice(0, 5);
 
   if (files.length === 0) {
-    throw new Error("No photos were attached.");
+    throw new Error("PHOTO_NONE_ATTACHED");
   }
 
   for (const file of files) {
@@ -77,21 +77,13 @@ export async function addPlacePhotos(formData: FormData): Promise<void> {
  * The swap is two statements rather than a database function. A
  * plpgsql function called through PostgREST's rpc endpoint was the
  * tidier design, but PostgREST discovers functions through a schema
- * cache that can miss one created after the service started — the
- * call then answers "function not found" while the function works
- * perfectly in the SQL editor. Two plain table updates use the same
- * path as the rest of this file, which is known to work.
+ * cache that can miss one created after the service started.
  *
  * Order matters and is not interchangeable: the partial unique index
  * allows one primary per place, so the old one must be cleared before
  * the new one is set. Each write is checked, and a failure on the
  * second one puts the old cover back rather than leaving the place
  * with none.
- *
- * No ownership check: choosing which photo represents a place is the
- * same kind of act as correcting a price, and anyone signed in may do
- * it. Who may DELETE a photo is a different question, and that one is
- * enforced in the database (see 0003's delete policy).
  */
 
 export async function setPrimaryPhoto(
@@ -105,7 +97,7 @@ export async function setPrimaryPhoto(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("You need to be signed in to choose a cover photo.");
+    throw new Error("PHOTO_SIGNED_OUT");
   }
 
   /* Remember the current cover so it can be restored if the second
@@ -126,7 +118,9 @@ export async function setPrimaryPhoto(
     .eq("is_primary", true);
 
   if (clearError) {
-    throw new Error(`Could not change the cover photo: ${clearError.message}`);
+    console.error("[setPrimaryPhoto] clear", clearError.message);
+
+    throw new Error("PHOTO_COVER_FAILED");
   }
 
   const { data: updated, error } = await supabase
@@ -137,6 +131,8 @@ export async function setPrimaryPhoto(
     .select("id");
 
   if (error || !updated || updated.length === 0) {
+    if (error) console.error("[setPrimaryPhoto] set", error.message);
+
     /* Put the old cover back rather than leaving the place bare. */
     if (previous?.id) {
       await supabase
@@ -145,9 +141,7 @@ export async function setPrimaryPhoto(
         .eq("id", previous.id);
     }
 
-    throw new Error(
-      error?.message ?? "That photo could not be set as the cover."
-    );
+    throw new Error("PHOTO_COVER_FAILED");
   }
 
   /* Both surfaces read the cover: the place page shows the strip, the
@@ -186,7 +180,7 @@ export async function deletePlacePhoto(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("You need to be signed in to delete a photo.");
+    throw new Error("PHOTO_SIGNED_OUT");
   }
 
   const { data: photo } = await supabase
@@ -197,7 +191,7 @@ export async function deletePlacePhoto(
     .maybeSingle();
 
   if (!photo) {
-    throw new Error("That photo is already gone.");
+    throw new Error("PHOTO_ALREADY_GONE");
   }
 
   const { data: deleted, error } = await supabase
@@ -208,13 +202,13 @@ export async function deletePlacePhoto(
     .select("id");
 
   if (error) {
-    throw new Error(`Could not delete that photo: ${error.message}`);
+    console.error("[deletePlacePhoto]", error.message);
+
+    throw new Error("PHOTO_UPLOAD_FAILED");
   }
 
   if (!deleted || deleted.length === 0) {
-    throw new Error(
-      "Only the person who added this photo, or the person who added the place, can delete it."
-    );
+    throw new Error("PHOTO_DELETE_DENIED");
   }
 
   await supabase.storage.from(PHOTO_BUCKET).remove([photo.storage_path]);
@@ -242,7 +236,7 @@ export async function replacePlacePhoto(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("You need to be signed in to change a photo.");
+    throw new Error("PHOTO_SIGNED_OUT");
   }
 
   const placeId = String(formData.get("place_id") ?? "");
@@ -251,11 +245,11 @@ export async function replacePlacePhoto(formData: FormData): Promise<void> {
   const file = formData.get("photo");
 
   if (!placeId || !photoId) {
-    throw new Error("That photo no longer exists.");
+    throw new Error("PHOTO_ALREADY_GONE");
   }
 
   if (!(file instanceof File) || file.size === 0) {
-    throw new Error("No photo was attached.");
+    throw new Error("PHOTO_NONE_ATTACHED");
   }
 
   const { data: photo } = await supabase
@@ -266,7 +260,7 @@ export async function replacePlacePhoto(formData: FormData): Promise<void> {
     .maybeSingle();
 
   if (!photo) {
-    throw new Error("That photo no longer exists.");
+    throw new Error("PHOTO_ALREADY_GONE");
   }
 
   /* Same rule as deleting: the uploader, or the person who added the
@@ -282,9 +276,7 @@ export async function replacePlacePhoto(formData: FormData): Promise<void> {
     photo.uploaded_by === user.id || place?.created_by === user.id;
 
   if (!allowed) {
-    throw new Error(
-      "Only the person who added this photo, or the person who added the place, can change it."
-    );
+    throw new Error("PHOTO_REPLACE_DENIED");
   }
 
   const previousPath = photo.storage_path;
@@ -297,11 +289,13 @@ export async function replacePlacePhoto(formData: FormData): Promise<void> {
     .eq("id", photoId);
 
   if (error) {
+    console.error("[replacePlacePhoto]", error.message);
+
     /* The new object is already in the bucket; drop it rather than
        leaving something no row points at. */
     await supabase.storage.from(PHOTO_BUCKET).remove([storagePathFrom(url)]);
 
-    throw new Error("Could not save the new photo.");
+    throw new Error("PHOTO_UPLOAD_FAILED");
   }
 
   await supabase.storage.from(PHOTO_BUCKET).remove([previousPath]);
