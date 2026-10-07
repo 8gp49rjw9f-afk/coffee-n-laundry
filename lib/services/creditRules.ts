@@ -11,14 +11,35 @@ export interface CreditRule {
   description: string | null;
 }
 
-export async function getCreditRules(): Promise<Record<string, CreditRule>> {
+/*
+ * The rules, or an empty set.
+ *
+ * Returns {} when the table cannot be read — which means contributions
+ * quietly stop earning. Before this the failure was silent: a visitor
+ * added a price, the ledger insert did nothing, and nothing anywhere
+ * said why.
+ *
+ * `listener` is how a caller finds out. It is called on the way out
+ * with `true` when the read failed, and it is optional so server code
+ * that only wants the numbers can ignore it.
+ */
+export async function getCreditRules(
+  listener?: (failed: boolean) => void
+): Promise<Record<string, CreditRule>> {
   try {
     const supabase = await createClient();
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("credit_rules")
       .select("action_key, credits, daily_cap, description")
       .eq("active", true);
+
+    if (error) {
+      console.error("[getCreditRules]", error.message);
+      listener?.(true);
+
+      return {};
+    }
 
     const rules: Record<string, CreditRule> = {};
 
@@ -27,7 +48,10 @@ export async function getCreditRules(): Promise<Record<string, CreditRule>> {
     }
 
     return rules;
-  } catch {
+  } catch (error) {
+    console.error("[getCreditRules]", error);
+    listener?.(true);
+
     return {};
   }
 }
