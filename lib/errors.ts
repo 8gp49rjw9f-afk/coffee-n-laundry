@@ -592,19 +592,30 @@ export function describeError(thrown: unknown): DescribedError {
         ? thrown.message
         : "";
 
-  const trimmed = raw.trim();
+  /*
+   * Held as a plain string, not narrowed.
+   *
+   * `isErrorCode` is declared as a type predicate, so once it fails
+   * TypeScript concludes `text` is none of the known codes — and,
+   * since every code is a string literal, narrows it all the way to
+   * `never`. That is wrong here: the predicate tests EQUALITY, while
+   * the loop below tests CONTAINMENT, and a string that merely
+   * contains a code is not equal to one. A separate `string` binding
+   * keeps the narrowing away so the containment test is allowed.
+   */
+  const text: string = raw.trim();
 
   /* An exact code, which is the normal case. */
-  if (isErrorCode(trimmed)) {
-    const copy = ERROR_COPY[trimmed];
+  if (isErrorCode(text)) {
+    const copy = ERROR_COPY[text];
 
     return {
-      code: trimmed,
+      code: text,
       title: copy.title,
       body: copy.body,
       severity: copy.severity,
       retry: Boolean(copy.retry),
-      reference: referenceFor(trimmed),
+      reference: referenceFor(text),
     };
   }
 
@@ -614,7 +625,7 @@ export function describeError(thrown: unknown): DescribedError {
    * to be the whole string.
    */
   for (const code of KNOWN) {
-    if (trimmed.includes(code)) {
+    if (text.includes(code)) {
       const copy = ERROR_COPY[code];
 
       return {
@@ -637,7 +648,7 @@ export function describeError(thrown: unknown): DescribedError {
     body: copy.body,
     severity: copy.severity,
     retry: Boolean(copy.retry),
-    reference: referenceFor(trimmed || "unknown"),
+    reference: referenceFor(text || "unknown"),
   };
 }
 
