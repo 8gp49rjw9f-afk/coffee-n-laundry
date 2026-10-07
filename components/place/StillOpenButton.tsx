@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 
 import { confirmStillOpen } from "@/app/actions/verify";
 
+import { showError } from "@/components/ui/ErrorPopup";
+
 /*
  * A single tap, for someone standing outside. It confirms the place
  * is still trading — nothing more. The price rows keep their own
@@ -54,9 +56,17 @@ export function StillOpenButton({
             await confirmStillOpen(placeId);
             setDone(true);
           } catch (err) {
-            setError(
-              err instanceof Error && err.message ? "already this week" : "failed"
-            );
+            /*
+             * The button used to print the word "failed" inside
+             * itself — the least useful thing on the busiest page.
+             * Now the popup explains it, and the button only keeps
+             * the state the person cares about.
+             */
+            const described = showError(err);
+
+            if (described.code === "VERIFY_ALREADY_THIS_WEEK") {
+              setError("This week ✓");
+            }
           }
         })
       }
@@ -70,3 +80,5 @@ export function StillOpenButton({
     </button>
   );
 }
+
+export default StillOpenButton;
