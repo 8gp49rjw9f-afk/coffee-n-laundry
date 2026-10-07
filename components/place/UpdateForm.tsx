@@ -478,33 +478,33 @@ export function UpdateForm({
 
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Toggle
-              label="Beans for sale"
+              label="🫘 Beans for sale"
               value={sellsBeans}
               onChange={setSellsBeans}
             />
 
             <Toggle
-              label="Has a roaster"
+              label="🔥 Has a roaster"
               value={hasRoaster}
               onChange={setHasRoaster}
             />
 
-            <Toggle label="Decaf" value={hasDecaf} onChange={setHasDecaf} />
-            <Toggle label="Cow milk" value={hasMilk} onChange={setHasMilk} />
-            <Toggle label="Oat milk" value={hasOat} onChange={setHasOat} />
-            <Toggle label="Soy milk" value={hasSoy} onChange={setHasSoy} />
+            <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
+            <Toggle label="🥛 Cow milk" value={hasMilk} onChange={setHasMilk} />
+            <Toggle label="🌾 Oat milk" value={hasOat} onChange={setHasOat} />
+            <Toggle label="🫛 Soy milk" value={hasSoy} onChange={setHasSoy} />
             <Toggle
-              label="Coconut milk"
+              label="🥥 Coconut milk"
               value={hasCoconut}
               onChange={setHasCoconut}
             />
             <Toggle
-              label="Almond milk"
+              label="🌰 Almond milk"
               value={hasAlmond}
               onChange={setHasAlmond}
             />
             <Toggle
-              label="Laptop-friendly"
+              label="💻 Laptop-friendly"
               value={laptop}
               onChange={setLaptop}
             />
@@ -665,16 +665,16 @@ export function UpdateForm({
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Toggle label="Open 24h" value={open24h} onChange={setOpen24h} />
+            <Toggle label="🕛 Open 24h" value={open24h} onChange={setOpen24h} />
 
             <Toggle
-              label="Detergent included"
+              label="🧴 Detergent included"
               value={detergentIncluded}
               onChange={setDetergentIncluded}
             />
 
             <Toggle
-              label="Detergent for sale"
+              label="🛒 Detergent for sale"
               value={detergentPurchasable}
               onChange={setDetergentPurchasable}
             />
@@ -745,11 +745,11 @@ export function UpdateForm({
         </h2>
 
         <div className="grid grid-cols-2 gap-2">
-          <Toggle label="Wi-Fi" value={wifi} onChange={setWifi} />
-          <Toggle label="Power sockets" value={power} onChange={setPower} />
-          <Toggle label="Parking" value={parking} onChange={setParking} />
-          <Toggle label="Seating" value={seating} onChange={setSeating} />
-          <Toggle label="Toilets" value={toilets} onChange={setToilets} />
+          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
+          <Toggle label="🔌 Power sockets" value={power} onChange={setPower} />
+          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
+          <Toggle label="🪑 Seating" value={seating} onChange={setSeating} />
+          <Toggle label="🚻 Toilets" value={toilets} onChange={setToilets} />
         </div>
 
         <label className="mt-4 block">
@@ -787,6 +787,7 @@ export function UpdateForm({
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-slate-700">
             Leave a note
+            <span className="font-normal text-slate-400"> (optional)</span>
           </span>
 
           <textarea
