@@ -12,6 +12,8 @@ import {
   setPrimaryPhoto,
 } from "@/app/actions/photos";
 
+import { showError } from "@/components/ui/ErrorPopup";
+
 import type { PlacePhoto } from "@/lib/types";
 
 /*
@@ -28,6 +30,14 @@ import type { PlacePhoto } from "@/lib/types";
  *
  * Tapping the image still opens it full-screen: a price list is
  * unreadable in a 140px square.
+ *
+ * FAILURES GO TO THE POPUP. This component used to keep a local
+ * `error` string and draw a red banner under the rail, which meant a
+ * photo failure looked different from every other failure on the
+ * site. It also printed whatever the server said. Now the four
+ * failures here — replace, compress, cover, delete — all report
+ * through showError, and the actions behind them throw codes the
+ * catalogue can translate.
  */
 
 const PHOTO_OPTIONS = {
@@ -58,7 +68,6 @@ export function PhotoStrip({
   const router = useRouter();
 
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const [error, setError] = useState("");
   const [choosing, setChoosing] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -121,7 +130,6 @@ export function PhotoStrip({
   }
 
   function pickReplacement(photoId: string) {
-    setError("");
     setReplacingId(photoId);
     fileInput.current?.click();
   }
@@ -146,8 +154,6 @@ export function PhotoStrip({
 
     if (!photoId) return;
 
-    setError("");
-
     try {
       const compressed = await compress(cropped);
 
@@ -162,17 +168,14 @@ export function PhotoStrip({
 
           router.refresh();
         } catch (err) {
-          setError(
-            err instanceof Error && err.message
-              ? err.message
-              : "Could not change that photo."
-          );
+          /* The action throws a code; the popup translates it. */
+          showError(err);
         } finally {
           setReplacingId(null);
         }
       });
     } catch {
-      setError("Could not process that photo. Try a smaller one.");
+      showError("PHOTO_PROCESS_FAILED");
       setReplacingId(null);
     }
   }
@@ -184,7 +187,6 @@ export function PhotoStrip({
    * broken one, and this one cannot be allowed to feel broken.
    */
   function makeCover(photoId: string) {
-    setError("");
     setChoosing(photoId);
 
     startTransition(async () => {
@@ -193,11 +195,7 @@ export function PhotoStrip({
 
         router.refresh();
       } catch (err) {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Could not change the cover photo."
-        );
+        showError(err);
       } finally {
         setChoosing(null);
       }
@@ -207,19 +205,13 @@ export function PhotoStrip({
   function remove(photoId: string) {
     if (!confirm("Delete this photo? This cannot be undone.")) return;
 
-    setError("");
-
     startTransition(async () => {
       try {
         await deletePlacePhoto(placeId, photoId);
 
         router.refresh();
       } catch (err) {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Could not delete that photo."
-        );
+        showError(err);
       }
     });
   }
@@ -363,12 +355,6 @@ export function PhotoStrip({
           </>
         )}
       </div>
-
-      {error && (
-        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800">
-          {error}
-        </p>
-      )}
 
       {open && (
         <div
