@@ -24,9 +24,7 @@ export default function NewPlaceError({
 
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-4 py-16 text-center sm:px-8">
-      <div className="text-5xl">➕</div>
-
-      <h1 className="mt-5 text-2xl font-bold text-slate-900">
+      <h1 className="text-2xl font-bold text-slate-900">
         The form could not be opened
       </h1>
 
