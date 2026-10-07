@@ -526,8 +526,20 @@ const KNOWN: Set<string> = new Set(Object.keys(ERROR_COPY));
 
 /**
  * Does this string name an error we have written copy for?
+ *
+ * A plain boolean, deliberately — NOT `value is ErrorCode`.
+ *
+ * Returning a type predicate arms the narrowing machinery: after a
+ * failed check TypeScript excludes every string literal in that
+ * union from the value, and since the union is made only of
+ * literals, the value collapses to `never`. The build then refuses
+ * the very next method call on it — "Property 'includes' does not
+ * exist on type 'never'" — which is exactly what happened twice.
+ *
+ * Nothing in this file needs the narrowing: the caller compares and
+ * looks the code up by string. A boolean is the honest return type.
  */
-export function isErrorCode(value: string): value is ErrorCode {
+export function isErrorCode(value: string): boolean {
   return KNOWN.has(value);
 }
 
@@ -592,18 +604,7 @@ export function describeError(thrown: unknown): DescribedError {
         ? thrown.message
         : "";
 
-  /*
-   * Held as a plain string, not narrowed.
-   *
-   * `isErrorCode` is declared as a type predicate, so once it fails
-   * TypeScript concludes `text` is none of the known codes — and,
-   * since every code is a string literal, narrows it all the way to
-   * `never`. That is wrong here: the predicate tests EQUALITY, while
-   * the loop below tests CONTAINMENT, and a string that merely
-   * contains a code is not equal to one. A separate `string` binding
-   * keeps the narrowing away so the containment test is allowed.
-   */
-  const text: string = raw.trim();
+  const text = raw.trim();
 
   /* An exact code, which is the normal case. */
   if (isErrorCode(text)) {
