@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 
-import { Button, Card, ErrorBanner, Input, Textarea } from "@/components/ui";
+import { Button, Card, Input, Textarea } from "@/components/ui";
 
 import { sendContact } from "@/app/actions/contact";
+
+import { showError } from "@/components/ui/ErrorPopup";
 
 /*
  * One form, two pages. "Report a bug" and "Reach us" differ only in
@@ -28,12 +30,10 @@ export function ContactForm({
 }) {
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function submit() {
-    setError("");
     setBusy(true);
 
     const formData = new FormData();
@@ -46,7 +46,10 @@ export function ContactForm({
     setBusy(false);
 
     if (!result.ok) {
-      setError(result.message ?? "Could not send that.");
+      /* The action answers with a code now, and the popup says what
+         it means. The text is kept in the field either way, so a
+         failed send never costs someone their message. */
+      showError(result.code ?? "CONTACT_SEND_FAILED");
       return;
     }
 
@@ -94,12 +97,6 @@ export function ContactForm({
           placeholder="name@example.com"
         />
       </div>
-
-      {error && (
-        <div className="mt-4">
-          <ErrorBanner message={error} />
-        </div>
-      )}
 
       <Button
         onClick={submit}
