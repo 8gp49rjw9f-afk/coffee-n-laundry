@@ -30,18 +30,26 @@ export async function reportPlace(formData: FormData): Promise<void> {
   const placeId = String(formData.get("place_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
 
-  if (!placeId || !reason) throw new Error("A reason is required.");
+  if (!placeId || !reason) throw new Error("REPORT_REASON_REQUIRED");
 
   /* One report per person. The unique index enforces it, so a second
-     press comes back as 23505 rather than adding a row. */
+     press comes back as 23505 rather than adding a row — and that is
+     not a failure worth alarming anyone about, so it is reported as
+     "already sent" rather than as a fault. */
   const { error } = await supabase.from("place_reports").insert({
     place_id: placeId,
     reported_by: user.id,
     reason,
   });
 
-  if (error && error.code !== "23505") {
-    throw new Error("Could not send that report.");
+  if (error && error.code === "23505") {
+    throw new Error("REPORT_ALREADY_SENT");
+  }
+
+  if (error) {
+    console.error("[reportPlace]", error.message);
+
+    throw new Error("REPORT_FAILED");
   }
 
   const settings = await getSettings();
