@@ -54,30 +54,69 @@ export const UPDATE_TYPE_LABEL: Record<string, string> = {
 /* PAYMENTS                                                */
 /* ====================================================== */
 
+/*
+ * Four categories, and the card detail behind one of them.
+ *
+ * The list used to hold thirteen flat options whose meanings
+ * overlapped: Visa sat beside Card, and "All major credit cards"
+ * competed with both. Nobody could tell which to pick, and the same
+ * shop got tagged three different ways depending on who filled the
+ * form.
+ *
+ * The keys that are no longer offered are kept below, so a place
+ * tagged `coins` or `contactless` before this change still renders a
+ * label instead of falling back to its raw key.
+ */
+
 export const PAYMENT_OPTIONS = [
-  { key: "cash", label: "Cash", emoji: "💵" },
-  { key: "card", label: "Card", emoji: "💳" },
-  { key: "visa", label: "Visa", emoji: "💳" },
-  { key: "mastercard", label: "Mastercard", emoji: "💳" },
-  { key: "amex", label: "American Express", emoji: "💳" },
-  { key: "major_cards", label: "All major credit cards", emoji: "💳" },
-  { key: "debit", label: "Debit", emoji: "🏧" },
-  { key: "contactless", label: "Contactless", emoji: "📱" },
-  { key: "apple_pay", label: "Apple Pay", emoji: "🍎" },
-  { key: "google_pay", label: "Google Pay", emoji: "🟢" },
-  { key: "laundry_card", label: "Laundry card", emoji: "🎟️" },
-  { key: "coins", label: "Coins only", emoji: "🪙" },
-  { key: "other", label: "Other", emoji: "➖" },
+  { key: "cash", label: "Cash / Coins", emoji: "💵" },
+  { key: "card", label: "Cards", emoji: "💳" },
+  { key: "online", label: "Online App", emoji: "📱" },
+  { key: "laundry_card", label: "Laundry Card", emoji: "🎟️" },
 ] as const;
 
+/* The card detail, shown only under Cards. */
+export const CARD_KINDS = [
+  { key: "mastercard", label: "MasterCard", emoji: "💳" },
+  { key: "visa", label: "Visa", emoji: "💳" },
+  { key: "amex", label: "Amex", emoji: "💳" },
+  { key: "major_cards", label: "Major Local Credit Cards", emoji: "💳" },
+] as const;
 
+/* Retired keys, kept so old rows still read as words. */
+const RETIRED_PAYMENTS: Record<string, { label: string; emoji: string }> = {
+  coins: { label: "Coins only", emoji: "🪙" },
+  contactless: { label: "Contactless", emoji: "📱" },
+  debit: { label: "Debit", emoji: "🏧" },
+  apple_pay: { label: "Apple Pay", emoji: "🍎" },
+  google_pay: { label: "Google Pay", emoji: "🟢" },
+  other: { label: "Other", emoji: "➖" },
+};
 
+const ALL_PAYMENTS = [...PAYMENT_OPTIONS, ...CARD_KINDS];
+
+/*
+ * A label for anything in accepted_payments.
+ *
+ * The four categories and the four card kinds are looked up; the
+ * retired keys above still resolve; and anything else is free text a
+ * person typed into the 25-character field, which is shown exactly as
+ * written — `key` is the fallback on purpose.
+ */
 export function paymentLabel(key: string): string {
-  return PAYMENT_OPTIONS.find((p) => p.key === key)?.label ?? key;
+  const known = ALL_PAYMENTS.find((p) => p.key === key);
+
+  if (known) return known.label;
+
+  return RETIRED_PAYMENTS[key]?.label ?? key;
 }
 
 export function paymentEmoji(key: string): string {
-  return PAYMENT_OPTIONS.find((p) => p.key === key)?.emoji ?? "➖";
+  const known = ALL_PAYMENTS.find((p) => p.key === key);
+
+  if (known) return known.emoji;
+
+  return RETIRED_PAYMENTS[key]?.emoji ?? "➖";
 }
 
 /* The laundromat answer, in one line. */
