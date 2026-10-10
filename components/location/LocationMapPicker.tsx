@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
 
 import "leaflet/dist/leaflet.css";
 
@@ -23,20 +23,21 @@ import { Button } from "@/components/ui";
  * fires when the gesture finishes, which is also when the coordinate
  * under the crosshair stops changing.
  *
- * NOTHING HERE RESIZES THE MAP AFTER A DELAY. There is no
- * invalidateSize() call at all, and no timer of any kind.
+ * WHAT IS NOT HERE, AND WHY
  *
- * Two timers used to run in this one map — MapResizeFix (250ms) and
- * SettleOnOpen (200ms) — both calling invalidateSize(). The map is
- * remounted on a `key` change, and a map caught mid-mount can still
- * answer getContainer() while being unable to resize: the call throws,
- * the error boundary takes the page, and the crosshair that had just
- * appeared is gone. 200ms is exactly how long the crosshair survived.
+ * No timer of any kind, and no invalidateSize(). Two used to run in
+ * this one map — MapResizeFix (250ms) and SettleOnOpen (200ms) — and a
+ * map caught mid-mount can still answer getContainer() while being
+ * unable to resize, so the call throws and the error boundary takes
+ * the modal. 200ms is exactly how long the crosshair survived.
  *
- * Neither timer was needed. MapContainer measures its container at
- * creation, and this modal gives it a fixed height (h-[420px]
- * sm:h-[520px]) rather than a flexible one, so there is no first-paint
- * measurement to correct.
+ * NothingOnTap is gone too: it called useMapEvents({}) — an empty
+ * listener object, which attaches nothing — so it never prevented the
+ * page scroll it claimed to, and it was the only useMapEvents in the
+ * project, on a react-leaflet major version where that hook changed.
+ *
+ * Three things remain inside the map: the tiles, the watcher, and
+ * nothing else.
  */
 
 function CentreWatcher({
@@ -86,13 +87,6 @@ function CentreWatcher({
   return null;
 }
 
-/* Keeps the gesture from being read as a page scroll on a phone. */
-function NothingOnTap() {
-  useMapEvents({});
-
-  return null;
-}
-
 export function LocationMapPicker({
   open,
   initial,
@@ -128,9 +122,8 @@ export function LocationMapPicker({
   /*
    * Two numbers, not the object. `initial` is rebuilt by the parent on
    * every render, so depending on it would re-run this effect and bump
-   * `key` each time — remounting the map in a loop, which is its own
-   * way to make the crosshair flicker. The coordinates only change when
-   * the caller actually picks a new point.
+   * `key` each time — remounting the map in a loop. The coordinates
+   * only change when the caller actually picks a new point.
    */
   useEffect(() => {
     if (!open) return;
@@ -220,8 +213,6 @@ export function LocationMapPicker({
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url={"https://tile.openstreetmap.org/{z}/{x}/{y}.png"}
             />
-
-            <NothingOnTap />
 
             <CentreWatcher
               onCentre={(lat, lng) => {
