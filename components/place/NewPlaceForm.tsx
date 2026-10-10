@@ -641,87 +641,80 @@ export function NewPlaceForm({
         </p>
       </Card>
 
-      <Card>
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment</h3>
+      {isCoffee && (
+        <Card>
+          <h3 className="mb-3 text-sm font-semibold text-slate-700">
+            Milk / PBM
+          </h3>
 
-        <div className="flex flex-wrap gap-2">
-          {PAYMENT_KEYS.map((key) => {
-            const on = payments.includes(key.value);
-
-            return (
-              <button
-                key={key.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => {
-                  /* Leaving Cards takes the card detail with it: a row
-                     saying "Visa" under a place that does not take
-                     cards is worse than no row at all. */
-                  if (key.value === "card" && on) {
-                    setPayments(
-                      payments.filter(
-                        (p) =>
-                          p !== "card" &&
-                          !CARD_KINDS.some((c) => c.value === p)
-                      )
-                    );
-                    return;
-                  }
-
-                  toggleIn(payments, setPayments, key.value);
-                }}
-                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                  on
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                {key.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {payments.includes("card") && (
-          <div className="mt-2 flex flex-wrap gap-2 border-l-2 border-slate-200 pl-2">
-            {CARD_KINDS.map((key) => {
-              const on = payments.includes(key.value);
+          <div className="flex flex-wrap gap-2">
+            {MILKS.map((option) => {
+              const on = milks.includes(option.key);
 
               return (
                 <button
-                  key={key.value}
+                  key={option.key}
                   type="button"
                   aria-pressed={on}
-                  onClick={() => toggleIn(payments, setPayments, key.value)}
-                  className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition ${
+                  onClick={() => toggleIn(milks, setMilks, option.key)}
+                  className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
                     on
                       ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-600"
+                      : "border-slate-300 bg-white text-slate-700"
                   }`}
                 >
-                  {key.label}
+                  {option.label}
                 </button>
               );
             })}
           </div>
-        )}
+        </Card>
+      )}
 
-        <label className="mt-3 block">
-          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Or add your own — {PAYMENT_NOTE_MAX} characters at most
-          </span>
+      {isCoffee && (
+        <Card>
+          <h3 className="mb-3 text-sm font-semibold text-slate-700">Decaf</h3>
 
-          <input
-            value={paymentNote}
-            onChange={(e) =>
-              setPaymentNote(e.target.value.slice(0, PAYMENT_NOTE_MAX))
-            }
-            maxLength={PAYMENT_NOTE_MAX}
-            placeholder="Exact change only, tokens at the counter…"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
-          />
-        </label>
-      </Card>
+          <div className="flex flex-wrap gap-2">
+            <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
+          </div>
+        </Card>
+      )}
+
+      {isCoffee && (
+        <Card>
+          <h3 className="mb-3 text-sm font-semibold text-slate-700">Beans</h3>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Toggle
+              label="🫘 Beans for sale"
+              value={sellsBeans}
+              onChange={setSellsBeans}
+            />
+
+            <Toggle
+              label="🔥 Has a roaster"
+              value={hasRoaster}
+              onChange={setHasRoaster}
+            />
+          </div>
+
+          {hasRoaster && (
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Roaster name
+              </span>
+
+              <input
+                value={roasterName}
+                onChange={(e) => setRoasterName(e.target.value)}
+                placeholder="Tim Wendelboe"
+                className={selectClass}
+              />
+            </label>
+          )}
+        </Card>
+      )}
 
       {isCoffee && (
         <Card>
@@ -750,79 +743,6 @@ export function NewPlaceForm({
       {isCoffee && (
         <Card>
           <h3 className="mb-3 text-sm font-semibold text-slate-700">
-            Beans and milk
-          </h3>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Toggle
-              label="🫘 Beans for sale"
-              value={sellsBeans}
-              onChange={setSellsBeans}
-            />
-
-            <Toggle
-              label="🔥 Has a roaster"
-              value={hasRoaster}
-              onChange={setHasRoaster}
-            />
-
-            <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
-            <Toggle
-              label="💻 Laptop-friendly"
-              value={laptop}
-              onChange={setLaptop}
-            />
-          </div>
-
-          {/* One question, one list. Tap a milk to add it, tap again to
-              take it away — a café with three plant milks answers once
-              instead of five times. */}
-          <p className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-            Which milks?
-          </p>
-
-          <div className="flex flex-wrap gap-2">
-            {MILKS.map((option) => {
-              const on = milks.includes(option.key);
-
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(milks, setMilks, option.key)}
-                  className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-700"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {hasRoaster && (
-            <label className="mt-3 block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Roaster name
-              </span>
-
-              <input
-                value={roasterName}
-                onChange={(e) => setRoasterName(e.target.value)}
-                placeholder="Tim Wendelboe"
-                className={selectClass}
-              />
-            </label>
-          )}
-        </Card>
-      )}
-
-      {isCoffee && (
-        <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
             Ambience
           </h3>
 
@@ -842,6 +762,14 @@ export function NewPlaceForm({
                 {option.emoji} {option.label}
               </button>
             ))}
+
+            {/* Laptop-friendly is a way of sitting, not a drink, so it
+                is asked alongside the room rather than the cup. */}
+            <Toggle
+              label="💻 Laptop-friendly"
+              value={laptop}
+              onChange={setLaptop}
+            />
           </div>
         </Card>
       )}
@@ -989,6 +917,88 @@ export function NewPlaceForm({
           )}
         </Card>
       )}
+
+      <Card>
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment</h3>
+
+        <div className="flex flex-wrap gap-2">
+          {PAYMENT_KEYS.map((key) => {
+            const on = payments.includes(key.value);
+
+            return (
+              <button
+                key={key.value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  /* Leaving Cards takes the card detail with it: a row
+                     saying "Visa" under a place that does not take
+                     cards is worse than no row at all. */
+                  if (key.value === "card" && on) {
+                    setPayments(
+                      payments.filter(
+                        (p) =>
+                          p !== "card" &&
+                          !CARD_KINDS.some((c) => c.value === p)
+                      )
+                    );
+                    return;
+                  }
+
+                  toggleIn(payments, setPayments, key.value);
+                }}
+                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
+                  on
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-300 bg-white text-slate-700"
+                }`}
+              >
+                {key.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {payments.includes("card") && (
+          <div className="mt-2 flex flex-wrap gap-2 border-l-2 border-slate-200 pl-2">
+            {CARD_KINDS.map((key) => {
+              const on = payments.includes(key.value);
+
+              return (
+                <button
+                  key={key.value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleIn(payments, setPayments, key.value)}
+                  className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition ${
+                    on
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-600"
+                  }`}
+                >
+                  {key.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+            Or add your own — {PAYMENT_NOTE_MAX} characters at most
+          </span>
+
+          <input
+            value={paymentNote}
+            onChange={(e) =>
+              setPaymentNote(e.target.value.slice(0, PAYMENT_NOTE_MAX))
+            }
+            maxLength={PAYMENT_NOTE_MAX}
+            placeholder="Exact change only, tokens at the counter…"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
+          />
+        </label>
+      </Card>
 
       <Card>
         <h3 className="mb-3 text-sm font-semibold text-slate-700">
