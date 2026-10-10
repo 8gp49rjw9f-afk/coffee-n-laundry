@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Card, Badge } from "@/components/ui";
 import { StillOpenButton } from "@/components/place/StillOpenButton";
+import { DeletePlaceButton } from "@/components/place/DeletePlaceButton";
 
 import type { PlaceWithFreshness } from "@/lib/types";
 import type { Freshness } from "@/lib/services/freshness";
@@ -12,12 +13,17 @@ export function PlaceHeader({
   signedIn,
   confirmedThisWeek,
   creatorName,
+  canDelete = false,
 }: {
   place: PlaceWithFreshness;
   freshness: Freshness;
   signedIn: boolean;
   confirmedThisWeek: boolean;
   creatorName?: string | null;
+  /* Set by the page when the signed-in person is an admin. The button
+     is only the affordance — deletePlace checks the same thing again
+     on the server, where a forged request cannot get past it. */
+  canDelete?: boolean;
 }) {
   const isCoffee = place.place_type === "coffee";
 
@@ -75,6 +81,10 @@ export function PlaceHeader({
             <span className="text-[10px] leading-tight text-slate-400">
               👍 {place.confirmations_count} confirmed
             </span>
+          )}
+
+          {canDelete && (
+            <DeletePlaceButton placeId={place.id} placeName={place.name} />
           )}
         </div>
       </div>
