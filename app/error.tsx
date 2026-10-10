@@ -7,36 +7,21 @@ import { describeError, logError } from "@/lib/errors";
 
 /*
  * ======================================================
- * THE GLOBAL ERROR BOUNDARY
+ * THE GLOBAL ERROR BOUNDARY — TEMPORARY DIAGNOSTIC
  * ======================================================
  *
- * Before this file existed, a page that threw during render
- * produced this, and nothing else:
+ * The real message and the digest are printed on the page, in a
+ * panel at the bottom.
  *
- *   An error occurred in the Server Components render. The
- *   specific message is omitted in production builds...
+ * WHY: a production Next build replaces the message of anything
+ * that fails during a server render with a single sentence, and
+ * keeps the real text in the logs. The logs could not be reached,
+ * so for now the text comes to the screen instead. One reload, and
+ * the cause is readable.
  *
- * A visitor reads that and has nothing to act on. It was also
- * what hid the real cause of a bug for hours: the 413 in the
- * logs was invisible behind a sentence designed to hide it.
- *
- * WHAT THIS DOES
- *
- * It is the catch-all for anything below it in the tree. It
- * shows the same popup everything else uses, plus a full-page
- * message, so a broken render is never a blank screen.
- *
- * It does NOT try to guess the cause. `describeError` turns the
- * error into copy it knows, and for anything unrecognised it
- * shows the generic text and a reference — the raw message is
- * dropped rather than printed.
- *
- * WHY A CLIENT COMPONENT
- *
- * Next.js requires an error boundary to be one: it needs
- * componentDidCatch semantics to hold the error and a reset()
- * callback to try again. That is the framework's shape, not a
- * choice worth arguing with.
+ * REMOVE THIS PANEL once the cause is found. It shows a raw message
+ * to a visitor, which the catalogue exists to prevent — this is a
+ * deliberate, temporary exception, not a new behaviour.
  */
 
 export default function GlobalError({
@@ -49,8 +34,6 @@ export default function GlobalError({
   const described = describeError(error);
 
   useEffect(() => {
-    /* The reference is logged beside the code, so "Ref. 4F2A" from
-       a screenshot leads straight to this line in the logs. */
     logError("app/error", error);
   }, [error]);
 
@@ -72,6 +55,32 @@ export default function GlobalError({
         Ref. {described.reference}
       </p>
 
+      {/* ---------- TEMPORARY: the raw truth ---------- */}
+
+      <div className="mt-6 w-full rounded-xl border border-slate-300 bg-slate-900 p-4 text-left">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          Diagnostic — remove once fixed
+        </p>
+
+        <p className="mt-2 break-all text-xs font-semibold text-amber-300">
+          message: {error?.message || "(empty)"}
+        </p>
+
+        <p className="mt-1 break-all text-xs font-semibold text-sky-300">
+          digest: {error?.digest || "(none)"}
+        </p>
+
+        <p className="mt-1 break-all text-xs font-semibold text-emerald-300">
+          name: {error?.name || "(none)"}
+        </p>
+
+        {error?.stack && (
+          <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all text-[10px] leading-tight text-slate-300">
+            {error.stack}
+          </pre>
+        )}
+      </div>
+
       <div className="mt-6 flex w-full flex-col gap-2">
         <button
           type="button"
@@ -88,11 +97,6 @@ export default function GlobalError({
           Back to the map
         </Link>
       </div>
-
-      <p className="mt-6 text-xs text-slate-400">
-        If it keeps happening, send us the reference above — it points at the
-        exact line.
-      </p>
     </main>
   );
 }
