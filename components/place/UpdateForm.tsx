@@ -146,6 +146,15 @@ export function UpdateForm({
   const [latitude, setLatitude] = useState(place.latitude);
   const [longitude, setLongitude] = useState(place.longitude);
 
+  /* The two prices this page shows, seeded from the place's own rows
+     so a wrong number can be corrected rather than only added. */
+  const amountOf = (kind: string) =>
+    place.prices.find((p) => p.kind === kind)?.amount?.toString() ?? "";
+
+  const [espressoPrice, setEspressoPrice] = useState(amountOf("espresso"));
+  const [flatWhitePrice, setFlatWhitePrice] = useState(amountOf("flat_white"));
+  const [currency, setCurrency] = useState(place.prices[0]?.currency ?? "SGD");
+
   const [payments, setPayments] = useState<string[]>(
     place.accepted_payments ?? []
   );
@@ -173,7 +182,9 @@ export function UpdateForm({
     Boolean(place.coffee?.has_roaster)
   );
   const [hasDecaf, setHasDecaf] = useState(Boolean(place.coffee?.has_decaf));
-  const [laptop, setLaptop] = useState(Boolean(place.coffee?.laptop_friendly));
+  const [laptop, setLaptop] = useState(
+    Boolean(place.coffee?.laptop_friendly)
+  );
 
   const [milks, setMilks] = useState<string[]>(
     MILKS.filter((m) =>
@@ -267,11 +278,10 @@ export function UpdateForm({
     ambience.forEach((a) => formData.append("ambience", a));
     food.forEach((f) => formData.append("food", f));
 
-    /* The currency comes off the place's own prices; a place with none
-       keeps whatever it already had. */
-    if (place.prices.length > 0) {
-      formData.set("currency", place.prices[0].currency);
-    }
+    /* The currency is the one chosen in Coffee Prices. A place with no
+       price yet has no currency of its own to fall back on, which is
+       why the picker sits with the amounts. */
+    formData.set("currency", currency);
 
     if (isCoffee) {
       formData.set("coffee_kind", coffeeKind);
@@ -286,6 +296,9 @@ export function UpdateForm({
       formData.set("has_soy_milk", String(milks.includes("soy_milk")));
       formData.set("has_coconut_milk", String(milks.includes("coconut_milk")));
       formData.set("has_almond_milk", String(milks.includes("almond_milk")));
+
+      formData.set("espresso_price", espressoPrice);
+      formData.set("flat_white_price", flatWhitePrice);
     } else {
       formData.set("detergent_included", String(detergentIncluded));
       formData.set("detergent_purchasable", String(detergentPurchasable));
@@ -373,10 +386,71 @@ export function UpdateForm({
         </Card>
       )}
 
+      {isCoffee && (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Coffee Prices
+          </h2>
+
+          <div className="grid grid-cols-3 gap-1.5">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                Espresso
+              </span>
+
+              <input
+                value={espressoPrice}
+                onChange={(e) => setEspressoPrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="3.50"
+                className={field}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                Flat white
+              </span>
+
+              <input
+                value={flatWhitePrice}
+                onChange={(e) => setFlatWhitePrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="4.50"
+                className={field}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                Currency
+              </span>
+
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className={field}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <p className="mt-2 text-xs text-slate-500">
+            The server refuses a price with no currency, which is why the
+            two travel together.
+          </p>
+        </Card>
+      )}
+
       <Card>
-        <p className="mb-2 text-sm font-semibold text-slate-700">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
           How do you pay?
-        </p>
+        </h2>
 
         <div className="flex flex-wrap gap-1.5">
           {PAYMENT_KEYS.map((option) => {
@@ -456,47 +530,34 @@ export function UpdateForm({
           />
         </label>
 
-        <div className="mt-3 grid grid-cols-3 gap-1.5">
-          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
-          <Toggle label="🔌 Power" value={power} onChange={setPower} />
-          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
-          <Toggle label="🪑 Seating" value={seating} onChange={setSeating} />
-          <Toggle label="🚻 Toilets" value={toilets} onChange={setToilets} />
-        </div>
-
         {isCoffee && (
           <>
-            <p className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Beans and milk
-            </p>
+            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+              Coffee type
+            </h3>
 
-            <div className="grid grid-cols-2 gap-1.5">
-              <Toggle
-                label="🫘 Beans for sale"
-                value={sellsBeans}
-                onChange={setSellsBeans}
-              />
-
-              <Toggle
-                label="🔥 Has a roaster"
-                value={hasRoaster}
-                onChange={setHasRoaster}
-              />
-
-              <Toggle
-                label="🌙 Decaf"
-                value={hasDecaf}
-                onChange={setHasDecaf}
-              />
-
-              <Toggle
-                label="💻 Laptop-friendly"
-                value={laptop}
-                onChange={setLaptop}
-              />
+            <div className="grid grid-cols-3 gap-1.5">
+              {COFFEE_KINDS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setCoffeeKind(option.key)}
+                  className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
+                    coffeeKind === option.key
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+              Milk / PBM
+            </h3>
+
+            <div className="flex flex-wrap gap-1.5">
               {MILKS.map((option) => {
                 const on = milks.includes(option.key);
 
@@ -518,29 +579,61 @@ export function UpdateForm({
               })}
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {AMBIENCE.map((option) => {
-                const on = ambience.includes(option.key);
+            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+              Decaf
+            </h3>
 
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleIn(ambience, setAmbience, option.key)}
-                    className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                      on
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white text-slate-700"
-                    }`}
-                  >
-                    {option.emoji} {option.label}
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-2 gap-1.5">
+              <Toggle
+                label="🌙 Decaf"
+                value={hasDecaf}
+                onChange={setHasDecaf}
+              />
+
+              <Toggle
+                label="💻 Laptop-friendly"
+                value={laptop}
+                onChange={setLaptop}
+              />
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+              Beans
+            </h3>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <Toggle
+                label="🫘 Beans for sale"
+                value={sellsBeans}
+                onChange={setSellsBeans}
+              />
+
+              <Toggle
+                label="🔥 Has a roaster"
+                value={hasRoaster}
+                onChange={setHasRoaster}
+              />
+            </div>
+
+            {hasRoaster && (
+              <label className="mt-2 block">
+                <span className="mb-1 block text-xs font-medium text-slate-500">
+                  Roaster name
+                </span>
+
+                <input
+                  value={roaster}
+                  onChange={(e) => setRoaster(e.target.value)}
+                  className={field}
+                />
+              </label>
+            )}
+
+            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+              Food
+            </h3>
+
+            <div className="flex flex-wrap gap-1.5">
               {FOOD.map((option) => {
                 const on = food.includes(option.key);
 
@@ -562,27 +655,51 @@ export function UpdateForm({
               })}
             </div>
 
-            {hasRoaster && (
-              <label className="mt-2 block">
-                <span className="mb-1 block text-xs font-medium text-slate-500">
-                  Roaster name
-                </span>
+            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+              Ambiance
+            </h3>
 
-                <input
-                  value={roaster}
-                  onChange={(e) => setRoaster(e.target.value)}
-                  className={field}
-                />
-              </label>
-            )}
+            <div className="flex flex-wrap gap-1.5">
+              {AMBIENCE.map((option) => {
+                const on = ambience.includes(option.key);
+
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggleIn(ambience, setAmbience, option.key)}
+                    className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
+                      on
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-300 bg-white text-slate-700"
+                    }`}
+                  >
+                    {option.emoji} {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </>
         )}
 
+        <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+          Amenities
+        </h3>
+
+        <div className="grid grid-cols-3 gap-1.5">
+          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
+          <Toggle label="🔌 Power" value={power} onChange={setPower} />
+          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
+          <Toggle label="🪑 Seating" value={seating} onChange={setSeating} />
+          <Toggle label="🚻 Toilets" value={toilets} onChange={setToilets} />
+        </div>
+
         {!isCoffee && (
           <>
-            <p className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
               Machines
-            </p>
+            </h3>
 
             <div className="grid grid-cols-3 gap-1.5">
               {MACHINE_SIZES.map((option) => {
@@ -608,9 +725,9 @@ export function UpdateForm({
               })}
             </div>
 
-            <p className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
               Timing
-            </p>
+            </h3>
 
             <div className="grid grid-cols-2 gap-1.5">
               <label className="block">
