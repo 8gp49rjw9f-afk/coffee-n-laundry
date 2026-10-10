@@ -65,6 +65,15 @@ const PAYMENT_KEYS = [
   { value: "other", label: "➖ Other" },
 ];
 
+/* The milks, listed once so the form and the payload agree. */
+const MILKS = [
+  { key: "milk", label: "🥛 Cow" },
+  { key: "oat_milk", label: "🌾 Oat" },
+  { key: "soy_milk", label: "🫘 Soy" },
+  { key: "coconut_milk", label: "🥥 Coconut" },
+  { key: "almond_milk", label: "🌰 Almond" },
+];
+
 const MACHINE_SIZES = [
   { key: "small", label: "Small" },
   { key: "medium", label: "Medium" },
@@ -168,11 +177,9 @@ export function NewPlaceForm({
   const [hasRoaster, setHasRoaster] = useState(false);
   const [roasterName, setRoasterName] = useState("");
 
-  const [hasMilk, setHasMilk] = useState(false);
-  const [hasOat, setHasOat] = useState(false);
-  const [hasSoy, setHasSoy] = useState(false);
-  const [hasCoconut, setHasCoconut] = useState(false);
-  const [hasAlmond, setHasAlmond] = useState(false);
+  /* The milks as a set. The five columns still exist and are
+     written one by one below — what changed is the asking. */
+  const [milks, setMilks] = useState<string[]>([]);
   const [hasDecaf, setHasDecaf] = useState(false);
   const [laptop, setLaptop] = useState(false);
 
@@ -305,11 +312,11 @@ export function NewPlaceForm({
         formData.set("has_roaster", String(hasRoaster));
         formData.set("roaster_name", roasterName.trim());
 
-        formData.set("has_milk", String(hasMilk));
-        formData.set("has_oat_milk", String(hasOat));
-        formData.set("has_soy_milk", String(hasSoy));
-        formData.set("has_coconut_milk", String(hasCoconut));
-        formData.set("has_almond_milk", String(hasAlmond));
+        formData.set("has_milk", String(milks.includes("milk")));
+        formData.set("has_oat_milk", String(milks.includes("oat_milk")));
+        formData.set("has_soy_milk", String(milks.includes("soy_milk")));
+        formData.set("has_coconut_milk", String(milks.includes("coconut_milk")));
+        formData.set("has_almond_milk", String(milks.includes("almond_milk")));
         formData.set("has_decaf", String(hasDecaf));
         formData.set("laptop_friendly", String(laptop));
 
@@ -560,24 +567,40 @@ export function NewPlaceForm({
             />
 
             <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
-            <Toggle label="🥛 Cow milk" value={hasMilk} onChange={setHasMilk} />
-            <Toggle label="🌾 Oat milk" value={hasOat} onChange={setHasOat} />
-            <Toggle label="🫘 Soy milk" value={hasSoy} onChange={setHasSoy} />
-            <Toggle
-              label="🥥 Coconut milk"
-              value={hasCoconut}
-              onChange={setHasCoconut}
-            />
-            <Toggle
-              label="🌰 Almond milk"
-              value={hasAlmond}
-              onChange={setHasAlmond}
-            />
             <Toggle
               label="💻 Laptop-friendly"
               value={laptop}
               onChange={setLaptop}
             />
+          </div>
+
+          {/* One question, one list. Tap a milk to add it, tap
+              again to take it away — a café with three plant milks
+              answers once instead of five times. */}
+          <p className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+            Which milks?
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {MILKS.map((option) => {
+              const on = milks.includes(option.key);
+
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleIn(milks, setMilks, option.key)}
+                  className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
+                    on
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
 
           {hasRoaster && (
