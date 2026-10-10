@@ -447,6 +447,31 @@ export function UpdateForm({
         </Card>
       )}
 
+      {isCoffee && (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Coffee type
+          </h2>
+
+          <div className="grid grid-cols-3 gap-1.5">
+            {COFFEE_KINDS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setCoffeeKind(option.key)}
+                className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
+                  coffeeKind === option.key
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-300 bg-white text-slate-700"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
           How do you pay?
@@ -529,163 +554,148 @@ export function UpdateForm({
             className={field}
           />
         </label>
+      </Card>
 
-        {isCoffee && (
-          <>
-            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Coffee type
-            </h3>
+      {isCoffee && (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            What is in the cup
+          </h2>
 
-            <div className="grid grid-cols-3 gap-1.5">
-              {COFFEE_KINDS.map((option) => (
+          <h3 className="mb-2 text-sm font-semibold text-slate-700">
+            Milk / PBM
+          </h3>
+
+          <div className="flex flex-wrap gap-1.5">
+            {MILKS.map((option) => {
+              const on = milks.includes(option.key);
+
+              return (
                 <button
                   key={option.key}
                   type="button"
-                  onClick={() => setCoffeeKind(option.key)}
+                  aria-pressed={on}
+                  onClick={() => toggleIn(milks, setMilks, option.key)}
                   className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                    coffeeKind === option.key
+                    on
                       ? "border-slate-900 bg-slate-900 text-white"
                       : "border-slate-300 bg-white text-slate-700"
                   }`}
                 >
                   {option.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Milk / PBM
-            </h3>
+          <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+            Decaf
+          </h3>
 
-            <div className="flex flex-wrap gap-1.5">
-              {MILKS.map((option) => {
-                const on = milks.includes(option.key);
+          <div className="grid grid-cols-2 gap-1.5">
+            <Toggle
+              label="🌙 Decaf"
+              value={hasDecaf}
+              onChange={setHasDecaf}
+            />
 
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleIn(milks, setMilks, option.key)}
-                    className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                      on
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white text-slate-700"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
+            <Toggle
+              label="💻 Laptop-friendly"
+              value={laptop}
+              onChange={setLaptop}
+            />
+          </div>
 
-            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Decaf
-            </h3>
+          <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+            Beans
+          </h3>
 
-            <div className="grid grid-cols-2 gap-1.5">
-              <Toggle
-                label="🌙 Decaf"
-                value={hasDecaf}
-                onChange={setHasDecaf}
+          <div className="grid grid-cols-2 gap-1.5">
+            <Toggle
+              label="🫘 Beans for sale"
+              value={sellsBeans}
+              onChange={setSellsBeans}
+            />
+
+            <Toggle
+              label="🔥 Has a roaster"
+              value={hasRoaster}
+              onChange={setHasRoaster}
+            />
+          </div>
+
+          {hasRoaster && (
+            <label className="mt-2 block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                Roaster name
+              </span>
+
+              <input
+                value={roaster}
+                onChange={(e) => setRoaster(e.target.value)}
+                className={field}
               />
+            </label>
+          )}
 
-              <Toggle
-                label="💻 Laptop-friendly"
-                value={laptop}
-                onChange={setLaptop}
-              />
-            </div>
+          <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+            Food
+          </h3>
 
-            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Beans
-            </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {FOOD.map((option) => {
+              const on = food.includes(option.key);
 
-            <div className="grid grid-cols-2 gap-1.5">
-              <Toggle
-                label="🫘 Beans for sale"
-                value={sellsBeans}
-                onChange={setSellsBeans}
-              />
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleIn(food, setFood, option.key)}
+                  className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
+                    on
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  {option.emoji} {option.label}
+                </button>
+              );
+            })}
+          </div>
 
-              <Toggle
-                label="🔥 Has a roaster"
-                value={hasRoaster}
-                onChange={setHasRoaster}
-              />
-            </div>
+          <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+            Ambiance
+          </h3>
 
-            {hasRoaster && (
-              <label className="mt-2 block">
-                <span className="mb-1 block text-xs font-medium text-slate-500">
-                  Roaster name
-                </span>
+          <div className="flex flex-wrap gap-1.5">
+            {AMBIENCE.map((option) => {
+              const on = ambience.includes(option.key);
 
-                <input
-                  value={roaster}
-                  onChange={(e) => setRoaster(e.target.value)}
-                  className={field}
-                />
-              </label>
-            )}
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleIn(ambience, setAmbience, option.key)}
+                  className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
+                    on
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  {option.emoji} {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
-            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Food
-            </h3>
-
-            <div className="flex flex-wrap gap-1.5">
-              {FOOD.map((option) => {
-                const on = food.includes(option.key);
-
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleIn(food, setFood, option.key)}
-                    className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                      on
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white text-slate-700"
-                    }`}
-                  >
-                    {option.emoji} {option.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Ambiance
-            </h3>
-
-            <div className="flex flex-wrap gap-1.5">
-              {AMBIENCE.map((option) => {
-                const on = ambience.includes(option.key);
-
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleIn(ambience, setAmbience, option.key)}
-                    className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                      on
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white text-slate-700"
-                    }`}
-                  >
-                    {option.emoji} {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
+      <Card>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
           Amenities
-        </h3>
+        </h2>
 
         <div className="grid grid-cols-3 gap-1.5">
           <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
