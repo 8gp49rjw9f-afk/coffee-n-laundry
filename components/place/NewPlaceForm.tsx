@@ -49,21 +49,39 @@ function clockTime(minutes: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/*
+ * Four ways to pay, and the card detail behind one of them.
+ *
+ * The old list had thirteen flat options and several of them meant
+ * the same thing: Visa competed with Card, and "All major credit
+ * cards" competed with both. Nobody could tell which to pick, and the
+ * same shop got tagged three different ways depending on who filled
+ * the form — which made the column useless to count from.
+ *
+ * Visa is not an alternative to Cards. It is a refinement of it, so it
+ * lives underneath, and only appears once Cards is chosen.
+ */
 const PAYMENT_KEYS = [
-  { value: "cash", label: "💵 Cash" },
-  { value: "coins", label: "🪙 Coins" },
-  { value: "card", label: "💳 Card" },
-  { value: "visa", label: "💳 Visa" },
-  { value: "mastercard", label: "💳 Mastercard" },
-  { value: "amex", label: "💳 American Express" },
-  { value: "major_cards", label: "💳 All major credit cards" },
-  { value: "debit", label: "🏧 Debit" },
-  { value: "contactless", label: "📱 Contactless" },
-  { value: "apple_pay", label: "🍎 Apple Pay" },
-  { value: "google_pay", label: "🟢 Google Pay" },
-  { value: "laundry_card", label: "🎟️ Laundry card" },
-  { value: "other", label: "➖ Other" },
+  { value: "cash", label: "💵 Cash / Coins" },
+  { value: "card", label: "💳 Cards" },
+  { value: "online", label: "📱 Online App" },
+  { value: "laundry_card", label: "🎟️ Laundry Card" },
 ];
+
+/* The card detail, asked only once Cards has been chosen. Visa is not
+   an alternative to Card — it is a refinement of it, which is why the
+   two no longer sit side by side in one list. */
+const CARD_KINDS = [
+  { value: "mastercard", label: "MasterCard" },
+  { value: "visa", label: "Visa" },
+  { value: "amex", label: "Amex" },
+  { value: "major_cards", label: "Major Local Credit Cards" },
+];
+
+/* A person may write one thing of their own — "exact change only",
+   "tokens at the counter". It goes into accepted_payments beside the
+   rest, capped so a note cannot become a paragraph. */
+const PAYMENT_NOTE_MAX = 25;
 
 /* The milks, listed once so the form and the payload agree. */
 const MILKS = [
@@ -197,6 +215,10 @@ export function NewPlaceForm({
 
   const [payments, setPayments] = useState<string[]>([]);
 
+  /* Held apart from `payments` so the button list stays the four
+     categories, and folded in at send time. */
+  const [paymentNote, setPaymentNote] = useState("");
+
   const [wifi, setWifi] = useState(false);
   const [power, setPower] = useState(false);
   const [parking, setParking] = useState(false);
@@ -296,6 +318,11 @@ export function NewPlaceForm({
       formData.set("currency", currency);
 
       payments.forEach((p) => formData.append("payments", p));
+
+      if (paymentNote.trim()) {
+        formData.append("payments", paymentNote.trim());
+      }
+
       machineSizes.forEach((s) => formData.append("machine_sizes", s));
       photos.forEach((p) => formData.append("photo", p));
 
@@ -667,9 +694,9 @@ export function NewPlaceForm({
             />
           </div>
 
-          {/* One question, one list. Tap a milk to add it, tap
-              again to take it away — a café with three plant milks
-              answers once instead of five times. */}
+          {/* One question, one list. Tap a milk to add it, tap again to
+              take it away — a café with three plant milks answers once
+              instead of five times. */}
           <p className="mt-4 mb-2 text-sm font-semibold text-slate-700">
             Which milks?
           </p>
@@ -887,22 +914,82 @@ export function NewPlaceForm({
         <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment</h3>
 
         <div className="flex flex-wrap gap-2">
-          {PAYMENT_KEYS.map((key) => (
-            <button
-              key={key.value}
-              type="button"
-              onClick={() => toggleIn(payments, setPayments, key.value)}
-              aria-pressed={payments.includes(key.value)}
-              className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                payments.includes(key.value)
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-300 bg-white text-slate-700"
-              }`}
-            >
-              {key.label}
-            </button>
-          ))}
+          {PAYMENT_KEYS.map((key) => {
+            const on = payments.includes(key.value);
+
+            return (
+              <button
+                key={key.value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  /* Leaving Cards takes the card detail with it: a row
+                     saying "Visa" under a place that does not take
+                     cards is worse than no row at all. */
+                  if (key.value === "card" && on) {
+                    setPayments(
+                      payments.filter(
+                        (p) =>
+                          p !== "card" &&
+                          !CARD_KINDS.some((c) => c.value === p)
+                      )
+                    );
+                    return;
+                  }
+
+                  toggleIn(payments, setPayments, key.value);
+                }}
+                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
+                  on
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-300 bg-white text-slate-700"
+                }`}
+              >
+                {key.label}
+              </button>
+            );
+          })}
         </div>
+
+        {payments.includes("card") && (
+          <div className="mt-2 flex flex-wrap gap-2 border-l-2 border-slate-200 pl-2">
+            {CARD_KINDS.map((key) => {
+              const on = payments.includes(key.value);
+
+              return (
+                <button
+                  key={key.value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleIn(payments, setPayments, key.value)}
+                  className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition ${
+                    on
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-600"
+                  }`}
+                >
+                  {key.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+            Or add your own — {PAYMENT_NOTE_MAX} characters at most
+          </span>
+
+          <input
+            value={paymentNote}
+            onChange={(e) =>
+              setPaymentNote(e.target.value.slice(0, PAYMENT_NOTE_MAX))
+            }
+            maxLength={PAYMENT_NOTE_MAX}
+            placeholder="Exact change only, tokens at the counter…"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
+          />
+        </label>
       </Card>
 
       <Card>
