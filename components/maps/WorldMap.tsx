@@ -30,6 +30,11 @@ export interface MePoint {
  * Anything that calls useMap() has to be a CHILD of MapContainer.
  * React-Leaflet provides the map through context, and context only
  * flows downwards — a sibling of the container never sees it.
+ *
+ * That is not a style note. Rendering a control that calls useMap()
+ * anywhere else throws "No context provided", which takes the whole
+ * page to the error boundary. ZoomBar and CentreArrow are therefore
+ * mounted ONCE each, inside the map, and nowhere else.
  */
 
 function MapState({
@@ -63,8 +68,8 @@ function MapState({
 
 /*
  * The zoom bar: one horizontal rail, minus on the left, plus on the
- * right. Inside MapContainer so it can call useMap() — context only
- * flows downwards, and a sibling never sees it.
+ * right. It sits at bottom-left by absolute positioning, so its place
+ * on screen does not depend on where it is mounted.
  *
  * The end stops are disabled rather than silently inert: a button that
  * looks pressable when it is not is a small lie.
@@ -137,7 +142,9 @@ function ZoomBar({
  *
  * pointer-events-none matters — a crosshair that eats clicks would
  * make the middle of the map undraggable, a worse bug than a missing
- * arrow ever was.
+ * arrow ever was. It calls no map method, so it can be mounted
+ * anywhere; it is kept beside ZoomBar for the two breakpoint copies
+ * to stay in step.
  */
 function CentreArrow({
   breakpoint,
@@ -276,6 +283,10 @@ function TheMap({
         <MapResizeFix trigger={panelOpen} />
         <FlyToSelected place={selected} />
         <FlyToMe target={me} request={request} />
+
+        {/* Both of these call into the map, so both live HERE and
+            only here. A second copy outside MapContainer has no
+            Leaflet context and throws. */}
         <ZoomBar breakpoint={breakpoint} />
         <CentreArrow breakpoint={breakpoint} />
 
@@ -324,32 +335,25 @@ function TheMap({
         )}
       </MapContainer>
 
-      {/* The controls sit on the map rather than under it: they are
-          things you do TO the map, and your thumb already knows where
-          the map is. Bottom left, because the pin counter owns the
-          bottom right and the position badge owns the top right.
+      {/* "Where am I" sits on the map rather than under it: it is a
+          thing you do TO the map, and your thumb already knows where
+          the map is. Bottom left, beside the zoom bar.
 
           z-[500] is deliberate: globals.css pins Leaflet's panes at
           400 with !important, so anything below that is drawn under
           the tiles and disappears. */}
-      <div
-        className={`${ownBreakpoint} absolute bottom-3 left-3 z-[500] flex-row items-center gap-1.5`}
+      <button
+        type="button"
+        onClick={onWhereAmI}
+        disabled={locating}
+        aria-label="Zoom to where I am"
+        className={`${ownBreakpoint} absolute bottom-3 left-[6.4rem] z-[500] min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70`}
       >
-        <ZoomBar breakpoint={breakpoint} />
-
-        <button
-          type="button"
-          onClick={onWhereAmI}
-          disabled={locating}
-          aria-label="Zoom to where I am"
-          className="flex min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70"
-        >
-          <span className="text-base">{locating ? "⏳" : "📍"}</span>
-          <span className="hidden sm:inline">
-            {locating ? "Locating…" : "Where am I?"}
-          </span>
-        </button>
-      </div>
+        <span className="text-base">{locating ? "⏳" : "📍"}</span>
+        <span className="hidden sm:inline">
+          {locating ? "Locating…" : "Where am I?"}
+        </span>
+      </button>
 
       {/* How many pins are drawn — the counter for a zoomed-out view. */}
       {visible.length < places.length && (
