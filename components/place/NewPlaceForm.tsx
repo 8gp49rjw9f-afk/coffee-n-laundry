@@ -523,6 +523,99 @@ export function NewPlaceForm({
         </Card>
       )}
 
+      <Card>
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">Prices</h3>
+
+        {/* The currency belongs beside the amounts, not in a corner of
+            the form: a price without one tells nobody anything, and
+            the server refuses a row that has no currency. */}
+        <CurrencyPicker
+          value={currency}
+          onChange={setCurrency}
+          selectClass={selectClass}
+        />
+
+        {isCoffee ? (
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Espresso
+              </span>
+
+              <input
+                value={espressoPrice}
+                onChange={(e) => setEspressoPrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="3.50"
+                className={selectClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Filter
+              </span>
+
+              <input
+                value={filterPrice}
+                onChange={(e) => setFilterPrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="4.00"
+                className={selectClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Flat white
+              </span>
+
+              <input
+                value={flatWhitePrice}
+                onChange={(e) => setFlatWhitePrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="4.50"
+                className={selectClass}
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Wash
+              </span>
+
+              <input
+                value={washAmount}
+                onChange={(e) => setWashAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="4.00"
+                className={selectClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Dryer
+              </span>
+
+              <input
+                value={dryerAmount}
+                onChange={(e) => setDryerAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="2.00"
+                className={selectClass}
+              />
+            </label>
+          </div>
+        )}
+
+        <p className="mt-2 text-xs text-slate-500">
+          Optional, but a price is the thing most people come for.
+        </p>
+      </Card>
+
       {isCoffee && (
         <Card>
           <h3 className="mb-3 text-sm font-semibold text-slate-700">Food</h3>
