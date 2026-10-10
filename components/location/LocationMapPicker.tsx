@@ -33,11 +33,28 @@ function CentreWatcher({
 }) {
   const map = useMap();
 
+  /*
+   * The caller passes a new arrow function every render, so putting
+   * `onCentre` in the dependency list restarted this effect on every
+   * render and re-attached its two listeners each time. Held in a
+   * ref instead, the listeners are attached once and always call the
+   * current callback.
+   */
+  const latest = useRef(onCentre);
+
+  useEffect(() => {
+    latest.current = onCentre;
+  }, [onCentre]);
+
   useEffect(() => {
     function report() {
+      /* A removed map has no container, and asking for one is the
+         cheap way to know this listener has outlived its map. */
+      if (!map.getContainer()) return;
+
       const centre = map.getCenter();
 
-      onCentre(centre.lat, centre.lng);
+      latest.current(centre.lat, centre.lng);
     }
 
     report();
@@ -49,7 +66,7 @@ function CentreWatcher({
       map.off("moveend", report);
       map.off("zoomend", report);
     };
-  }, [map, onCentre]);
+  }, [map]);
 
   return null;
 }
@@ -59,6 +76,11 @@ function CentreWatcher({
  * a real layout. Leaflet caches the container size, and in a modal the
  * first measurement can be taken before the box has its final width —
  * the centre then reads back slightly off, and the saved point drifts.
+ *
+ * The 200ms delay is why a removed map has to be guarded against: the
+ * timer outlives a closing modal, and `invalidateSize()` on a torn-down
+ * map throws — which took the whole page to the error boundary, and is
+ * why the crosshair was visible for a moment and then gone.
  */
 function SettleOnOpen({ open }: { open: boolean }) {
   const map = useMap();
@@ -66,7 +88,11 @@ function SettleOnOpen({ open }: { open: boolean }) {
   useEffect(() => {
     if (!open) return;
 
-    const timer = setTimeout(() => map.invalidateSize(), 200);
+    const timer = setTimeout(() => {
+      if (!map.getContainer()) return;
+
+      map.invalidateSize();
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [map, open]);
