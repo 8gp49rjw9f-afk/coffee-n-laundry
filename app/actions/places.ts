@@ -78,6 +78,19 @@ export async function createPlace(formData: FormData): Promise<void> {
     throw new Error("PLACE_POSITION_INVALID");
   }
 
+  /*
+   * At least one photo. The form disables its button without one, but
+   * the form is a suggestion — this is the rule, and it holds for a
+   * request built by hand as well.
+   */
+  const photoCount = formData
+    .getAll("photo")
+    .filter((value) => value instanceof File && value.size > 0).length;
+
+  if (photoCount === 0) {
+    throw new Error("PLACE_PHOTO_REQUIRED");
+  }
+
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const { count: recentCount } = await supabase
@@ -93,9 +106,7 @@ export async function createPlace(formData: FormData): Promise<void> {
   /*
    * The lookup may not answer — and when it does not, the place still
    * goes on the map with no city and no country. The flag is logged so
-   * a run of failures is visible; nothing is said to the visitor,
-   * because an empty city is the normal shape of a place in the
-   * countryside and the two are not worth telling apart on screen.
+   * a run of failures is visible; nothing is said to the visitor.
    */
   const geo = await reverseGeocode(latitude, longitude);
 
@@ -217,8 +228,7 @@ export async function createPlace(formData: FormData): Promise<void> {
 
       /* The place is real and saved; losing its prices would leave it
          silently useless to the person who drives there. This is the
-         one failure here that WARNS rather than blocks, so the place
-         is kept and the visitor is told what was lost. */
+         one failure here that WARNS rather than blocks. */
       if (priceError) {
         console.error("[createPlace] prices", priceError.message);
 
@@ -432,8 +442,7 @@ export async function createPlace(formData: FormData): Promise<void> {
    *
    * The credits for this place are paid when somebody else verifies
    * it, not now — see `awardPlaceCreditsOnce` in lib/services/credits.
-   * Paying at creation would reward empty pins, and an empty pin is
-   * worth nothing to the person who drives to it.
+   * Paying at creation would reward empty pins.
    */
 
   revalidatePath("/");
