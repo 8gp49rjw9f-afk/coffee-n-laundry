@@ -31,13 +31,11 @@ import type { PlacePhoto } from "@/lib/types";
  * Tapping the image still opens it full-screen: a price list is
  * unreadable in a 140px square.
  *
- * FAILURES GO TO THE POPUP. This component used to keep a local
- * `error` string and draw a red banner under the rail, which meant a
- * photo failure looked different from every other failure on the
- * site. It also printed whatever the server said. Now the four
- * failures here — replace, compress, cover, delete — all report
- * through showError, and the actions behind them throw codes the
- * catalogue can translate.
+ * THE DATE SITS ON THE PHOTO, not under it. A row of controls and a
+ * date stacked below the picture made every card taller than the photo
+ * it showed, and the rail grew with it. The date is an overlay in the
+ * bottom-right corner: it costs no height, and it reads as belonging
+ * to the picture rather than to the buttons.
  */
 
 const PHOTO_OPTIONS = {
@@ -136,11 +134,6 @@ export function PhotoStrip({
     };
   }, [openIndex, ordered.length]);
 
-  /*
-   * One card at a time. The card is a fraction of the rail's width, so
-   * its own width is what to move by — measured rather than assumed,
-   * since a phone and a desktop show different fractions.
-   */
   function scrollBy(direction: -1 | 1) {
     const rail = scrollRef.current;
 
@@ -166,8 +159,6 @@ export function PhotoStrip({
       return;
     }
 
-    /* Always clear the input, or picking the same file twice fires
-       no change event the second time. */
     if (fileInput.current) fileInput.current.value = "";
 
     setCropping(list[0]);
@@ -194,7 +185,6 @@ export function PhotoStrip({
 
           router.refresh();
         } catch (err) {
-          /* The action throws a code; the popup translates it. */
           showError(err);
         } finally {
           setReplacingId(null);
@@ -206,12 +196,6 @@ export function PhotoStrip({
     }
   }
 
-  /*
-   * The cover is chosen optimistically: the ring moves the moment the
-   * button is pressed, then the server call settles it. A control that
-   * gives no sign of having been pressed is indistinguishable from a
-   * broken one, and this one cannot be allowed to feel broken.
-   */
   function makeCover(photoId: string) {
     setChoosing(photoId);
 
@@ -242,7 +226,6 @@ export function PhotoStrip({
     });
   }
 
-  /* The crop owns the screen while it lasts. */
   if (cropping) {
     return (
       <SquareCrop
@@ -258,7 +241,6 @@ export function PhotoStrip({
 
   if (ordered.length === 0) return null;
 
-  /* Under four photos everything already fits; arrows would be noise. */
   const scrollable = ordered.length > 3;
 
   return (
@@ -280,8 +262,6 @@ export function PhotoStrip({
         >
           <ul className="flex snap-x snap-mandatory gap-3">
             {ordered.map((photo, index) => {
-              /* While the server confirms, the ring already sits on the
-                 photo that was clicked. */
               const isCover =
                 choosing != null ? photo.id === choosing : photo.is_primary;
 
@@ -290,10 +270,16 @@ export function PhotoStrip({
                   key={photo.id}
                   className="w-[62%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
                 >
+                  {/*
+                    The picture, with everything that belongs to it
+                    laid over it: the cover badge top-left, the date
+                    bottom-right. Both are pointer-events-none passes
+                    through, so the whole square stays tappable.
+                  */}
                   <button
                     type="button"
                     onClick={() => setOpenIndex(index)}
-                    className={`block w-full overflow-hidden rounded-xl transition ${
+                    className={`relative block w-full overflow-hidden rounded-xl transition ${
                       isCover
                         ? "border-2 border-sky-300"
                         : "border-2 border-transparent"
@@ -311,85 +297,67 @@ export function PhotoStrip({
                       loading="lazy"
                       className="aspect-square w-full object-cover"
                     />
+
+                    {isCover && (
+                      <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-md bg-sky-600/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
+                        Cover
+                      </span>
+                    )}
+
+                    <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
+                      {formatPhotoDate(photo.created_at)}
+                    </span>
                   </button>
 
                   {/*
-                    One row, three small targets, and the date.
+                    The controls, on one line, signed in only.
 
-                    The buttons were stacked and full width, which made
-                    them the loudest thing under a photo and left the
-                    date nowhere to go. They are now one line: the cover
-                    on the left (or a badge when this photo already IS
-                    the cover), Modify, then a red ✕.
-
-                    The date sits at the end of the same row, right-
-                    aligned and quiet — a photo's age is what tells you
-                    whether the price list in it is still worth reading.
+                    They were stacked and full width, which made them
+                    the loudest thing under a photo. Now: the cover on
+                    the left (or nothing when this photo already is the
+                    cover — the badge on the picture says so), Modify
+                    in the middle, a red ✕ on the right.
                   */}
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    {signedIn ? (
-                      <>
-                        {isCover ? (
-                          <span className="flex h-8 shrink-0 items-center rounded-lg bg-sky-50 px-2 text-[11px] font-bold uppercase tracking-wide text-sky-700">
-                            Cover
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => makeCover(photo.id)}
-                            disabled={pending}
-                            className="flex h-8 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            Set cover
-                          </button>
-                        )}
-
+                  {signedIn && (
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      {!isCover && (
                         <button
                           type="button"
-                          onClick={() => pickReplacement(photo.id)}
+                          onClick={() => makeCover(photo.id)}
                           disabled={pending}
-                          className="flex h-8 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                          className="flex h-8 items-center rounded-lg border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                         >
-                          Modify
+                          Set cover
                         </button>
+                      )}
 
-                        <button
-                          type="button"
-                          onClick={() => remove(photo.id)}
-                          disabled={pending}
-                          aria-label="Delete this photo"
-                          title="Delete this photo"
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-sm font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-                        >
-                          ✕
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => pickReplacement(photo.id)}
+                        disabled={pending}
+                        className="flex h-8 flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Modify
+                      </button>
 
-                        <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-slate-400">
-                          {formatPhotoDate(photo.created_at)}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        {isCover && (
-                          <span className="flex h-8 shrink-0 items-center rounded-lg bg-sky-50 px-2 text-[11px] font-bold uppercase tracking-wide text-sky-700">
-                            Cover
-                          </span>
-                        )}
-
-                        <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-slate-400">
-                          {formatPhotoDate(photo.created_at)}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => remove(photo.id)}
+                        disabled={pending}
+                        aria-label="Delete this photo"
+                        title="Delete this photo"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-sm font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ul>
         </div>
 
-        {/* Arrows ride on top of the rail, half transparent until
-            touched — they must not compete with the photos. */}
         {scrollable && (
           <>
             <button
