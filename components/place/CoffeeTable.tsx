@@ -65,6 +65,14 @@ function formatDate(iso: string) {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
+/*
+ * The order here is the order on the page, and it is deliberate: what
+ * the place is, then what it costs, then what is in the cup, then
+ * what else is on offer, then the room, then the icons.
+ *
+ * Milk and decaf sit with the drinks rather than at the bottom, and
+ * the two bean facts sit together; both used to be scattered.
+ */
 const ROWS: {
   key: string;
   label: string;
@@ -103,15 +111,27 @@ const ROWS: {
     fallback: (p) => price(p, "flat_white"),
   },
   {
-    key: "food",
-    label: "Food",
-    emoji: "🍽️",
-    fallback: (p) =>
-      p.food && p.food.length > 0
-        ? p.food
-            .map((f) => `${FOOD_EMOJI[f] ?? ""} ${FOOD_LABEL[f] ?? f}`.trim())
-            .join(", ")
-        : null,
+    key: "milk",
+    label: "Milk / PBM",
+    emoji: "🥛",
+    fallback: (p) => {
+      /* One line for all the plant milks: four separate rows pushed
+         the useful facts below the fold. */
+      const found: string[] = [];
+
+      if (p.has_oat_milk) found.push("Oat");
+      if (p.has_soy_milk) found.push("Soy");
+      if (p.has_coconut_milk) found.push("Coconut");
+      if (p.has_almond_milk) found.push("Almond");
+
+      return found.length > 0 ? found.join(", ") : null;
+    },
+  },
+  {
+    key: "decaf",
+    label: "Decaf",
+    emoji: "🌙",
+    fallback: (p) => yesNo(p.has_decaf),
   },
   {
     key: "beans",
@@ -133,6 +153,17 @@ const ROWS: {
           : "no",
   },
   {
+    key: "food",
+    label: "Food",
+    emoji: "🍽️",
+    fallback: (p) =>
+      p.food && p.food.length > 0
+        ? p.food
+            .map((f) => `${FOOD_EMOJI[f] ?? ""} ${FOOD_LABEL[f] ?? f}`.trim())
+            .join(", ")
+        : null,
+  },
+  {
     key: "ambience",
     label: "Ambience",
     emoji: "🪑",
@@ -142,29 +173,6 @@ const ROWS: {
             .map((a) => `${AMBIENCE_EMOJI[a] ?? ""} ${AMBIENCE_LABEL[a] ?? a}`)
             .join(", ")
         : null,
-  },
-  {
-    key: "decaf",
-    label: "Decaf",
-    emoji: "🌙",
-    fallback: (p) => yesNo(p.has_decaf),
-  },
-  {
-    key: "milk",
-    label: "Milk / PBM",
-    emoji: "🥛",
-    fallback: (p) => {
-      /* One line for all the plant milks: four separate rows pushed
-         the useful facts below the fold. */
-      const found: string[] = [];
-
-      if (p.has_oat_milk) found.push("Oat");
-      if (p.has_soy_milk) found.push("Soy");
-      if (p.has_coconut_milk) found.push("Coconut");
-      if (p.has_almond_milk) found.push("Almond");
-
-      return found.length > 0 ? found.join(", ") : null;
-    },
   },
   {
     key: "laptop",
