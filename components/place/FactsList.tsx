@@ -136,14 +136,14 @@ export function FactsList({ place }: { place: Place }) {
 
       {methods.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-3">
-          <span className="mr-1 text-xs font-semibold text-slate-500">
+          <span className="mr-1 text-[11px] font-semibold text-slate-500">
             💳 Payment
           </span>
 
           {methods.map((key) => (
             <span
               key={key}
-              className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+              className="rounded bg-slate-100 px-1.5 py-px text-[11px] font-medium text-slate-600"
             >
               {paymentEmoji(key)} {paymentLabel(key)}
             </span>
@@ -151,11 +151,11 @@ export function FactsList({ place }: { place: Place }) {
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-1.5">
+      <div className="mt-3 flex flex-wrap gap-1">
         {amenities.map((item) => (
           <span
             key={item}
-            className="rounded-lg bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-700"
+            className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700"
           >
             {item}
           </span>
