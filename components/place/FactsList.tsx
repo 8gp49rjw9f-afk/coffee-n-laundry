@@ -87,15 +87,13 @@ export function FactsList({ place }: { place: Place }) {
     });
   }
 
-  rows.push({
-    label: "💳 Payment",
-    value:
-      (place.accepted_payments ?? []).length > 0
-        ? place.accepted_payments
-            .map((key) => `${paymentEmoji(key)} ${paymentLabel(key)}`)
-            .join(", ")
-        : "Not recorded",
-  });
+  /*
+   * Payment is the one row that can hold a dozen values at once, so it
+   * is not turned into a sentence inside the dl: each method becomes
+   * its own chip underneath, in small type, and the whole list still
+   * fits on one or two lines. The amenities below keep their emoji.
+   */
+  const methods = place.accepted_payments ?? [];
 
   const amenities: string[] = [];
 
@@ -135,6 +133,23 @@ export function FactsList({ place }: { place: Place }) {
           </div>
         ))}
       </dl>
+
+      {methods.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-slate-100 pt-3">
+          <span className="mr-1 text-xs font-semibold text-slate-500">
+            💳 Payment
+          </span>
+
+          {methods.map((key) => (
+            <span
+              key={key}
+              className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+            >
+              {paymentEmoji(key)} {paymentLabel(key)}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-1.5">
         {amenities.map((item) => (
