@@ -289,6 +289,105 @@ export async function restorePlace(placeId: string): Promise<void> {
   revalidatePath("/");
 }
 
+/* ---------- deleting a place completely ---------- */
+
+/*
+ * Removing a place, for good.
+ *
+ * Not the same thing as closing one. Closing sets status = 'closed':
+ * the place leaves the map and restorePlace can bring it back, which
+ * is the right answer for a laundromat that shut down, or a report
+ * that turned out to be wrong.
+ *
+ * Deleting is for a place that should never have been on the map:
+ * invented to farm credits, spam, a duplicate, something illegal.
+ * Keeping a row for those is a hiding place, not a safety net. It
+ * cannot be undone, so the button that calls it asks first.
+ *
+ * ADMINS ONLY — any admin, not only the master. The button lives on
+ * the place page, but the check is here, on the server: a hidden
+ * button protects nothing, since this function is reachable by anyone
+ * who can forge a request.
+ *
+ * THE ORDER MATTERS
+ *
+ * Credits are withdrawn first, through the same append-only ledger
+ * the close path uses — a negative row, never a deletion, so the
+ * history stays honest. Then every child row, then the place itself.
+ * If a step fails the function stops: a place still on the map with
+ * its credits intact is recoverable, a place gone with its credits
+ * left behind is not.
+ */
+
+export async function deletePlace(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const supabase = await createClient();
+
+  const placeId = String(formData.get("place_id") ?? "");
+
+  if (!placeId) throw new Error("PLACE_NOT_FOUND");
+
+  /* Read first, so a stale page cannot delete something that is no
+     longer there — and so the failure is a readable code rather than
+     a silent zero-row delete. */
+  const { data: place, error: readError } = await supabase
+    .from("places")
+    .select("name")
+    .eq("id", placeId)
+    .maybeSingle();
+
+  if (readError || !place) {
+    console.error("[deletePlace] read", readError?.message ?? "not found");
+
+    throw new Error("PLACE_NOT_FOUND");
+  }
+
+  /* Before the row goes: revokePlaceCredits looks the place up by id. */
+  await revokePlaceCredits(placeId, "Place deleted by an admin");
+
+  /* Every table that points at this place, cleared before its parent.
+     A foreign key would otherwise block the delete, or leave rows
+     pointing at a place that no longer exists.
+
+     The list is wider than this schema on purpose: a table that is not
+     there is skipped rather than fatal, so a place is never left
+     half-deleted over a name that did not exist. 42P01 is Postgres
+     for "undefined table". */
+  const children = [
+    "place_photos",
+    "place_reports",
+    "place_confirmations",
+    "place_updates",
+    "place_field_checks",
+    "place_prices",
+  ];
+
+  for (const table of children) {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq("place_id", placeId);
+
+    if (error && error.code !== "42P01") {
+      console.error(`[deletePlace] ${table}`, error.message);
+
+      throw new Error("ADMIN_DELETE_FAILED");
+    }
+  }
+
+  const { error } = await supabase.from("places").delete().eq("id", placeId);
+
+  if (error) {
+    console.error("[deletePlace] places", error.message);
+
+    throw new Error("ADMIN_DELETE_FAILED");
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
+
 /* ---------- admins: master only ---------- */
 
 export async function addAdmin(formData: FormData): Promise<void> {
