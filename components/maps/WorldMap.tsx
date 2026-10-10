@@ -33,8 +33,13 @@ export interface MePoint {
  *
  * That is not a style note. Rendering a control that calls useMap()
  * anywhere else throws "No context provided", which takes the whole
- * page to the error boundary. ZoomBar and CentreArrow are therefore
- * mounted ONCE each, inside the map, and nowhere else.
+ * page to the error boundary. ZoomBar is therefore mounted ONCE,
+ * inside the map, and nowhere else.
+ *
+ * There is no crosshair on this map, on purpose. A crosshair means
+ * "the centre is the answer" — true for the pin picker, where the map
+ * moves under a fixed point, and false here, where the map is being
+ * read rather than aimed with.
  */
 
 function MapState({
@@ -130,51 +135,6 @@ function ZoomBar({
       >
         +
       </button>
-    </div>
-  );
-}
-
-/*
- * The arrow at the centre of the map.
- *
- * Not a marker and not a control: a glyph pinned to the middle of the
- * viewport, reading as "the point you are looking at".
- *
- * pointer-events-none matters — a crosshair that eats clicks would
- * make the middle of the map undraggable, a worse bug than a missing
- * arrow ever was. It calls no map method, so it can be mounted
- * anywhere; it is kept beside ZoomBar for the two breakpoint copies
- * to stay in step.
- */
-function CentreArrow({
-  breakpoint,
-}: {
-  breakpoint: "phone" | "desktop";
-}) {
-  const visible = breakpoint === "phone" ? "md:hidden" : "hidden md:block";
-
-  return (
-    <div
-      className={`${visible} pointer-events-none absolute left-1/2 top-1/2 z-[500] -translate-x-1/2 -translate-y-1/2`}
-      aria-hidden
-    >
-      <svg
-        width="26"
-        height="26"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-slate-900/70 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
-      >
-        <line x1="12" y1="2" x2="12" y2="8" />
-        <line x1="12" y1="16" x2="12" y2="22" />
-        <line x1="2" y1="12" x2="8" y2="12" />
-        <line x1="16" y1="12" x2="22" y2="12" />
-        <circle cx="12" cy="12" r="2.5" />
-      </svg>
     </div>
   );
 }
@@ -284,11 +244,10 @@ function TheMap({
         <FlyToSelected place={selected} />
         <FlyToMe target={me} request={request} />
 
-        {/* Both of these call into the map, so both live HERE and
-            only here. A second copy outside MapContainer has no
-            Leaflet context and throws. */}
+        {/* The zoom bar calls into the map, so it lives HERE and only
+            here. A copy outside MapContainer has no Leaflet context
+            and throws. */}
         <ZoomBar breakpoint={breakpoint} />
-        <CentreArrow breakpoint={breakpoint} />
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
