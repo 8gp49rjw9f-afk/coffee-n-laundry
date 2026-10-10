@@ -19,6 +19,7 @@ import { Card, Button, DirectionsButton } from "@/components/ui";
 import { verifyField, hasConfirmedThisWeek } from "@/app/actions/verify";
 
 import { getFreshness } from "@/lib/services/freshness";
+import { currentAdmin } from "@/lib/services/admin";
 
 export default async function PlacePage({
   params,
@@ -36,7 +37,10 @@ export default async function PlacePage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const place = await getPlace(id);
+  /* Two independent reads, so they go together — and the admin check
+     is done here, once, rather than in the header: whether this person
+     may delete the place is a server fact, not a rendering choice. */
+  const [place, admin] = await Promise.all([getPlace(id), currentAdmin()]);
 
   if (!place) {
     return (
@@ -126,6 +130,7 @@ export default async function PlacePage({
         signedIn={Boolean(user)}
         confirmedThisWeek={confirmedThisWeek}
         creatorName={place.creator_name}
+        canDelete={Boolean(admin)}
       />
 
       <PhotoStrip
