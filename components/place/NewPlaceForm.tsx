@@ -68,9 +68,7 @@ const PAYMENT_KEYS = [
   { value: "laundry_card", label: "🎟️ Laundry Card" },
 ];
 
-/* The card detail, asked only once Cards has been chosen. Visa is not
-   an alternative to Card — it is a refinement of it, which is why the
-   two no longer sit side by side in one list. */
+/* The card detail, asked only once Cards has been chosen. */
 const CARD_KINDS = [
   { value: "mastercard", label: "MasterCard" },
   { value: "visa", label: "Visa" },
@@ -643,6 +641,88 @@ export function NewPlaceForm({
         </p>
       </Card>
 
+      <Card>
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment</h3>
+
+        <div className="flex flex-wrap gap-2">
+          {PAYMENT_KEYS.map((key) => {
+            const on = payments.includes(key.value);
+
+            return (
+              <button
+                key={key.value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  /* Leaving Cards takes the card detail with it: a row
+                     saying "Visa" under a place that does not take
+                     cards is worse than no row at all. */
+                  if (key.value === "card" && on) {
+                    setPayments(
+                      payments.filter(
+                        (p) =>
+                          p !== "card" &&
+                          !CARD_KINDS.some((c) => c.value === p)
+                      )
+                    );
+                    return;
+                  }
+
+                  toggleIn(payments, setPayments, key.value);
+                }}
+                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
+                  on
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-300 bg-white text-slate-700"
+                }`}
+              >
+                {key.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {payments.includes("card") && (
+          <div className="mt-2 flex flex-wrap gap-2 border-l-2 border-slate-200 pl-2">
+            {CARD_KINDS.map((key) => {
+              const on = payments.includes(key.value);
+
+              return (
+                <button
+                  key={key.value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleIn(payments, setPayments, key.value)}
+                  className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition ${
+                    on
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-600"
+                  }`}
+                >
+                  {key.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+            Or add your own — {PAYMENT_NOTE_MAX} characters at most
+          </span>
+
+          <input
+            value={paymentNote}
+            onChange={(e) =>
+              setPaymentNote(e.target.value.slice(0, PAYMENT_NOTE_MAX))
+            }
+            maxLength={PAYMENT_NOTE_MAX}
+            placeholder="Exact change only, tokens at the counter…"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
+          />
+        </label>
+      </Card>
+
       {isCoffee && (
         <Card>
           <h3 className="mb-3 text-sm font-semibold text-slate-700">Food</h3>
@@ -909,88 +989,6 @@ export function NewPlaceForm({
           )}
         </Card>
       )}
-
-      <Card>
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment</h3>
-
-        <div className="flex flex-wrap gap-2">
-          {PAYMENT_KEYS.map((key) => {
-            const on = payments.includes(key.value);
-
-            return (
-              <button
-                key={key.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => {
-                  /* Leaving Cards takes the card detail with it: a row
-                     saying "Visa" under a place that does not take
-                     cards is worse than no row at all. */
-                  if (key.value === "card" && on) {
-                    setPayments(
-                      payments.filter(
-                        (p) =>
-                          p !== "card" &&
-                          !CARD_KINDS.some((c) => c.value === p)
-                      )
-                    );
-                    return;
-                  }
-
-                  toggleIn(payments, setPayments, key.value);
-                }}
-                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                  on
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                {key.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {payments.includes("card") && (
-          <div className="mt-2 flex flex-wrap gap-2 border-l-2 border-slate-200 pl-2">
-            {CARD_KINDS.map((key) => {
-              const on = payments.includes(key.value);
-
-              return (
-                <button
-                  key={key.value}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(payments, setPayments, key.value)}
-                  className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-600"
-                  }`}
-                >
-                  {key.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        <label className="mt-3 block">
-          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Or add your own — {PAYMENT_NOTE_MAX} characters at most
-          </span>
-
-          <input
-            value={paymentNote}
-            onChange={(e) =>
-              setPaymentNote(e.target.value.slice(0, PAYMENT_NOTE_MAX))
-            }
-            maxLength={PAYMENT_NOTE_MAX}
-            placeholder="Exact change only, tokens at the counter…"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
-          />
-        </label>
-      </Card>
 
       <Card>
         <h3 className="mb-3 text-sm font-semibold text-slate-700">
