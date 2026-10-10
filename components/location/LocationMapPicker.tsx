@@ -23,18 +23,20 @@ import { Button } from "@/components/ui";
  * fires when the gesture finishes, which is also when the coordinate
  * under the crosshair stops changing.
  *
- * EVERY TIMER AND LISTENER HERE CHECKS AN `alive` FLAG. This map is
- * remounted on a `key` change, and React unmounts the old one. A
- * removed Leaflet map can still answer getContainer() for a moment, so
- * asking the map whether it is alive is not enough — invalidateSize()
- * then throws and the error boundary takes the page, which is why the
- * crosshair appeared and then vanished. The cleanup sets the flag, and
- * the cleanup always runs before the timer.
+ * NOTHING HERE RESIZES THE MAP AFTER A DELAY. There is no
+ * invalidateSize() call at all, and no timer of any kind.
  *
- * MapResizeFix is deliberately NOT mounted here. Its job is to
- * re-measure after a side panel changes the map's width; this modal has
- * no side panel, and SettleOnOpen already does what is needed. Two
- * timers resizing one map was never right.
+ * Two timers used to run in this one map — MapResizeFix (250ms) and
+ * SettleOnOpen (200ms) — both calling invalidateSize(). The map is
+ * remounted on a `key` change, and a map caught mid-mount can still
+ * answer getContainer() while being unable to resize: the call throws,
+ * the error boundary takes the page, and the crosshair that had just
+ * appeared is gone. 200ms is exactly how long the crosshair survived.
+ *
+ * Neither timer was needed. MapContainer measures its container at
+ * creation, and this modal gives it a fixed height (h-[420px]
+ * sm:h-[520px]) rather than a flexible one, so there is no first-paint
+ * measurement to correct.
  */
 
 function CentreWatcher({
@@ -84,35 +86,6 @@ function CentreWatcher({
   return null;
 }
 
-/*
- * A nudge of the map after it opens, so the centre is measured against
- * a real layout. Leaflet caches the container size, and in a modal the
- * first measurement can be taken before the box has its final width —
- * the centre then reads back slightly off, and the saved point drifts.
- */
-function SettleOnOpen({ open }: { open: boolean }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!open) return;
-
-    let alive = true;
-
-    const timer = setTimeout(() => {
-      if (!alive) return;
-
-      map.invalidateSize();
-    }, 200);
-
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [map, open]);
-
-  return null;
-}
-
 /* Keeps the gesture from being read as a page scroll on a phone. */
 function NothingOnTap() {
   useMapEvents({});
@@ -149,19 +122,28 @@ export function LocationMapPicker({
 
   const moved = useRef(false);
 
+  const lat = initial?.latitude;
+  const lng = initial?.longitude;
+
+  /*
+   * Two numbers, not the object. `initial` is rebuilt by the parent on
+   * every render, so depending on it would re-run this effect and bump
+   * `key` each time — remounting the map in a loop, which is its own
+   * way to make the crosshair flicker. The coordinates only change when
+   * the caller actually picks a new point.
+   */
   useEffect(() => {
     if (!open) return;
 
-    const target: [number, number] = initial
-      ? [initial.latitude, initial.longitude]
-      : [20, 0];
+    const target: [number, number] =
+      lat != null && lng != null ? [lat, lng] : [20, 0];
 
     setStart(target);
     setCentre(target);
-    setZoom(initial ? 16 : 2);
+    setZoom(lat != null ? 16 : 2);
     moved.current = false;
     setKey((current) => current + 1);
-  }, [open, initial]);
+  }, [open, lat, lng]);
 
   if (!open) return null;
 
@@ -239,7 +221,6 @@ export function LocationMapPicker({
               url={"https://tile.openstreetmap.org/{z}/{x}/{y}.png"}
             />
 
-            <SettleOnOpen open={open} />
             <NothingOnTap />
 
             <CentreWatcher
