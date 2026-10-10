@@ -79,18 +79,6 @@ const MACHINE_SIZES = [
   { key: "large", label: "Large" },
 ];
 
-function SectionTitle({ title, note }: { title: string; note?: string }) {
-  return (
-    <div className="flex items-baseline gap-2 pt-2">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-        {title}
-      </h2>
-
-      {note && <span className="text-xs text-slate-400">{note}</span>}
-    </div>
-  );
-}
-
 function Toggle({
   label,
   value,
@@ -118,14 +106,21 @@ function Toggle({
 
 export function UpdateForm({
   place,
+  canEdit,
+  blockedMessage,
+  isOwner,
 }: {
   place: {
     id: string;
-    place_type: PlaceType;
     name: string;
+    place_type: PlaceType;
     address: string | null;
+    city: string | null;
+    country: string | null;
     latitude: number;
     longitude: number;
+    website: string | null;
+    description: string | null;
     accepted_payments: string[];
     has_wifi: boolean | null;
     has_power: boolean | null;
@@ -134,9 +129,15 @@ export function UpdateForm({
     has_toilets: boolean | null;
     coffee: CoffeeDetails | null;
     laundry: LaundryDetails | null;
-    website?: string | null;
-    description?: string | null;
+    prices: { kind: string; amount: number; currency: string }[];
   };
+  /* Whether today's edit is still available, and the sentence to show
+     when it is not. Both are decided by the page, which reads the same
+     counter the server does. */
+  canEdit: boolean;
+  blockedMessage: string;
+  /* Only the creator may touch the name, the address or the pin. */
+  isOwner: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -172,9 +173,7 @@ export function UpdateForm({
     Boolean(place.coffee?.has_roaster)
   );
   const [hasDecaf, setHasDecaf] = useState(Boolean(place.coffee?.has_decaf));
-  const [laptop, setLaptop] = useState(
-    Boolean(place.coffee?.laptop_friendly)
-  );
+  const [laptop, setLaptop] = useState(Boolean(place.coffee?.laptop_friendly));
 
   const [milks, setMilks] = useState<string[]>(
     MILKS.filter((m) =>
@@ -240,12 +239,17 @@ export function UpdateForm({
     const formData = new FormData();
 
     formData.set("place_id", place.id);
-    formData.set("name", name.trim());
-    formData.set("address", address.trim());
-    formData.set("latitude", String(latitude));
-    formData.set("longitude", String(longitude));
-    formData.set("description", description.trim());
     formData.set("website", website.trim());
+    formData.set("description", description.trim());
+
+    /* The identity fields travel with the form either way; the server
+       honours them only for the creator. */
+    if (isOwner) {
+      formData.set("name", name.trim());
+      formData.set("address", address.trim());
+      formData.set("latitude", String(latitude));
+      formData.set("longitude", String(longitude));
+    }
 
     formData.set("has_wifi", String(wifi));
     formData.set("has_power", String(power));
@@ -262,6 +266,12 @@ export function UpdateForm({
     machineSizes.forEach((s) => formData.append("machine_sizes", s));
     ambience.forEach((a) => formData.append("ambience", a));
     food.forEach((f) => formData.append("food", f));
+
+    /* The currency comes off the place's own prices; a place with none
+       keeps whatever it already had. */
+    if (place.prices.length > 0) {
+      formData.set("currency", place.prices[0].currency);
+    }
 
     if (isCoffee) {
       formData.set("coffee_kind", coffeeKind);
@@ -298,21 +308,70 @@ export function UpdateForm({
     });
   }
 
+  /* One edit per day, per type, per person. The page reads the same
+     counter, so this is the reason rather than a late failure. */
+  if (!canEdit) {
+    return (
+      <Card>
+        <p className="text-base font-semibold text-slate-900">
+          {blockedMessage}
+        </p>
+
+        <p className="mt-2 text-sm text-slate-600">
+          One coffee shop and one laundromat per day, per person — that is
+          what keeps the prices believable. What is on the page right now
+          was last written by someone who had the same limit.
+        </p>
+
+        <a
+          href={`/place/${place.id}`}
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 font-semibold text-slate-800 hover:bg-slate-50"
+        >
+          ← Back to {place.name}
+        </a>
+      </Card>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <IdentityBlock
-        placeId={place.id}
-        name={name}
-        address={address}
-        latitude={latitude}
-        longitude={longitude}
-        onNameChange={setName}
-        onAddressChange={setAddress}
-        onPositionChange={(lat, lng) => {
-          setLatitude(lat);
-          setLongitude(lng);
-        }}
-      />
+      {/* Name, address and pin belong to the creator; everyone else
+          sees them read-only. The server enforces the same rule, so a
+          stranger's form cannot slip past it. */}
+      {isOwner ? (
+        <IdentityBlock
+          placeId={place.id}
+          name={name}
+          address={address}
+          latitude={latitude}
+          longitude={longitude}
+          onNameChange={setName}
+          onAddressChange={setAddress}
+          onPositionChange={(lat, lng) => {
+            setLatitude(lat);
+            setLongitude(lng);
+          }}
+        />
+      ) : (
+        <Card>
+          <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">
+            What it is
+          </h2>
+
+          <p className="mb-3 text-xs text-slate-400">
+            Name, address and position are fixed. If this place moved or
+            changed name, report it instead.
+          </p>
+
+          <p className="text-lg font-bold text-slate-900">{place.name}</p>
+
+          <p className="mt-1 text-sm text-slate-600">
+            {[place.address, place.city, place.country]
+              .filter(Boolean)
+              .join(" · ") || "No address recorded"}
+          </p>
+        </Card>
+      )}
 
       <Card>
         <p className="mb-2 text-sm font-semibold text-slate-700">
@@ -502,6 +561,20 @@ export function UpdateForm({
                 );
               })}
             </div>
+
+            {hasRoaster && (
+              <label className="mt-2 block">
+                <span className="mb-1 block text-xs font-medium text-slate-500">
+                  Roaster name
+                </span>
+
+                <input
+                  value={roaster}
+                  onChange={(e) => setRoaster(e.target.value)}
+                  className={field}
+                />
+              </label>
+            )}
           </>
         )}
 
