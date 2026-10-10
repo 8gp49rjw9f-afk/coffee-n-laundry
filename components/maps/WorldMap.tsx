@@ -61,6 +61,117 @@ function MapState({
   return null;
 }
 
+/*
+ * The zoom bar: one horizontal rail, minus on the left, plus on the
+ * right. Inside MapContainer so it can call useMap() — context only
+ * flows downwards, and a sibling never sees it.
+ *
+ * The end stops are disabled rather than silently inert: a button that
+ * looks pressable when it is not is a small lie.
+ */
+function ZoomBar({
+  breakpoint,
+}: {
+  breakpoint: "phone" | "desktop";
+}) {
+  const map = useMap();
+
+  const visible = breakpoint === "phone" ? "md:hidden" : "hidden md:flex";
+
+  const [zoom, setZoom] = useState(map.getZoom());
+  const [min, setMin] = useState(map.getMinZoom());
+  const [max, setMax] = useState(map.getMaxZoom());
+
+  useEffect(() => {
+    function update() {
+      setZoom(map.getZoom());
+      setMin(map.getMinZoom());
+      setMax(map.getMaxZoom());
+    }
+
+    update();
+
+    map.on("zoomend", update);
+
+    return () => {
+      map.off("zoomend", update);
+    };
+  }, [map]);
+
+  return (
+    <div
+      className={`${visible} absolute bottom-3 left-3 z-[500] flex-row items-center overflow-hidden rounded-xl bg-white/95 shadow-lg backdrop-blur`}
+    >
+      <button
+        type="button"
+        onClick={() => map.zoomOut()}
+        disabled={zoom <= min}
+        aria-label="Zoom out"
+        className="flex h-10 w-12 items-center justify-center text-xl font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-40"
+      >
+        −
+      </button>
+
+      {/* A hairline, not a gap: two buttons that touch read as one
+          control, which is what they are. */}
+      <span className="h-6 w-px bg-slate-200" aria-hidden />
+
+      <button
+        type="button"
+        onClick={() => map.zoomIn()}
+        disabled={zoom >= max}
+        aria-label="Zoom in"
+        className="flex h-10 w-12 items-center justify-center text-xl font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-40"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+/*
+ * The arrow at the centre of the map.
+ *
+ * Not a marker and not a control: a glyph pinned to the middle of the
+ * viewport, reading as "the point you are looking at".
+ *
+ * pointer-events-none matters — a crosshair that eats clicks would
+ * make the middle of the map undraggable, a worse bug than a missing
+ * arrow ever was.
+ */
+function CentreArrow({
+  breakpoint,
+}: {
+  breakpoint: "phone" | "desktop";
+}) {
+  const visible = breakpoint === "phone" ? "md:hidden" : "hidden md:block";
+
+  return (
+    <div
+      className={`${visible} pointer-events-none absolute left-1/2 top-1/2 z-[500] -translate-x-1/2 -translate-y-1/2`}
+      aria-hidden
+    >
+      <svg
+        width="26"
+        height="26"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-slate-900/70 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
+      >
+        <line x1="12" y1="2" x2="12" y2="8" />
+        <line x1="12" y1="16" x2="12" y2="22" />
+        <line x1="2" y1="12" x2="8" y2="12" />
+        <line x1="16" y1="12" x2="22" y2="12" />
+        <circle cx="12" cy="12" r="2.5" />
+      </svg>
+    </div>
+  );
+}
+
 function FlyToSelected({ place }: { place: PlaceWithFreshness | null }) {
   const map = useMap();
 
@@ -81,7 +192,6 @@ function FlyToSelected({ place }: { place: PlaceWithFreshness | null }) {
  * `request` is a counter, not the point: pressing the button twice
  * with the same coordinates has to fly twice.
  */
-
 function FlyToMe({
   target,
   request,
@@ -151,6 +261,9 @@ function TheMap({
         zoom={2}
         minZoom={2}
         maxZoom={18}
+        /* Leaflet's own control is a tall rounded bar down the left
+           edge. Replaced by the horizontal bar below. */
+        zoomControl={false}
         worldCopyJump
         maxBounds={[
           [-90, -180],
@@ -163,6 +276,8 @@ function TheMap({
         <MapResizeFix trigger={panelOpen} />
         <FlyToSelected place={selected} />
         <FlyToMe target={me} request={request} />
+        <ZoomBar breakpoint={breakpoint} />
+        <CentreArrow breakpoint={breakpoint} />
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -209,26 +324,32 @@ function TheMap({
         )}
       </MapContainer>
 
-      {/* "Where am I" sits on the map rather than under it: it is a
-          thing you do TO the map, and your thumb already knows where
+      {/* The controls sit on the map rather than under it: they are
+          things you do TO the map, and your thumb already knows where
           the map is. Bottom left, because the pin counter owns the
           bottom right and the position badge owns the top right.
 
           z-[500] is deliberate: globals.css pins Leaflet's panes at
           400 with !important, so anything below that is drawn under
           the tiles and disappears. */}
-      <button
-        type="button"
-        onClick={onWhereAmI}
-        disabled={locating}
-        aria-label="Zoom to where I am"
-        className={`${ownBreakpoint} absolute bottom-3 left-3 z-[500] min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70`}
+      <div
+        className={`${ownBreakpoint} absolute bottom-3 left-3 z-[500] flex-row items-center gap-1.5`}
       >
-        <span className="text-base">{locating ? "⏳" : "📍"}</span>
-        <span className="hidden sm:inline">
-          {locating ? "Locating…" : "Where am I?"}
-        </span>
-      </button>
+        <ZoomBar breakpoint={breakpoint} />
+
+        <button
+          type="button"
+          onClick={onWhereAmI}
+          disabled={locating}
+          aria-label="Zoom to where I am"
+          className="flex min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70"
+        >
+          <span className="text-base">{locating ? "⏳" : "📍"}</span>
+          <span className="hidden sm:inline">
+            {locating ? "Locating…" : "Where am I?"}
+          </span>
+        </button>
+      </div>
 
       {/* How many pins are drawn — the counter for a zoomed-out view. */}
       {visible.length < places.length && (
