@@ -46,6 +46,32 @@ const PHOTO_OPTIONS = {
   useWebWorker: true,
 };
 
+/*
+ * Built by hand, and in UTC: toLocaleDateString renders differently on
+ * the server and in the browser, which breaks hydration the moment
+ * this strip is server-rendered.
+ */
+function formatPhotoDate(iso: string) {
+  const d = new Date(iso);
+
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 async function compress(file: File): Promise<File> {
   const result = await imageCompression(file, PHOTO_OPTIONS);
 
@@ -287,44 +313,75 @@ export function PhotoStrip({
                     />
                   </button>
 
-                  {isCover && (
-                    <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-wide text-sky-600">
-                      Cover
-                    </p>
-                  )}
+                  {/*
+                    One row, three small targets, and the date.
 
-                  {signedIn && (
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => pickReplacement(photo.id)}
-                        disabled={pending}
-                        className="min-h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        Modify
-                      </button>
+                    The buttons were stacked and full width, which made
+                    them the loudest thing under a photo and left the
+                    date nowhere to go. They are now one line: the cover
+                    on the left (or a badge when this photo already IS
+                    the cover), Modify, then a red ✕.
 
-                      <button
-                        type="button"
-                        onClick={() => remove(photo.id)}
-                        disabled={pending}
-                        className="min-h-9 flex-1 rounded-lg border border-rose-200 bg-white px-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
+                    The date sits at the end of the same row, right-
+                    aligned and quiet — a photo's age is what tells you
+                    whether the price list in it is still worth reading.
+                  */}
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    {signedIn ? (
+                      <>
+                        {isCover ? (
+                          <span className="flex h-8 shrink-0 items-center rounded-lg bg-sky-50 px-2 text-[11px] font-bold uppercase tracking-wide text-sky-700">
+                            Cover
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => makeCover(photo.id)}
+                            disabled={pending}
+                            className="flex h-8 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Set cover
+                          </button>
+                        )}
 
-                      {!isCover && (
                         <button
                           type="button"
-                          onClick={() => makeCover(photo.id)}
+                          onClick={() => pickReplacement(photo.id)}
                           disabled={pending}
-                          className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                          className="flex h-8 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                         >
-                          Set as cover
+                          Modify
                         </button>
-                      )}
-                    </div>
-                  )}
+
+                        <button
+                          type="button"
+                          onClick={() => remove(photo.id)}
+                          disabled={pending}
+                          aria-label="Delete this photo"
+                          title="Delete this photo"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-sm font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                        >
+                          ✕
+                        </button>
+
+                        <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-slate-400">
+                          {formatPhotoDate(photo.created_at)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {isCover && (
+                          <span className="flex h-8 shrink-0 items-center rounded-lg bg-sky-50 px-2 text-[11px] font-bold uppercase tracking-wide text-sky-700">
+                            Cover
+                          </span>
+                        )}
+
+                        <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-slate-400">
+                          {formatPhotoDate(photo.created_at)}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </li>
               );
             })}
