@@ -70,8 +70,9 @@ function formatDate(iso: string) {
  * the place is, then what it costs, then what is in the cup, then
  * what else is on offer, then the room, then the icons.
  *
- * Milk and decaf sit with the drinks rather than at the bottom, and
- * the two bean facts sit together; both used to be scattered.
+ * Espresso and flat white only. Filter coffee was offered when a café
+ * with a brew bar was the common case; it made a third price row that
+ * almost every café left empty, so it is gone.
  */
 const ROWS: {
   key: string;
@@ -97,12 +98,6 @@ const ROWS: {
     label: "Espresso",
     emoji: "💰",
     fallback: (p) => price(p, "espresso"),
-  },
-  {
-    key: "filter_price",
-    label: "Filter coffee",
-    emoji: "🫖",
-    fallback: (p) => price(p, "filter"),
   },
   {
     key: "flat_white_price",
