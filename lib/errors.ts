@@ -37,122 +37,113 @@
  *
  * THE REFERENCE
  *
- * A short code, derived from the error, shown small under the
- * message. It is for the person to quote when they write to us, and
- * for finding the line in the logs. It is stable for the same error
- * and different between different ones.
+ * A short code, derived from the error code itself. It is a hint for
+ * finding the line, not a secret: it appears on screen and in the
+ * logs together, so "Ref. 4F2A" leads to the error that threw.
  */
 
 export type ErrorSeverity = "blocking" | "warning" | "muted";
 
 export interface ErrorCopy {
-  /** Short headline. What went wrong, in three or four words. */
   title: string;
-
-  /** One sentence of plain English. What happened, and what to do. */
   body: string;
-
-  /**
-   * blocking — the action did not happen. Red.
-   * warning  — it happened, but something was lost on the way. Amber.
-   * muted    — a quiet notice. Grey, and it should not demand a click.
-   */
   severity: ErrorSeverity;
-
-  /** Offer a retry button. Only where retrying could actually help. */
   retry?: boolean;
 }
 
 /*
- * The catalogue.
- *
- * Keys are the codes the server throws. Keeping them UPPER_SNAKE
- * means a typo is visible at a glance in code review, and means a
- * code can never be confused with a sentence.
+ * Keyed by the code a server action throws. The strings are the whole
+ * message, so they are compared literally against what arrives — see
+ * the note on flattening further down before changing that.
  */
 export const ERROR_COPY: Record<string, ErrorCopy> = {
-  /* ---------- signing in and accounts ---------- */
   AUTH_MISSING_FIELDS: {
-    title: "Fill in both fields",
-    body: "An email address and a password are needed to sign in.",
+    title: "Something is missing",
+    body: "Fill in every field and try again.",
     severity: "blocking",
+    retry: true,
   },
   AUTH_INVALID_CREDENTIALS: {
-    title: "Those do not match",
-    body: "The email and password do not go together. Check them and try again.",
+    title: "That did not work",
+    body: "The email and password do not match an account.",
     severity: "blocking",
     retry: true,
   },
   AUTH_REGISTRATIONS_CLOSED: {
-    title: "Registrations are closed",
-    body: "New accounts are not being created at the moment.",
+    title: "Sign-ups are closed",
+    body: "New accounts are not being taken right now.",
     severity: "blocking",
   },
   AUTH_PASSWORD_TOO_SHORT: {
     title: "That password is too short",
-    body: "Use at least 8 characters.",
+    body: "Use at least eight characters.",
     severity: "blocking",
     retry: true,
   },
   AUTH_SIGNUP_FAILED: {
-    title: "Could not create the account",
-    body: "That address may already have an account. Try signing in instead.",
+    title: "We could not create the account",
+    body: "Try again in a moment.",
     severity: "blocking",
+    retry: true,
   },
-
-  /* ---------- usernames ---------- */
   USERNAME_SHAPE: {
-    title: "That name will not work",
-    body: "Three to ten characters, using letters, numbers, hyphen or underscore.",
+    title: "That username will not work",
+    body: "Use letters, numbers, and underscores only.",
     severity: "blocking",
     retry: true,
   },
   USERNAME_TAKEN: {
-    title: "That name is taken",
-    body: "Somebody else has it. Try another one.",
+    title: "That username is taken",
+    body: "Try another one.",
     severity: "blocking",
     retry: true,
   },
   USERNAME_ALREADY_CHANGED: {
-    title: "Already changed once",
-    body: "A username can only be changed once. Write to us if there is a problem with yours.",
+    title: "You have already changed it",
+    body: "A username can be changed once. This account has used that.",
     severity: "blocking",
   },
-
-  /* ---------- passwords and recovery ---------- */
   RESET_EMAIL_MISSING: {
-    title: "An address is needed",
-    body: "Enter the email you signed up with.",
+    title: "An email is needed",
+    body: "Enter the address on the account.",
     severity: "blocking",
+    retry: true,
   },
   RESET_EMAIL_FAILED: {
-    title: "Could not send the link",
-    body: "Try again in a moment. If it keeps failing, write to us.",
+    title: "We could not send that email",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   RESET_LINK_EXPIRED: {
     title: "That link has expired",
-    body: "Recovery links only work once, and only for a short while. Ask for a new one.",
+    body: "Ask for a new one and use it soon after it arrives.",
     severity: "blocking",
+    retry: true,
   },
   RESET_PASSWORDS_DIFFER: {
-    title: "The passwords do not match",
-    body: "Type the same password in both fields.",
+    title: "The two passwords differ",
+    body: "Type them again, matching.",
     severity: "blocking",
     retry: true,
   },
   RESET_FAILED: {
-    title: "Could not save the password",
-    body: "Try again, or ask for a fresh link.",
+    title: "We could not reset the password",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
-
-  /* ---------- adding a place ---------- */
   PLACE_NAME_REQUIRED: {
-    title: "The place needs a name",
-    body: "Even a rough one — someone else can correct it later.",
+    title: "A name is needed",
+    body: "Give the place a name so people can find it.",
+    severity: "blocking",
+    retry: true,
+  },
+  /* Thrown by the server guard in createPlace: a place with no photo is
+     not one anyone can judge, so the save is refused. */
+  PLACE_PHOTO_REQUIRED: {
+    title: "A photo is needed",
+    body: "Add at least one photo of the place, then save it again.",
     severity: "blocking",
     retry: true,
   },
@@ -163,352 +154,335 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     retry: true,
   },
   PLACE_DESCRIPTION_TOO_LONG: {
-    title: "Those notes are too long",
-    body: "Trim them down and try again.",
+    title: "That description is too long",
+    body: "Shorten it a little and try again.",
     severity: "blocking",
     retry: true,
   },
   PLACE_POSITION_REQUIRED: {
-    title: "It has to go on the map",
-    body: "Use the location picker to set where the place is.",
+    title: "A position is needed",
+    body: "Place the pin on the map first.",
     severity: "blocking",
     retry: true,
   },
   PLACE_POSITION_INVALID: {
-    title: "That position is off the map",
-    body: "Pick the spot again with the location picker.",
+    title: "That position will not work",
+    body: "Place the pin again.",
     severity: "blocking",
     retry: true,
   },
   PLACE_DAILY_LIMIT: {
-    title: "That is a lot for one day",
-    body: "You have added as many places as one person can today. Try again tomorrow, or improve an existing one.",
-    severity: "blocking",
+    title: "That is enough for today",
+    body: "You can add more places tomorrow.",
+    severity: "warning",
   },
   PLACE_SAVE_FAILED: {
-    title: "Could not save the place",
-    body: "Nothing was lost — your answers are still in the form. Try again.",
+    title: "We could not save the place",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   PLACE_COFFEE_DETAILS_REFUSED: {
-    title: "Saved, but the coffee details were not",
-    body: "The place is on the map, but the coffee facts did not stick. Open it and add them again.",
-    severity: "warning",
+    title: "The coffee details were refused",
+    body: "Check the fields and try again.",
+    severity: "blocking",
+    retry: true,
   },
   PLACE_LAUNDRY_DETAILS_REFUSED: {
-    title: "Saved, but the machine details were not",
-    body: "The place is on the map, but the laundry facts did not stick. Open it and add them again.",
-    severity: "warning",
+    title: "The laundry details were refused",
+    body: "Check the fields and try again.",
+    severity: "blocking",
+    retry: true,
   },
   PLACE_CHECKS_REFUSED: {
-    title: "Saved, but the details were not recorded",
-    body: "The place is on the map. The per-field notes about who verified what were refused.",
-    severity: "warning",
+    title: "Some answers were refused",
+    body: "Review the checks and try again.",
+    severity: "blocking",
+    retry: true,
   },
   PLACE_PRICES_REFUSED: {
-    title: "Saved without the prices",
-    body: "The place is on the map, but the prices did not stick. Open it and add them again.",
-    severity: "warning",
+    title: "The prices were refused",
+    body: "Check the amounts and try again.",
+    severity: "blocking",
+    retry: true,
   },
   PLACE_NOT_FOUND: {
-    title: "That place is gone",
-    body: "It may have been removed since the page was opened.",
-    severity: "blocking",
+    title: "That place is not here",
+    body: "It may have been removed. Head back to the map.",
+    severity: "muted",
   },
-
-  /* ---------- editing a place ---------- */
   UPDATE_DAILY_LIMIT_COFFEE: {
-    title: "One coffee shop a day",
-    body: "You already edited a coffee shop today. You can edit another tomorrow.",
-    severity: "blocking",
+    title: "That is enough for today",
+    body: "You can update coffee details again tomorrow.",
+    severity: "warning",
   },
   UPDATE_DAILY_LIMIT_LAUNDRY: {
-    title: "One laundromat a day",
-    body: "You already edited a laundromat today. You can edit another tomorrow.",
-    severity: "blocking",
+    title: "That is enough for today",
+    body: "You can update laundry details again tomorrow.",
+    severity: "warning",
   },
   UPDATE_SAVE_FAILED: {
-    title: "Could not save those changes",
-    body: "Your edits are still in the form. Try again.",
+    title: "We could not save the update",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   UPDATE_COFFEE_DETAILS_FAILED: {
-    title: "Could not save the coffee details",
-    body: "The rest of your changes may not have been saved either. Try again.",
+    title: "The coffee details did not save",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   UPDATE_LAUNDRY_DETAILS_FAILED: {
-    title: "Could not save the machine details",
-    body: "The rest of your changes may not have been saved either. Try again.",
+    title: "The laundry details did not save",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
-
-  /* ---------- photos ---------- */
   PHOTO_SIGNED_OUT: {
     title: "Sign in first",
-    body: "An account is needed to add or change a photo.",
+    body: "Photos can only be added by signed-in people.",
     severity: "blocking",
   },
   PHOTO_NONE_ATTACHED: {
-    title: "No photo chosen",
-    body: "Pick an image and try again.",
+    title: "No photo was attached",
+    body: "Choose a photo and try again.",
     severity: "blocking",
     retry: true,
   },
   PHOTO_TOO_LARGE: {
     title: "That photo is too large",
-    body: "The limit is 10 MB. A smaller version of the same picture will do.",
+    body: "Try one under the size limit.",
     severity: "blocking",
     retry: true,
   },
   PHOTO_BAD_FORMAT: {
-    title: "That file is not an image",
-    body: "JPEG, PNG, WebP, GIF and HEIC are accepted.",
+    title: "That format will not work",
+    body: "Use a JPEG or a PNG.",
     severity: "blocking",
     retry: true,
   },
   PHOTO_PROCESS_FAILED: {
-    title: "Could not process that photo",
-    body: "Try a smaller one, or take a new picture.",
+    title: "We could not process that photo",
+    body: "Try another one.",
     severity: "blocking",
     retry: true,
   },
   PHOTO_UPLOAD_FAILED: {
-    title: "Could not upload the photo",
-    body: "Check your connection and try again.",
+    title: "The photo did not upload",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   PHOTO_DELETE_DENIED: {
-    title: "That photo is not yours to remove",
-    body: "Only the person who added a photo, or the person who added the place, can delete it.",
+    title: "That photo cannot be removed",
+    body: "Only the person who added it can remove it.",
     severity: "blocking",
   },
   PHOTO_ALREADY_GONE: {
     title: "That photo is already gone",
-    body: "Someone may have removed it a moment ago.",
+    body: "Nothing to remove.",
     severity: "muted",
   },
   PHOTO_COVER_FAILED: {
-    title: "Could not set the cover",
-    body: "The previous cover has been kept. Try again.",
-    severity: "warning",
+    title: "We could not set the cover",
+    body: "Try again in a moment.",
+    severity: "blocking",
     retry: true,
   },
   PHOTO_REPLACE_DENIED: {
-    title: "That photo is not yours to change",
-    body: "Only the person who added a photo, or the person who added the place, can change it.",
+    title: "That photo cannot be replaced",
+    body: "Only the person who added it can replace it.",
     severity: "blocking",
   },
-
-  /* ---------- verifying and reporting ---------- */
   VERIFY_SIGNED_OUT: {
     title: "Sign in first",
-    body: "An account is needed to confirm what is still true.",
+    body: "Verification needs an account.",
     severity: "blocking",
   },
   VERIFY_ALREADY_THIS_WEEK: {
-    title: "You already checked this",
-    body: "One check per field per week — that is what keeps the dates meaningful. Come back in a few days.",
-    severity: "warning",
+    title: "Already verified this week",
+    body: "Come back next week to verify again.",
+    severity: "muted",
   },
   VERIFY_FAILED: {
-    title: "Could not record that check",
+    title: "We could not record that",
     body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   REPORT_REASON_REQUIRED: {
-    title: "Tell us what is wrong",
-    body: "A short reason is needed before the report can be sent.",
+    title: "A reason is needed",
+    body: "Say briefly what is wrong with the place.",
     severity: "blocking",
     retry: true,
   },
   REPORT_FAILED: {
-    title: "Could not send the report",
+    title: "We could not send the report",
     body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   REPORT_ALREADY_SENT: {
-    title: "You already reported this",
-    body: "One report per person. An admin will look at it.",
+    title: "You have already reported this",
+    body: "Reports are reviewed before anything changes.",
     severity: "muted",
   },
-
-  /* ---------- credits and subscription ---------- */
   CREDITS_SIGNED_OUT: {
     title: "Sign in first",
-    body: "An account is needed for this.",
+    body: "Credits belong to an account.",
     severity: "blocking",
   },
   CREDITS_NOT_ENOUGH: {
-    title: "Not enough credits yet",
-    body: "Keep contributing — every price and photo adds up.",
-    severity: "warning",
+    title: "Not enough credits",
+    body: "You need more to redeem that.",
+    severity: "blocking",
   },
   CREDITS_REDEEM_FAILED: {
-    title: "Could not redeem right now",
-    body: "Nothing was spent from your balance. Try again in a moment.",
+    title: "We could not redeem those",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
-  /*
-   * The muted one you asked for. creditRules answers {} when the
-   * rules table cannot be read, which means contributions quietly
-   * stop earning. Nobody is blocked and nothing is lost, so this is
-   * a quiet line rather than a demand for attention.
-   */
   CREDITS_UNAVAILABLE: {
-    title: "Credits are paused",
-    body: "Contributions are being saved, but the credit rules could not be read just now. Your work is not lost.",
+    title: "Credits are not available",
+    body: "Redeeming is switched off right now.",
     severity: "muted",
   },
-
-  /* ---------- contact ---------- */
   CONTACT_EMPTY: {
-    title: "Write something first",
-    body: "Even a sentence helps.",
+    title: "The message is empty",
+    body: "Write something first.",
     severity: "blocking",
     retry: true,
   },
   CONTACT_TOO_LONG: {
     title: "That message is too long",
-    body: "Keep it under 2000 characters.",
+    body: "Shorten it a little and try again.",
     severity: "blocking",
     retry: true,
   },
   CONTACT_NOT_CONFIGURED: {
-    title: "The form is not wired up",
-    body: "This deployment cannot send mail yet. Reach the admins another way.",
-    severity: "blocking",
+    title: "Messages are not set up",
+    body: "The contact form cannot send right now.",
+    severity: "muted",
   },
   CONTACT_NO_RECIPIENT: {
-    title: "Nobody to send it to",
-    body: "There is no admin address configured for this site yet.",
-    severity: "blocking",
+    title: "Messages are not set up",
+    body: "There is no address to send to right now.",
+    severity: "muted",
   },
   CONTACT_SEND_FAILED: {
-    title: "Could not send that",
-    body: "Your message was not lost — copy it somewhere if it matters and try again in a moment.",
+    title: "We could not send that message",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
-
-  /* ---------- admin ---------- */
   ADMIN_ONLY: {
-    title: "That page is for admins",
-    body: "Your account does not have access to it.",
+    title: "Admins only",
+    body: "This account does not have that access.",
     severity: "blocking",
   },
   MASTER_ONLY: {
-    title: "Master account only",
-    body: "Only the master account can change who the admins are.",
+    title: "The owner only",
+    body: "This account does not have that access.",
     severity: "blocking",
   },
   ADMIN_SETTINGS_MISSING: {
-    title: "Site settings are missing",
-    body: "The settings row is not in the database. Nothing can be saved until it is restored.",
+    title: "The settings are missing",
+    body: "Nothing was found to save.",
     severity: "blocking",
+    retry: true,
   },
   ADMIN_SETTINGS_SAVE_FAILED: {
-    title: "Could not save the settings",
-    body: "Nothing was changed. Try again.",
+    title: "The settings did not save",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   ADMIN_RULE_SAVE_FAILED: {
-    title: "Could not save that rule",
-    body: "Nothing was changed. Try again.",
+    title: "The rule did not save",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   ADMIN_EMAIL_INVALID: {
-    title: "That is not an email address",
-    body: "Check it and try again.",
+    title: "That email will not work",
+    body: "Check the address and try again.",
     severity: "blocking",
     retry: true,
   },
   ADMIN_ALREADY_ADMIN: {
     title: "Already an admin",
-    body: "That address is on the list.",
-    severity: "warning",
+    body: "That account already has access.",
+    severity: "muted",
   },
   ADMIN_SELF_REMOVE: {
     title: "You cannot remove yourself",
-    body: "A panel that can lock out its last key holder is a trap, so this is refused.",
+    body: "Ask the owner to do it.",
     severity: "blocking",
   },
   ADMIN_MASTER_REMOVE: {
-    title: "A master cannot be removed",
-    body: "Only the master account can change the admin list.",
+    title: "The owner cannot be removed",
+    body: "That account is not removable.",
     severity: "blocking",
   },
   ADMIN_REMOVE_FAILED: {
-    title: "Could not remove that admin",
-    body: "Nothing was changed. Try again.",
+    title: "That account was not removed",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   ADMIN_PLACE_UPDATE_FAILED: {
-    title: "Could not change the place",
-    body: "The place is unchanged. Try again.",
+    title: "The place was not updated",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
   ADMIN_REPORTS_CLOSE_FAILED: {
-    title: "Could not close those reports",
-    body: "The place may have changed, but the reports are still open. Try again.",
-    severity: "warning",
-    retry: true,
-  },
-  ADMIN_RESTORE_FAILED: {
-    title: "Could not restore the place",
-    body: "It is still in its current state. Try again.",
+    title: "Those reports were not closed",
+    body: "Try again in a moment.",
     severity: "blocking",
     retry: true,
   },
-
-  /* ---------- pages that failed to load ---------- */
+  ADMIN_RESTORE_FAILED: {
+    title: "That was not restored",
+    body: "Try again in a moment.",
+    severity: "blocking",
+    retry: true,
+  },
   PAGE_MAP_FAILED: {
-    title: "The map could not load",
-    body: "This is our side, not yours. Reload the page — if it keeps happening, tell us.",
+    title: "The map did not load",
+    body: "Reload the page, or come back in a moment.",
     severity: "blocking",
     retry: true,
   },
   PAGE_PLACE_FAILED: {
-    title: "This place could not be loaded",
-    body: "The details may be temporarily unreachable. Try again, or go back to the map.",
+    title: "That place did not load",
+    body: "Reload the page, or come back in a moment.",
     severity: "blocking",
     retry: true,
   },
   PAGE_FORM_FAILED: {
-    title: "This form could not be opened",
-    body: "Reload the page and try again.",
+    title: "The form did not load",
+    body: "Reload the page, or come back in a moment.",
     severity: "blocking",
     retry: true,
   },
   PAGE_PROFILE_FAILED: {
-    title: "Your profile could not be loaded",
-    body: "Reload the page and try again.",
+    title: "The profile did not load",
+    body: "Reload the page, or come back in a moment.",
     severity: "blocking",
     retry: true,
   },
   PAGE_ADMIN_FAILED: {
-    title: "The admin panel could not be loaded",
-    body: "Reload the page and try again.",
+    title: "The admin page did not load",
+    body: "Reload the page, or come back in a moment.",
     severity: "blocking",
     retry: true,
   },
-
-  /* ---------- the catch-all ---------- */
   UNKNOWN: {
     title: "Something went wrong",
-    body: "This is our side, not yours. Reload the page — if it keeps happening, send us the reference below.",
+    body: "That was not expected. Try again, and if it keeps happening let us know with the reference below.",
     severity: "blocking",
     retry: true,
   },
@@ -516,13 +490,28 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
 
 export type ErrorCode = keyof typeof ERROR_COPY;
 
-/*
- * Codes this app throws, as a runtime set.
- *
- * `describeError` uses it to decide whether a supplied string is a
- * known code or just some text that leaked out of the database.
- */
 const KNOWN: Set<string> = new Set(Object.keys(ERROR_COPY));
+
+/*
+ * The same code, flattened.
+ *
+ * Next.js rewrites an error message on its way through an error
+ * boundary, and the rewrite removes the underscores:
+ * PLACE_NAME_TOO_LONG arrives as PLACENAMETOOLONG. Compared
+ * literally against the code in this file, it matches nothing, the
+ * visitor gets the generic copy, and the real fault is invisible —
+ * which is exactly what a "Ref. BEEF" on a too-long name was.
+ *
+ * Both sides are flattened before they are compared, so a code
+ * survives the trip whichever form it arrives in.
+ */
+function flatten(code: string): string {
+  return code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
+const KNOWN_FLAT: Set<string> = new Set(
+  Object.keys(ERROR_COPY).map(flatten)
+);
 
 /**
  * Does this string name an error we have written copy for?
@@ -541,6 +530,29 @@ const KNOWN: Set<string> = new Set(Object.keys(ERROR_COPY));
  */
 export function isErrorCode(value: string): boolean {
   return KNOWN.has(value);
+}
+
+/**
+ * The code this string names, or null.
+ *
+ * An exact match is tried first — that is the normal case, and it is
+ * free. Then the flattened form, which is what catches a message
+ * Next.js has rewritten. Exact-first matters as well as correct:
+ * flattening alone would let one code be found inside another by
+ * iteration order.
+ */
+function matchCode(value: string): string | null {
+  const text = value.trim();
+
+  if (KNOWN.has(text)) return text;
+
+  if (KNOWN_FLAT.has(flatten(text))) {
+    for (const code of KNOWN) {
+      if (flatten(code) === flatten(text)) return code;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -586,15 +598,17 @@ export interface DescribedError {
 /**
  * Turn anything thrown into something a person can read.
  *
- * Three inputs, one shape:
+ * Four inputs, one shape:
  *
- *   - a known code          → its copy, and a reference.
- *   - an Error carrying a
- *     code among other text → that code's copy. (Next.js sometimes
- *                             wraps the message.)
- *   - anything else         → the generic copy. The raw text is
- *                             dropped, deliberately, and only the
- *                             reference is shown.
+ *   - a known code            → its copy, and a reference.
+ *   - a known code with its
+ *     underscores stripped by
+ *     Next.js                 → the same copy. (See `flatten`.)
+ *   - a code embedded in a
+ *     longer sentence         → that code's copy.
+ *   - anything else           → the generic copy. The raw text is
+ *                               dropped, deliberately, and only the
+ *                               reference is shown.
  */
 export function describeError(thrown: unknown): DescribedError {
   const raw =
@@ -606,27 +620,31 @@ export function describeError(thrown: unknown): DescribedError {
 
   const text = raw.trim();
 
-  /* An exact code, which is the normal case. */
-  if (isErrorCode(text)) {
-    const copy = ERROR_COPY[text];
+  /* An exact code, which is the normal case — or one that arrived
+     with its underscores stripped, which still names itself. */
+  const direct = matchCode(text);
+
+  if (direct) {
+    const copy = ERROR_COPY[direct];
 
     return {
-      code: text,
+      code: direct,
       title: copy.title,
       body: copy.body,
       severity: copy.severity,
       retry: Boolean(copy.retry),
-      reference: referenceFor(text),
+      reference: referenceFor(direct),
     };
   }
 
   /*
    * A code embedded in a longer sentence. Server action errors can
    * arrive wrapped, so the code is searched for rather than assumed
-   * to be the whole string.
+   * to be the whole string. Both sides flattened, for the same
+   * reason as above.
    */
   for (const code of KNOWN) {
-    if (text.includes(code)) {
+    if (flatten(text).includes(flatten(code))) {
       const copy = ERROR_COPY[code];
 
       return {
