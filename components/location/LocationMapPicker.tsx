@@ -6,8 +6,6 @@ import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 
 import "leaflet/dist/leaflet.css";
 
-import MapResizeFix from "@/components/map/MapResizeFix";
-
 import { Button } from "@/components/ui";
 
 /*
@@ -24,6 +22,19 @@ import { Button } from "@/components/ui";
  * The centre is read once per settle, not on every frame: `moveend`
  * fires when the gesture finishes, which is also when the coordinate
  * under the crosshair stops changing.
+ *
+ * EVERY TIMER AND LISTENER HERE CHECKS AN `alive` FLAG. This map is
+ * remounted on a `key` change, and React unmounts the old one. A
+ * removed Leaflet map can still answer getContainer() for a moment, so
+ * asking the map whether it is alive is not enough — invalidateSize()
+ * then throws and the error boundary takes the page, which is why the
+ * crosshair appeared and then vanished. The cleanup sets the flag, and
+ * the cleanup always runs before the timer.
+ *
+ * MapResizeFix is deliberately NOT mounted here. Its job is to
+ * re-measure after a side panel changes the map's width; this modal has
+ * no side panel, and SettleOnOpen already does what is needed. Two
+ * timers resizing one map was never right.
  */
 
 function CentreWatcher({
@@ -47,10 +58,10 @@ function CentreWatcher({
   }, [onCentre]);
 
   useEffect(() => {
+    let alive = true;
+
     function report() {
-      /* A removed map has no container, and asking for one is the
-         cheap way to know this listener has outlived its map. */
-      if (!map.getContainer()) return;
+      if (!alive) return;
 
       const centre = map.getCenter();
 
@@ -63,6 +74,8 @@ function CentreWatcher({
     map.on("zoomend", report);
 
     return () => {
+      alive = false;
+
       map.off("moveend", report);
       map.off("zoomend", report);
     };
@@ -76,11 +89,6 @@ function CentreWatcher({
  * a real layout. Leaflet caches the container size, and in a modal the
  * first measurement can be taken before the box has its final width —
  * the centre then reads back slightly off, and the saved point drifts.
- *
- * The 200ms delay is why a removed map has to be guarded against: the
- * timer outlives a closing modal, and `invalidateSize()` on a torn-down
- * map throws — which took the whole page to the error boundary, and is
- * why the crosshair was visible for a moment and then gone.
  */
 function SettleOnOpen({ open }: { open: boolean }) {
   const map = useMap();
@@ -88,13 +96,18 @@ function SettleOnOpen({ open }: { open: boolean }) {
   useEffect(() => {
     if (!open) return;
 
+    let alive = true;
+
     const timer = setTimeout(() => {
-      if (!map.getContainer()) return;
+      if (!alive) return;
 
       map.invalidateSize();
     }, 200);
 
-    return () => clearTimeout(timer);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
   }, [map, open]);
 
   return null;
@@ -226,7 +239,6 @@ export function LocationMapPicker({
               url={"https://tile.openstreetmap.org/{z}/{x}/{y}.png"}
             />
 
-            <MapResizeFix trigger={open} />
             <SettleOnOpen open={open} />
             <NothingOnTap />
 
