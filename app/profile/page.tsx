@@ -105,30 +105,27 @@ export default async function ProfilePage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-8">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold text-slate-900">
-            @{profile?.username ?? "unnamed"}
-          </h1>
+      {/*
+        No sign-out here. The hamburger carries it on every page
+        already, so a second exit beside the username was one too many —
+        and "sign out" is not what this page is about. The email and the
+        username are the header; nothing else belongs in it.
+      */}
+      <div className="min-w-0">
+        <h1 className="truncate text-2xl font-bold text-slate-900">
+          @{profile?.username ?? "unnamed"}
+        </h1>
 
-          {/* The address is shown to its owner, and only to its owner. */}
-          <p className="mt-1 truncate text-sm text-slate-600">{user.email}</p>
+        {/* The address is shown to its owner, and only to its owner. */}
+        <p className="mt-1 truncate text-sm text-slate-600">{user.email}</p>
 
-          {profile?.is_founder && (
-            <div className="mt-2">
-              <Badge className="bg-amber-100 text-amber-900">
-                🏅 Founder · {profile.founder_places ?? 0} places verified
-              </Badge>
-            </div>
-          )}
-        </div>
-
-        <Link
-          href="/signout"
-          className="shrink-0 text-sm font-semibold text-slate-500 underline"
-        >
-          Sign out
-        </Link>
+        {profile?.is_founder && (
+          <div className="mt-2">
+            <Badge className="bg-amber-100 text-amber-900">
+              🏅 Founder · {profile.founder_places ?? 0} places verified
+            </Badge>
+          </div>
+        )}
       </div>
 
       <UsernameForm
