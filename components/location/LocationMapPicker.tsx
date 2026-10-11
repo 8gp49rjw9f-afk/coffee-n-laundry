@@ -23,21 +23,27 @@ import { Button } from "@/components/ui";
  * fires when the gesture finishes, which is also when the coordinate
  * under the crosshair stops changing.
  *
- * WHAT IS NOT HERE, AND WHY
+ * WHY THE CROSSHAIR NEEDED A Z-INDEX
  *
- * No timer of any kind, and no invalidateSize(). Two used to run in
- * this one map — MapResizeFix (250ms) and SettleOnOpen (200ms) — and a
- * map caught mid-mount can still answer getContainer() while being
- * unable to resize, so the call throws and the error boundary takes
- * the modal. 200ms is exactly how long the crosshair survived.
+ * It kept vanishing a moment after the modal opened, and reappearing
+ * at maximum zoom — which is the clue that solved it. Leaflet builds
+ * its own panes inside the container and they climb to z-index 700;
+ * the crosshair had none, so as soon as the tiles painted it was
+ * covered. At maximum zoom the map goes grey because the tile source
+ * has no imagery that deep: nothing repaints over the guide and it is
+ * visible again. It was never a mount or a timer problem — the
+ * crosshair was simply underneath the map.
+ *
+ * No timer of any kind here, and no invalidateSize(). Two used to run
+ * in this one map — MapResizeFix (250ms) and SettleOnOpen (200ms) —
+ * and a map caught mid-mount can still answer getContainer() while
+ * being unable to resize, so the call throws and the error boundary
+ * takes the modal.
  *
  * NothingOnTap is gone too: it called useMapEvents({}) — an empty
  * listener object, which attaches nothing — so it never prevented the
  * page scroll it claimed to, and it was the only useMapEvents in the
- * project, on a react-leaflet major version where that hook changed.
- *
- * Three things remain inside the map: the tiles, the watcher, and
- * nothing else.
+ * project.
  */
 
 function CentreWatcher({
@@ -223,8 +229,12 @@ export function LocationMapPicker({
           </MapContainer>
 
           {/* The crosshair: a guide, never a target. The small hole in
-              the middle is what you line the door up with. */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              the middle is what you line the door up with.
+
+              z-[800] lifts it above every Leaflet pane — the tile
+              pane alone reaches 700 — which is what kept it hidden
+              once the tiles began to paint. */}
+          <div className="pointer-events-none absolute inset-0 z-[800] flex items-center justify-center">
             <div className="relative h-12 w-12">
               <span className="absolute left-1/2 top-0 h-4 w-0.5 -translate-x-1/2 bg-slate-900 shadow-[0_0_3px_rgba(255,255,255,0.9)]" />
               <span className="absolute bottom-0 left-1/2 h-4 w-0.5 -translate-x-1/2 bg-slate-900 shadow-[0_0_3px_rgba(255,255,255,0.9)]" />
