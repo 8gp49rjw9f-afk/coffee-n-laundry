@@ -499,6 +499,19 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     severity: "blocking",
     retry: true,
   },
+  /*
+   * Deleting is the irreversible one, and it stops part-way through
+   * on purpose: credits first, then the child rows, then the place.
+   * A failure here means the place is still there in some state —
+   * which is the recoverable half of the operation, and what the
+   * sentence promises.
+   */
+  ADMIN_DELETE_FAILED: {
+    title: "Could not delete the place",
+    body: "It is still there, though some of its parts may already be gone. Try again, or close it instead.",
+    severity: "blocking",
+    retry: true,
+  },
 
   /* ---------- pages that failed to load ---------- */
   PAGE_MAP_FAILED: {
