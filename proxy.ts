@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { getSettings } from "@/lib/services/settings";
+import { getSettings, readMaintenanceMode } from "@/lib/services/settings";
 
 /*
  * Next 16 renamed the "middleware" convention to "proxy". Same file,
@@ -44,6 +44,43 @@ function isAllowed(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  /*
+   * ======================================================
+   * TEMPORARY TRACE — remove once the switch is confirmed working
+   * ======================================================
+   *
+   * Three lines, so the Vercel logs answer a question the source
+   * cannot: is this function running at all, and what does it think
+   * the switch says?
+   *
+   *   no line at all      → the runtime never calls this file, and
+   *                         the problem is the convention or the
+   *                         matcher, not the logic.
+   *   RUNNING … mode=false → it runs and reads the switch as off.
+   *                         The database says true, so the read is
+   *                         what fails — the Supabase client in a
+   *                         serverless runtime, or the settings row
+   *                         read from this context.
+   *   RUNNING … mode=true  → it runs and sees the switch on, and the
+   *                         redirect below is being skipped for the
+   *                         wrong reason: the admin lookup, or
+   *                         isAllowed, or the response.
+   *
+   * DELETE THIS BLOCK, including the dedicated read below, once the
+   * answer is known. It logs on every non-static request.
+   */
+  let traced: boolean | null = null;
+
+  try {
+    traced = await readMaintenanceMode();
+  } catch (error) {
+    console.error("[proxy] maintenance read threw:", error);
+  }
+
+  console.log(`[proxy] RUNNING ${pathname} · mode=${traced}`);
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -104,8 +141,6 @@ export async function proxy(request: NextRequest) {
   const settings = await getSettings();
 
   if (settings.maintenance_mode) {
-    const pathname = request.nextUrl.pathname;
-
     /* An admin is never redirected: they are the only one who can end
        the maintenance, and locking them out would make it permanent. */
     let admin = false;
