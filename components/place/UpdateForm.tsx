@@ -83,17 +83,26 @@ function Toggle({
   label,
   value,
   onChange,
+  size = "sm",
 }: {
   label: string;
   value: boolean;
   onChange: (next: boolean) => void;
+  /* "sm" is the form's default weight; "lg" is the roomier shape the
+     machine-size buttons use. */
+  size?: "sm" | "lg";
 }) {
+  const shape =
+    size === "lg"
+      ? "min-h-11 rounded-xl px-4 text-sm"
+      : "min-h-9 rounded-lg px-2.5 text-xs";
+
   return (
     <button
       type="button"
       onClick={() => onChange(!value)}
       aria-pressed={value}
-      className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
+      className={`${shape} border font-semibold transition ${
         value
           ? "border-slate-900 bg-slate-900 text-white"
           : "border-slate-300 bg-white text-slate-700"
@@ -238,6 +247,14 @@ export function UpdateForm({
   const field =
     "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500";
 
+  /* The laundry prices, seeded the same way the coffee ones are: a
+     wrong amount can be corrected, not only added. */
+  const amountFrom = (kind: string) =>
+    place.prices.find((p) => p.kind === kind)?.amount?.toString() ?? "";
+
+  const [washAmount, setWashAmount] = useState(amountFrom("wash"));
+  const [dryerAmount, setDryerAmount] = useState(amountFrom("dryer"));
+
   function toggleIn(list: string[], set: (v: string[]) => void, key: string) {
     set(list.includes(key) ? list.filter((k) => k !== key) : [...list, key]);
   }
@@ -278,7 +295,7 @@ export function UpdateForm({
     ambience.forEach((a) => formData.append("ambience", a));
     food.forEach((f) => formData.append("food", f));
 
-    /* The currency is the one chosen in Coffee Prices. A place with no
+    /* The currency is the one chosen with the amounts. A place with no
        price yet has no currency of its own to fall back on, which is
        why the picker sits with the amounts. */
     formData.set("currency", currency);
@@ -300,8 +317,11 @@ export function UpdateForm({
       formData.set("espresso_price", espressoPrice);
       formData.set("flat_white_price", flatWhitePrice);
     } else {
+      formData.set("wash_amount", washAmount);
+      formData.set("dryer_amount", dryerAmount);
       formData.set("detergent_included", String(detergentIncluded));
       formData.set("detergent_purchasable", String(detergentPurchasable));
+      formData.set("detergent_price", detergentPrice);
       formData.set("open_24h", String(open24h));
       formData.set("wash_minutes", washMinutes);
       formData.set("dryer_minutes", dryerMinutes);
@@ -386,7 +406,9 @@ export function UpdateForm({
         </Card>
       )}
 
-      {isCoffee && (
+      {/* ---------- price and time ---------- */}
+
+      {isCoffee ? (
         <Card>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
             Coffee Prices
@@ -444,6 +466,102 @@ export function UpdateForm({
             The server refuses a price with no currency, which is why the
             two travel together.
           </p>
+        </Card>
+      ) : (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Price and time
+          </h2>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                🧺 Wash
+              </span>
+
+              <input
+                value={washAmount}
+                onChange={(e) => setWashAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="6.00"
+                className={field}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                ⏱️ Wash takes
+              </span>
+
+              <select
+                value={washMinutes}
+                onChange={(e) => setWashMinutes(e.target.value)}
+                className={field}
+              >
+                <option value="">—</option>
+
+                {DURATIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d} min
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                🔥 Dryer
+              </span>
+
+              <input
+                value={dryerAmount}
+                onChange={(e) => setDryerAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="4.00"
+                className={field}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                ⏱️ Dryer takes
+              </span>
+
+              <select
+                value={dryerMinutes}
+                onChange={(e) => setDryerMinutes(e.target.value)}
+                className={field}
+              >
+                <option value="">—</option>
+
+                {DURATIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d} min
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                Currency
+              </span>
+
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className={field}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.country} — {c.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </Card>
       )}
 
@@ -692,140 +810,152 @@ export function UpdateForm({
         </Card>
       )}
 
+      {/* ---------- machines ---------- */}
+
+      {!isCoffee && (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Machine size
+          </h2>
+
+          <p className="mb-2 text-xs text-slate-400">
+            Tick every size this laundromat has.
+          </p>
+
+          <div className="grid grid-cols-3 gap-2">
+            {MACHINE_SIZES.map((option) => {
+              const on = machineSizes.includes(option.key);
+
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    toggleIn(machineSizes, setMachineSizes, option.key)
+                  }
+                  className={`min-h-11 rounded-xl border text-sm font-semibold transition ${
+                    on
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* ---------- detergent ---------- */}
+
+      {!isCoffee && (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Detergent
+          </h2>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <Toggle
+              label="🧼 Detergent included"
+              value={detergentIncluded}
+              onChange={setDetergentIncluded}
+              size="lg"
+            />
+
+            <Toggle
+              label="🛒 Can buy it there"
+              value={detergentPurchasable}
+              onChange={setDetergentPurchasable}
+              size="lg"
+            />
+          </div>
+
+          {detergentPurchasable && !detergentIncluded && (
+            <label className="mt-2 block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                Detergent price
+              </span>
+
+              <input
+                value={detergentPrice}
+                onChange={(e) => setDetergentPrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="1.00"
+                className={field}
+              />
+            </label>
+          )}
+        </Card>
+      )}
+
+      {/* ---------- opening hours ---------- */}
+
+      {!isCoffee && (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Opening hours
+          </h2>
+
+          <div className="flex flex-wrap gap-1.5">
+            <Toggle
+              label="🕛 Open 24 hours"
+              value={open24h}
+              onChange={setOpen24h}
+              size="lg"
+            />
+          </div>
+
+          {/* 24h means there is no last entry to record. */}
+          {!open24h && (
+            <label className="mt-2 block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                Last entry
+              </span>
+
+              <select
+                value={lastEntry}
+                onChange={(e) => setLastEntry(e.target.value)}
+                className={field}
+              >
+                <option value="">—</option>
+
+                {ENTRY_TIMES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </Card>
+      )}
+
+      {/* ---------- amenities ---------- */}
+
       <Card>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
           Amenities
         </h2>
 
         <div className="grid grid-cols-3 gap-1.5">
-          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
-          <Toggle label="🔌 Power" value={power} onChange={setPower} />
-          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
-          <Toggle label="🪑 Seating" value={seating} onChange={setSeating} />
-          <Toggle label="🚻 Toilets" value={toilets} onChange={setToilets} />
+          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} size="lg" />
+          <Toggle label="🔌 Power" value={power} onChange={setPower} size="lg" />
+          <Toggle
+            label="🅿️ Parking"
+            value={parking}
+            onChange={setParking}
+            size="lg"
+          />
+
+          <Toggle
+            label={isCoffee ? "🪑 Seating" : "🚻 Toilets"}
+            value={isCoffee ? seating : toilets}
+            onChange={isCoffee ? setSeating : setToilets}
+            size="lg"
+          />
         </div>
-
-        {!isCoffee && (
-          <>
-            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Machines
-            </h3>
-
-            <div className="grid grid-cols-3 gap-1.5">
-              {MACHINE_SIZES.map((option) => {
-                const on = machineSizes.includes(option.key);
-
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() =>
-                      toggleIn(machineSizes, setMachineSizes, option.key)
-                    }
-                    className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                      on
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white text-slate-700"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-              Timing
-            </h3>
-
-            <div className="grid grid-cols-2 gap-1.5">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-500">
-                  Wash takes
-                </span>
-
-                <select
-                  value={washMinutes}
-                  onChange={(e) => setWashMinutes(e.target.value)}
-                  className={field}
-                >
-                  <option value="">—</option>
-
-                  {DURATIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {d} min
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-500">
-                  Dryer takes
-                </span>
-
-                <select
-                  value={dryerMinutes}
-                  onChange={(e) => setDryerMinutes(e.target.value)}
-                  className={field}
-                >
-                  <option value="">—</option>
-
-                  {DURATIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {d} min
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="mt-2">
-              <Toggle
-                label="🕛 Open 24 hours"
-                value={open24h}
-                onChange={setOpen24h}
-              />
-            </div>
-
-            {!open24h && (
-              <label className="mt-2 block">
-                <span className="mb-1 block text-xs font-medium text-slate-500">
-                  Last entry
-                </span>
-
-                <select
-                  value={lastEntry}
-                  onChange={(e) => setLastEntry(e.target.value)}
-                  className={field}
-                >
-                  <option value="">—</option>
-
-                  {ENTRY_TIMES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
-              <Toggle
-                label="🧼 Detergent included"
-                value={detergentIncluded}
-                onChange={setDetergentIncluded}
-              />
-
-              <Toggle
-                label="🛒 Can buy it there"
-                value={detergentPurchasable}
-                onChange={setDetergentPurchasable}
-              />
-            </div>
-          </>
-        )}
       </Card>
 
       <Card>
