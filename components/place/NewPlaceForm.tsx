@@ -260,6 +260,7 @@ export function NewPlaceForm({
       return;
     }
 
+    /* Crop, then compress — in that order, one photo at a time. */
     setQueue(picked.slice(1));
     setCropping(picked[0]);
   }
@@ -326,6 +327,9 @@ export function NewPlaceForm({
       }
 
       machineSizes.forEach((s) => formData.append("machine_sizes", s));
+
+      /* One entry per file, under "photo" — createPlace reads them
+         with getAll. */
       photos.forEach((p) => formData.append("photo", p));
 
       if (chainHit) formData.set("chain_flagged", chainHit);
@@ -930,8 +934,7 @@ export function NewPlaceForm({
             <Toggle label="Open 24h" value={open24h} onChange={setOpen24h} />
           </div>
 
-          {/* 24h means there is no last entry to record, so the field
-              goes away rather than sitting there greyed and empty. */}
+          {/* 24h means there is no last entry to record. */}
           {!open24h && (
             <label className="mt-3 block">
               <span className="mb-1 block text-xs font-semibold text-slate-500">
@@ -979,23 +982,49 @@ export function NewPlaceForm({
       <Card>
         <SectionTitle title="Photos" note="up to 5" />
 
+        {/*
+         * The input is hidden and the label below is the button that
+         * opens it. Without the label there is nothing to click: a
+         * bare file input renders as inert text on a phone, which is
+         * exactly what happened when this card was rewritten.
+         */}
         <input
+          id="new-photos"
           type="file"
           accept="image/*"
           multiple
+          className="hidden"
           onChange={(e) => handlePhotos(e.target.files)}
-          className="mt-2 block w-full text-sm text-slate-600"
         />
 
-        {compressing && (
-          <p className="mt-2 text-xs text-slate-500">Compressing…</p>
-        )}
+        <label
+          htmlFor="new-photos"
+          className="mt-2 flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          {compressing ? "Compressing…" : "📷 Choose photos"}
+        </label>
 
         {photos.length > 0 && (
-          <p className="mt-2 text-xs text-slate-500">
-            {photos.length} photo{photos.length === 1 ? "" : "s"} ready
-          </p>
+          <ul className="mt-3 space-y-1 text-sm text-slate-600">
+            {photos.map((file, index) => (
+              <li
+                key={index}
+                className="flex items-center justify-between gap-3"
+              >
+                <span className="min-w-0 truncate">{file.name}</span>
+
+                <span className="shrink-0 text-xs text-slate-400">
+                  {Math.round(file.size / 1024)} KB
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
+
+        <p className="mt-2 text-xs text-slate-500">
+          Up to {MAX_INPUT_MB} MB each photo. Each one is squared, then
+          compressed to 1400px. At least one is needed to add the place.
+        </p>
       </Card>
 
       {/* ---------- 9. description ---------- */}
