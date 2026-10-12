@@ -523,9 +523,7 @@ export function NewPlaceForm({
 
         <div className="mt-3">
           <LocationPicker
-            latitude={latitude}
-            longitude={longitude}
-            onChange={(lat, lng) => {
+            onPicked={(lat, lng) => {
               setLatitude(lat);
               setLongitude(lng);
             }}
