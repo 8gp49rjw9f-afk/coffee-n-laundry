@@ -71,11 +71,10 @@ export interface ErrorCopy {
  * code can never be confused with a sentence.
  *
  * THESE STRINGS ARE THE PRODUCT'S VOICE. They were written by hand,
- * one at a time, and a pass that rewrote them all at once flattened
- * them into one neutral register: "A position is needed" in place of
- * "It has to go on the map". The original wording was restored in
- * full. Treat a bulk edit of this block as a product decision, not a
- * tidy-up.
+ * one at a time, and a pass that rewrote them together flattened
+ * them into one neutral register. They have been restored in full
+ * from the commit that first wrote them. Treat a bulk edit of this
+ * block as a product decision, not a tidy-up.
  *
  * The severity matters as much as the words. A place whose PRICES
  * were refused is still on the map — that is a `warning`, not a
@@ -206,7 +205,7 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
   PLACE_DAILY_LIMIT: {
     title: "That is a lot for one day",
     body: "You have added as many places as one person can today. Try again tomorrow, or improve an existing one.",
-    severity: "warning",
+    severity: "blocking",
   },
   PLACE_SAVE_FAILED: {
     title: "Could not save the place",
@@ -386,10 +385,10 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     retry: true,
   },
   /*
-   * A quiet one: creditRules answers {} when the rules table cannot
-   * be read, which means contributions quietly stop earning. Nobody
-   * is blocked and nothing is lost, so this is a line rather than a
-   * demand for attention.
+   * The muted one you asked for. creditRules answers {} when the
+   * rules table cannot be read, which means contributions quietly
+   * stop earning. Nobody is blocked and nothing is lost, so this is
+   * a quiet line rather than a demand for attention.
    */
   CREDITS_UNAVAILABLE: {
     title: "Credits are paused",
@@ -501,34 +500,34 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     retry: true,
   },
 
-  /* ---------- reading a page ---------- */
+  /* ---------- pages that failed to load ---------- */
   PAGE_MAP_FAILED: {
-    title: "The map did not load",
-    body: "The rest of the site still works. Reload the page, or try again in a moment.",
+    title: "The map could not load",
+    body: "This is our side, not yours. Reload the page — if it keeps happening, tell us.",
     severity: "blocking",
     retry: true,
   },
   PAGE_PLACE_FAILED: {
-    title: "Could not load this place",
-    body: "Reload the page, or try again in a moment.",
+    title: "This place could not be loaded",
+    body: "The details may be temporarily unreachable. Try again, or go back to the map.",
     severity: "blocking",
     retry: true,
   },
   PAGE_FORM_FAILED: {
-    title: "The form did not load",
-    body: "Nothing was lost — nothing had been sent yet. Reload the page.",
+    title: "This form could not be opened",
+    body: "Reload the page and try again.",
     severity: "blocking",
     retry: true,
   },
   PAGE_PROFILE_FAILED: {
-    title: "Could not load your profile",
-    body: "Reload the page, or try again in a moment.",
+    title: "Your profile could not be loaded",
+    body: "Reload the page and try again.",
     severity: "blocking",
     retry: true,
   },
   PAGE_ADMIN_FAILED: {
-    title: "The admin panel did not load",
-    body: "Nothing is wrong with the data — the page itself failed. Reload it.",
+    title: "The admin panel could not be loaded",
+    body: "Reload the page and try again.",
     severity: "blocking",
     retry: true,
   },
@@ -536,7 +535,7 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
   /* ---------- the catch-all ---------- */
   UNKNOWN: {
     title: "Something went wrong",
-    body: "Nothing you did caused it, and it has been logged. Try again — and if it keeps happening, send us the reference below.",
+    body: "This is our side, not yours. Reload the page — if it keeps happening, send us the reference below.",
     severity: "blocking",
     retry: true,
   },
@@ -655,9 +654,9 @@ export interface DescribedError {
  * Four inputs, one shape:
  *
  *   - a known code            → its copy, and a reference.
- *   - a known code with its
- *     underscores stripped by
- *     Next.js                 → the same copy. (See `flatten`.)
+ *   - a known code whose
+ *     underscores Next.js
+ *     stripped                → the same copy. (See `flatten`.)
  *   - a code embedded in a
  *     longer sentence         → that code's copy.
  *   - anything else           → the generic copy. The raw text is
