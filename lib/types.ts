@@ -4,6 +4,22 @@
 
 export type PlaceType = "coffee" | "laundry";
 export type CoffeeKind = "barista" | "regular" | "both";
+
+/*
+ * The kinds a row in `place_prices` can carry.
+ *
+ * `filter` is still here, and nothing offers it any more: the third
+ * price row left the page when Filter coffee stopped being asked for,
+ * and neither form nor server writes it now.
+ *
+ * It stays in the type on purpose. Rows written before that change
+ * may still exist — a place whose filter price was filled in while
+ * the field was on screen — and dropping the member would make them
+ * an unrecognised kind at read time. Same reasoning as the retired
+ * keys in lib/format.ts, which keep their labels so an old row still
+ * reads as words rather than a bare column value. `wash_fold` and
+ * `service` are retired in exactly the same way.
+ */
 export type PriceKind =
   | "wash"
   | "dryer"
@@ -13,6 +29,7 @@ export type PriceKind =
   | "filter"
   | "flat_white"
   | "detergent";
+
 export type FoodKind = "full_meals" | "vegan" | "sandwich" | "pastries";
 export type PhotoType = "exterior" | "interior" | "machines" | "prices" | "detail";
 export type UpdateType =
@@ -104,7 +121,16 @@ export interface CoffeeDetails {
   place_id: string;
   coffee_kind: CoffeeKind;
   roaster: string | null;
+
+  /*
+   * No writer, no reader. It was meant for "which brewing methods does
+   * this café offer", which is where a Filter entry would naturally
+   * live — and that question is no longer asked. Kept rather than
+   * dropped because removing a column is a migration, and this one
+   * costs nothing sitting here.
+   */
   brew_methods: string[];
+
   has_decaf: boolean | null;
 
   /*
