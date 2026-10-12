@@ -29,6 +29,7 @@ const PHOTO_OPTIONS = {
 };
 
 const MAX_INPUT_MB = 10;
+const MAX_PHOTOS = 5;
 
 /* Duration steps of five minutes, from 5 to 90. A short cycle exists
    and so does a long one; the old list started at 15 and skipped 55. */
@@ -112,17 +113,24 @@ function Toggle({
   label,
   value,
   onChange,
+  size = "lg",
 }: {
   label: string;
   value: boolean;
   onChange: (next: boolean) => void;
+  size?: "sm" | "lg";
 }) {
+  const shape =
+    size === "lg"
+      ? "min-h-11 rounded-xl px-4 text-sm"
+      : "min-h-9 rounded-lg px-2.5 text-xs";
+
   return (
     <button
       type="button"
       onClick={() => onChange(!value)}
       aria-pressed={value}
-      className={`min-h-11 rounded-xl border text-sm font-semibold transition ${
+      className={`${shape} border font-semibold transition ${
         value
           ? "border-slate-900 bg-slate-900 text-white"
           : "border-slate-300 bg-white text-slate-700"
@@ -251,7 +259,16 @@ export function NewPlaceForm({
 
     setError("");
 
-    const picked = Array.from(files).slice(0, 5);
+    /* Already-chosen photos count towards the ceiling: adding three
+       when two are held must not end with five uploaded silently. */
+    const room = MAX_PHOTOS - photos.length;
+
+    if (room <= 0) {
+      setError(`That is already ${MAX_PHOTOS} photos. Remove one to add another.`);
+      return;
+    }
+
+    const picked = Array.from(files).slice(0, room);
 
     const tooBig = picked.find((file) => file.size > MAX_INPUT_MB * 1_000_000);
 
@@ -278,7 +295,7 @@ export function NewPlaceForm({
         { type: "image/jpeg" }
       );
 
-      setPhotos((current) => [...current, compressed].slice(0, 5));
+      setPhotos((current) => [...current, compressed].slice(0, MAX_PHOTOS));
     } catch {
       setError("Could not process that photo. Try a smaller one.");
     }
@@ -289,6 +306,13 @@ export function NewPlaceForm({
       setCropping(queue[0]);
       setQueue((current) => current.slice(1));
     }
+  }
+
+  /* Taking one back before the form is sent. Filtering by position
+     rather than by name: two photos from the same phone can share a
+     name once the crop has renamed them both "-square.jpg". */
+  function removePhoto(index: number) {
+    setPhotos((current) => current.filter((_, i) => i !== index));
   }
 
   function toggleIn(list: string[], set: (v: string[]) => void, key: string) {
@@ -703,6 +727,7 @@ export function NewPlaceForm({
                   label={option.label}
                   value={payments.includes(option.value)}
                   onChange={() => toggleIn(payments, setPayments, option.value)}
+                  size="sm"
                 />
               ))}
             </div>
@@ -739,6 +764,7 @@ export function NewPlaceForm({
                 label={option.label}
                 value={coffeeKind === option.key}
                 onChange={() => setCoffeeKind(option.key)}
+                size="sm"
               />
             ))}
           </div>
@@ -758,6 +784,7 @@ export function NewPlaceForm({
                 label={option.label}
                 value={milks.includes(option.key)}
                 onChange={() => toggleIn(milks, setMilks, option.key)}
+                size="sm"
               />
             ))}
           </div>
@@ -828,6 +855,7 @@ export function NewPlaceForm({
                 label={`${option.emoji} ${option.label}`}
                 value={food.includes(option.key)}
                 onChange={() => toggleIn(food, setFood, option.key)}
+                size="sm"
               />
             ))}
           </div>
@@ -847,6 +875,7 @@ export function NewPlaceForm({
                 label={`${option.emoji} ${option.label}`}
                 value={ambience.includes(option.key)}
                 onChange={() => toggleIn(ambience, setAmbience, option.key)}
+                size="sm"
               />
             ))}
 
@@ -871,7 +900,7 @@ export function NewPlaceForm({
             Tick every size this laundromat has.
           </p>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {MACHINE_SIZES.map((option) => (
               <Toggle
                 key={option.key}
@@ -890,7 +919,7 @@ export function NewPlaceForm({
         <Card>
           <SectionTitle title="Detergent" note="bought there or already included" />
 
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 grid grid-cols-2 gap-2">
             <Toggle
               label="🧼 Included"
               value={detergentIncluded}
@@ -930,8 +959,13 @@ export function NewPlaceForm({
             Opening hours
           </h2>
 
-          <div className="flex flex-wrap gap-2">
-            <Toggle label="Open 24h" value={open24h} onChange={setOpen24h} />
+          <div className="grid grid-cols-2 gap-2">
+            <Toggle
+              label="Open 24h"
+              value={open24h}
+              onChange={setOpen24h}
+            />
+            <span />
           </div>
 
           {/* 24h means there is no last entry to record. */}
@@ -964,7 +998,7 @@ export function NewPlaceForm({
       <Card>
         <SectionTitle title="Amenities" note="what else is there" />
 
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
           <Toggle label="🔌 Power" value={power} onChange={setPower} />
           <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
@@ -980,7 +1014,7 @@ export function NewPlaceForm({
       {/* ---------- 8. photos ---------- */}
 
       <Card>
-        <SectionTitle title="Photos" note="up to 5" />
+        <SectionTitle title="Photos" note={`up to ${MAX_PHOTOS}`} />
 
         {/*
          * The input is hidden and the label below is the button that
@@ -994,7 +1028,13 @@ export function NewPlaceForm({
           accept="image/*"
           multiple
           className="hidden"
-          onChange={(e) => handlePhotos(e.target.files)}
+          onChange={(e) => {
+            handlePhotos(e.target.files);
+
+            /* Cleared so choosing the same file twice still fires a
+               change event. */
+            e.target.value = "";
+          }}
         />
 
         <label
@@ -1005,17 +1045,29 @@ export function NewPlaceForm({
         </label>
 
         {photos.length > 0 && (
-          <ul className="mt-3 space-y-1 text-sm text-slate-600">
+          <ul className="mt-3 space-y-2">
             {photos.map((file, index) => (
               <li
-                key={index}
-                className="flex items-center justify-between gap-3"
+                key={`${file.name}-${index}`}
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"
               >
-                <span className="min-w-0 truncate">{file.name}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
+                  {file.name}
+                </span>
 
                 <span className="shrink-0 text-xs text-slate-400">
                   {Math.round(file.size / 1024)} KB
                 </span>
+
+                <button
+                  type="button"
+                  onClick={() => removePhoto(index)}
+                  aria-label={`Remove ${file.name}`}
+                  title="Remove this photo"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-sm font-bold text-rose-600 transition hover:bg-rose-50"
+                >
+                  ✕
+                </button>
               </li>
             ))}
           </ul>
@@ -1067,3 +1119,5 @@ export function NewPlaceForm({
     </form>
   );
 }
+
+export default NewPlaceForm;
