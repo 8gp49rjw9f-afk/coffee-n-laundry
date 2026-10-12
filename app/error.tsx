@@ -7,18 +7,24 @@ import { describeError, logError } from "@/lib/errors";
 
 /*
  * ======================================================
- * THE GLOBAL ERROR BOUNDARY — TEMPORARY DIAGNOSTIC
+ * THE GLOBAL ERROR BOUNDARY
  * ======================================================
  *
- * The real message, the digest and the stack are printed on the page.
+ * The last thing a visitor should meet when something breaks. It says
+ * what happened in plain English, offers a way onward, and prints a
+ * short reference that points at the line in the logs.
  *
- * WHY: a production Next build replaces the message of anything that
- * fails during a render with a single sentence and keeps the real text
- * in the logs. Two attempts at guessing the cause have now been wrong,
- * so the text comes back to the screen until it is read.
+ * The raw message is NEVER shown. A Postgres string, a thrown code
+ * like PLACE_PHOTO_REQUIRED, or a stack trace tells a visitor nothing
+ * they can act on, and it tells whoever is reading the page over
+ * their shoulder more than they should see. Everything technical goes
+ * to logError below, which is where it is actually useful.
  *
- * REMOVE THIS PANEL once the cause is found. It shows a raw message to
- * a visitor, which the catalogue exists to prevent.
+ * A diagnostic panel used to sit here and print message, digest, name
+ * and stack to the screen. It did its job while the cause was being
+ * hunted and then had to go: it was defeating the whole point of the
+ * catalogue in lib/errors.ts. If something needs pinning down again,
+ * read the logs — not this page.
  */
 
 export default function GlobalError({
@@ -51,32 +57,6 @@ export default function GlobalError({
       <p className="mt-2 text-xs font-medium text-slate-400">
         Ref. {described.reference}
       </p>
-
-      {/* ---------- TEMPORARY: the raw truth ---------- */}
-
-      <div className="mt-6 w-full rounded-xl border border-slate-300 bg-slate-900 p-4 text-left">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-          Diagnostic — remove once fixed
-        </p>
-
-        <p className="mt-2 break-all text-xs font-semibold text-amber-300">
-          message: {error?.message || "(empty)"}
-        </p>
-
-        <p className="mt-1 break-all text-xs font-semibold text-sky-300">
-          digest: {error?.digest || "(none)"}
-        </p>
-
-        <p className="mt-1 break-all text-xs font-semibold text-emerald-300">
-          name: {error?.name || "(none)"}
-        </p>
-
-        {error?.stack && (
-          <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all text-[10px] leading-tight text-slate-300">
-            {error.stack}
-          </pre>
-        )}
-      </div>
 
       <div className="mt-6 flex w-full flex-col gap-2">
         <button
