@@ -83,13 +83,13 @@ function Toggle({
   label,
   value,
   onChange,
-  size = "sm",
+  size = "lg",
 }: {
   label: string;
   value: boolean;
   onChange: (next: boolean) => void;
-  /* "sm" is the form's default weight; "lg" is the roomier shape the
-     machine-size buttons use. */
+  /* "sm" is the form's default weight; "lg" is the roomier shape
+     used where the buttons sit alone or in a short row. */
   size?: "sm" | "lg";
 }) {
   const shape =
@@ -214,12 +214,20 @@ export function UpdateForm({
   const [machineSizes, setMachineSizes] = useState<string[]>(
     place.laundry?.machine_sizes ?? []
   );
+
   const [detergentIncluded, setDetergentIncluded] = useState(
     Boolean(place.laundry?.detergent_included)
   );
   const [detergentPurchasable, setDetergentPurchasable] = useState(
     Boolean(place.laundry?.detergent_purchasable)
   );
+
+  /* Seeded from the place's own row so a wrong detergent price can be
+     corrected, the same way the wash and dryer amounts are. Without
+     this declaration the detergent price was sent to the server by a
+     form that had no value to send. */
+  const [detergentPrice, setDetergentPrice] = useState(amountOf("detergent"));
+
   const [open24h, setOpen24h] = useState(Boolean(place.laundry?.open_24h));
   const [washMinutes, setWashMinutes] = useState(
     place.laundry?.wash_minutes != null
@@ -249,11 +257,8 @@ export function UpdateForm({
 
   /* The laundry prices, seeded the same way the coffee ones are: a
      wrong amount can be corrected, not only added. */
-  const amountFrom = (kind: string) =>
-    place.prices.find((p) => p.kind === kind)?.amount?.toString() ?? "";
-
-  const [washAmount, setWashAmount] = useState(amountFrom("wash"));
-  const [dryerAmount, setDryerAmount] = useState(amountFrom("dryer"));
+  const [washAmount, setWashAmount] = useState(amountOf("wash"));
+  const [dryerAmount, setDryerAmount] = useState(amountOf("dryer"));
 
   function toggleIn(list: string[], set: (v: string[]) => void, key: string) {
     set(list.includes(key) ? list.filter((k) => k !== key) : [...list, key]);
@@ -861,14 +866,12 @@ export function UpdateForm({
               label="🧼 Detergent included"
               value={detergentIncluded}
               onChange={setDetergentIncluded}
-              size="lg"
             />
 
             <Toggle
               label="🛒 Can buy it there"
               value={detergentPurchasable}
               onChange={setDetergentPurchasable}
-              size="lg"
             />
           </div>
 
@@ -903,7 +906,6 @@ export function UpdateForm({
               label="🕛 Open 24 hours"
               value={open24h}
               onChange={setOpen24h}
-              size="lg"
             />
           </div>
 
@@ -940,20 +942,18 @@ export function UpdateForm({
         </h2>
 
         <div className="grid grid-cols-3 gap-1.5">
-          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} size="lg" />
-          <Toggle label="🔌 Power" value={power} onChange={setPower} size="lg" />
+          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
+          <Toggle label="🔌 Power" value={power} onChange={setPower} />
           <Toggle
             label="🅿️ Parking"
             value={parking}
             onChange={setParking}
-            size="lg"
           />
 
           <Toggle
             label={isCoffee ? "🪑 Seating" : "🚻 Toilets"}
             value={isCoffee ? seating : toilets}
             onChange={isCoffee ? setSeating : setToilets}
-            size="lg"
           />
         </div>
       </Card>
