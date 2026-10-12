@@ -59,7 +59,6 @@ type FieldKey =
   | "seating"
   | "coffee_kind"
   | "espresso_price"
-  | "filter_price"
   | "flat_white_price"
   | "beans"
   | "roaster_available"
@@ -95,7 +94,6 @@ const UPDATE_TYPE_FOR: Partial<Record<FieldKey, string>> = {
   wash_price: "price",
   dryer_price: "price",
   espresso_price: "price",
-  filter_price: "price",
   flat_white_price: "price",
   detergent_price: "detergent",
   wash_minutes: "hours",
@@ -400,7 +398,6 @@ export async function updatePlace(formData: FormData): Promise<void> {
     };
 
     priceChange("espresso_price", "espresso", "espresso_price");
-    priceChange("filter_price", "filter", "filter_price");
     priceChange("flat_white_price", "flat_white", "flat_white_price");
 
     change("beans", before.beans ? "yes" : null, bool("sells_beans") ? "yes" : null);
@@ -495,7 +492,6 @@ export async function updatePlace(formData: FormData): Promise<void> {
     };
 
     await writePrice("espresso", "espresso_price");
-    await writePrice("filter", "filter_price");
     await writePrice("flat_white", "flat_white_price");
   } else {
     const details = laundryRow.data ?? {};
