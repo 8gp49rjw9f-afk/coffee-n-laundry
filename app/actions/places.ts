@@ -216,8 +216,10 @@ export async function createPlace(formData: FormData): Promise<void> {
         add("detergent", formData.get("detergent_price"));
       }
     } else {
+      /* Espresso and flat white only. Filter coffee was a third price
+         row that almost every café left empty, and nothing offers it
+         any more — so nothing reads the field either. */
       add("espresso", formData.get("espresso_price"));
-      add("filter", formData.get("filter_price"));
       add("flat_white", formData.get("flat_white_price"));
     }
 
@@ -360,7 +362,6 @@ export async function createPlace(formData: FormData): Promise<void> {
     };
 
     named("espresso_price", "espresso_price");
-    named("filter_price", "filter_price");
     named("flat_white_price", "flat_white_price");
 
     if (readBool(formData.get("sells_beans"))) push("beans", "yes");
