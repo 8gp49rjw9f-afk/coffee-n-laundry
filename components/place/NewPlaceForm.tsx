@@ -201,6 +201,11 @@ export function NewPlaceForm({
   const [ambience, setAmbience] = useState<string[]>([]);
   const [food, setFood] = useState<string[]>([]);
 
+  /*
+   * Laundry. The durations live with the prices — a wash is a
+   * number and a length of time, and separating them made the person
+   * scroll to answer one question. Opening hours keep their own card.
+   */
   const [machineSizes, setMachineSizes] = useState<string[]>([]);
   const [detergentIncluded, setDetergentIncluded] = useState(false);
   const [detergentPurchasable, setDetergentPurchasable] = useState(false);
@@ -479,6 +484,8 @@ export function NewPlaceForm({
         ← {isCoffee ? "☕ Coffee" : "🧺 Laundry"}
       </button>
 
+      {/* ---------- 1. what and where ---------- */}
+
       <Card>
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold text-slate-700">
@@ -531,7 +538,9 @@ export function NewPlaceForm({
         </div>
       </Card>
 
-      {isCoffee && (
+      {/* ---------- 2. price and time ---------- */}
+
+      {isCoffee ? (
         <Card>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
             Coffee Prices
@@ -575,7 +584,93 @@ export function NewPlaceForm({
             />
           </div>
         </Card>
+      ) : (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Price and time
+          </h2>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                🧺 Wash
+              </span>
+
+              <input
+                value={washAmount}
+                onChange={(e) => setWashAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="6.00"
+                className={selectClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                ⏱️ Wash takes
+              </span>
+
+              <select
+                value={washMinutes}
+                onChange={(e) => setWashMinutes(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Not recorded</option>
+
+                {DURATIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d} min
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                🔥 Dryer
+              </span>
+
+              <input
+                value={dryerAmount}
+                onChange={(e) => setDryerAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="4.00"
+                className={selectClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                ⏱️ Dryer takes
+              </span>
+
+              <select
+                value={dryerMinutes}
+                onChange={(e) => setDryerMinutes(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Not recorded</option>
+
+                {DURATIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d} min
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-2">
+            <CurrencyPicker
+              value={currency}
+              onChange={setCurrency}
+              selectClass={selectClass}
+            />
+          </div>
+        </Card>
       )}
+
+      {/* ---------- 3. payment ---------- */}
 
       <Card>
         <SectionTitle title="How do you pay?" note={`up to ${PAYMENT_NOTE_MAX} characters`} />
@@ -624,6 +719,8 @@ export function NewPlaceForm({
           />
         </label>
       </Card>
+
+      {/* ---------- coffee only ---------- */}
 
       {isCoffee && (
         <Card>
@@ -758,11 +855,17 @@ export function NewPlaceForm({
         </Card>
       )}
 
+      {/* ---------- 4. machines ---------- */}
+
       {!isCoffee && (
         <Card>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            Machines
+            Machine size
           </h2>
+
+          <p className="mb-2 text-xs text-slate-400">
+            Tick every size this laundromat has.
+          </p>
 
           <div className="flex flex-wrap gap-2">
             {MACHINE_SIZES.map((option) => (
@@ -776,6 +879,8 @@ export function NewPlaceForm({
           </div>
         </Card>
       )}
+
+      {/* ---------- 5. detergent ---------- */}
 
       {!isCoffee && (
         <Card>
@@ -813,6 +918,8 @@ export function NewPlaceForm({
         </Card>
       )}
 
+      {/* ---------- 6. opening hours ---------- */}
+
       {!isCoffee && (
         <Card>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
@@ -820,78 +927,54 @@ export function NewPlaceForm({
           </h2>
 
           <div className="flex flex-wrap gap-2">
-            <Toggle
-              label="Open 24h"
-              value={open24h}
-              onChange={setOpen24h}
-            />
+            <Toggle label="Open 24h" value={open24h} onChange={setOpen24h} />
           </div>
 
+          {/* 24h means there is no last entry to record, so the field
+              goes away rather than sitting there greyed and empty. */}
           {!open24h && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-slate-500">
-                  Last entry
-                </span>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-xs font-semibold text-slate-500">
+                Last entry
+              </span>
 
-                <select
-                  value={lastEntry}
-                  onChange={(e) => setLastEntry(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Not recorded</option>
+              <select
+                value={lastEntry}
+                onChange={(e) => setLastEntry(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Not recorded</option>
 
-                  {ENTRY_TIMES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-slate-500">
-                  Wash cycle
-                </span>
-
-                <select
-                  value={washMinutes}
-                  onChange={(e) => setWashMinutes(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Not recorded</option>
-
-                  {DURATIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {d} min
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-slate-500">
-                  Dryer cycle
-                </span>
-
-                <select
-                  value={dryerMinutes}
-                  onChange={(e) => setDryerMinutes(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Not recorded</option>
-
-                  {DURATIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {d} min
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+                {ENTRY_TIMES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
         </Card>
       )}
+
+      {/* ---------- 7. amenities ---------- */}
+
+      <Card>
+        <SectionTitle title="Amenities" note="what else is there" />
+
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
+          <Toggle label="🔌 Power" value={power} onChange={setPower} />
+          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
+
+          <Toggle
+            label={isCoffee ? "🪑 Seating" : "🚻 Toilets"}
+            value={isCoffee ? seating : toilets}
+            onChange={isCoffee ? setSeating : setToilets}
+          />
+        </div>
+      </Card>
+
+      {/* ---------- 8. photos ---------- */}
 
       <Card>
         <SectionTitle title="Photos" note="up to 5" />
@@ -915,21 +998,7 @@ export function NewPlaceForm({
         )}
       </Card>
 
-      <Card>
-        <SectionTitle title="Amenities" note="what else is there" />
-
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
-          <Toggle label="🔌 Power" value={power} onChange={setPower} />
-          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
-
-          <Toggle
-            label={isCoffee ? "🪑 Seating" : "🚻 Toilets"}
-            value={isCoffee ? seating : toilets}
-            onChange={isCoffee ? setSeating : setToilets}
-          />
-        </div>
-      </Card>
+      {/* ---------- 9. description ---------- */}
 
       <Card>
         <SectionTitle title="Description" />
