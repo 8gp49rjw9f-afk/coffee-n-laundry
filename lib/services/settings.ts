@@ -74,13 +74,45 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   currency_hint: "EUR",
 };
 
+/*
+ * TWO CACHES, NOT ONE.
+ *
+ * Everything in `site_settings` is read on nearly every request —
+ * the proxy alone runs on each one that is not a static asset — and
+ * almost none of it changes during a day. A minute of staleness on
+ * a label, a length limit or a map zoom costs nothing, and caching
+ * it keeps a database read off the hot path.
+ *
+ * The maintenance switch is the exception, and it is the reason
+ * these are two caches rather than one. It is an emergency lever:
+ * the moment it is flipped, the site should be resting. Under the
+ * single minute-long cache it took up to sixty seconds to bite,
+ * repeated per warm instance on Vercel — long enough that flipping
+ * it looked like it did nothing at all, which is exactly what it
+ * looked like.
+ *
+ * So the switch gets its own short window. Five seconds is fast
+ * enough that a person who flips it, reloads and finds the site
+ * still up knows something else is wrong, and slow enough that a
+ * burst of traffic does not turn into a burst of queries.
+ */
+
 let cached: SiteSettings | null = null;
 let cachedAt = 0;
-const CACHE_TTL = 1000 * 60; // 1 minute
+const CACHE_TTL = 1000 * 60; // 1 minute — everything but the switch
+
+let cachedMaintenance: boolean | null = null;
+let cachedMaintenanceAt = 0;
+const MAINTENANCE_TTL = 1000 * 5; // 5 seconds
 
 export async function getSettings(): Promise<SiteSettings> {
   if (cached && Date.now() - cachedAt < CACHE_TTL) {
-    return cached;
+    /*
+     * The cached copy is a minute old, which is fine for the rest of
+     * it and not fine for this one field. Ask about the switch on its
+     * own, far more cheaply than re-reading the whole row.
+     */
+    return { ...cached, maintenance_mode: await readMaintenanceMode() };
   }
 
   try {
@@ -99,9 +131,49 @@ export async function getSettings(): Promise<SiteSettings> {
     cached = { ...DEFAULT_SETTINGS, ...(data as SiteSettings) };
     cachedAt = Date.now();
 
+    /* The row just told us the switch's value, so start its own
+       window from now rather than making a second query. */
+    cachedMaintenance = cached.maintenance_mode;
+    cachedMaintenanceAt = Date.now();
+
     return cached;
   } catch {
     return DEFAULT_SETTINGS;
+  }
+}
+
+/**
+ * The maintenance flag, on a five-second window of its own.
+ *
+ * One column, not the whole row. A failure returns the last known
+ * value rather than `false`: an unreachable database must not be
+ * what lifts a maintenance mode, since that is the one moment the
+ * site most needs to stay closed.
+ */
+async function readMaintenanceMode(): Promise<boolean> {
+  if (cachedMaintenance !== null && Date.now() - cachedMaintenanceAt < MAINTENANCE_TTL) {
+    return cachedMaintenance;
+  }
+
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("site_settings")
+      .select("maintenance_mode")
+      .eq("id", 1)
+      .single();
+
+    if (error || !data) {
+      return cachedMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
+    }
+
+    cachedMaintenance = Boolean(data.maintenance_mode);
+    cachedMaintenanceAt = Date.now();
+
+    return cachedMaintenance;
+  } catch {
+    return cachedMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
   }
 }
 
@@ -129,4 +201,7 @@ export async function isAdmin(): Promise<boolean> {
 
 export function clearSettingsCache() {
   cached = null;
+  cachedAt = 0;
+  cachedMaintenance = null;
+  cachedMaintenanceAt = 0;
 }
