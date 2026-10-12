@@ -186,7 +186,6 @@ export function NewPlaceForm({
   const [currency, setCurrency] = useState(currencyHint);
 
   const [espressoPrice, setEspressoPrice] = useState("");
-  const [filterPrice, setFilterPrice] = useState("");
   const [flatWhitePrice, setFlatWhitePrice] = useState("");
 
   const [sellsBeans, setSellsBeans] = useState(false);
@@ -330,7 +329,6 @@ export function NewPlaceForm({
         formData.set("coffee_kind", coffeeKind);
 
         formData.set("espresso_price", espressoPrice);
-        formData.set("filter_price", filterPrice);
         formData.set("flat_white_price", flatWhitePrice);
 
         formData.set("sells_beans", String(sellsBeans));
@@ -496,7 +494,7 @@ export function NewPlaceForm({
           />
         </label>
 
-        <label className="mt-4 block">
+        <label className="mt-3 block">
           <span className="mb-1.5 block text-sm font-semibold text-slate-700">
             Address
           </span>
@@ -504,66 +502,46 @@ export function NewPlaceForm({
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="123 Main Street"
+            placeholder="Street, number"
             className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
           />
         </label>
-      </Card>
 
-      <Card>
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">
-          Where is it?
-        </h3>
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+            Website
+          </span>
 
-        <LocationPicker
-          onPicked={(lat, lng) => {
-            setLatitude(lat);
-            setLongitude(lng);
-          }}
-        />
+          <input
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://"
+            inputMode="url"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
+          />
+        </label>
+
+        <div className="mt-3">
+          <LocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            onChange={(lat, lng) => {
+              setLatitude(lat);
+              setLongitude(lng);
+            }}
+          />
+        </div>
       </Card>
 
       {isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
-            Coffee type
-          </h3>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Coffee Prices
+          </h2>
 
-          <div className="grid grid-cols-3 gap-2">
-            {COFFEE_KINDS.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setCoffeeKind(option.key)}
-                className={`min-h-11 rounded-xl border text-sm font-bold transition ${
-                  coffeeKind === option.key
-                    ? "border-[#6f4e37] bg-[#6f4e37] text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      <Card>
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Prices</h3>
-
-        {/* The currency belongs beside the amounts, not in a corner of
-            the form: a price without one tells nobody anything, and
-            the server refuses a row that has no currency. */}
-        <CurrencyPicker
-          value={currency}
-          onChange={setCurrency}
-          selectClass={selectClass}
-        />
-
-        {isCoffee ? (
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
                 Espresso
               </span>
 
@@ -577,21 +555,7 @@ export function NewPlaceForm({
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Filter
-              </span>
-
-              <input
-                value={filterPrice}
-                onChange={(e) => setFilterPrice(e.target.value)}
-                inputMode="decimal"
-                placeholder="4.00"
-                className={selectClass}
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
                 Flat white
               </span>
 
@@ -604,96 +568,132 @@ export function NewPlaceForm({
               />
             </label>
           </div>
-        ) : (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Wash
-              </span>
 
-              <input
-                value={washAmount}
-                onChange={(e) => setWashAmount(e.target.value)}
-                inputMode="decimal"
-                placeholder="4.00"
-                className={selectClass}
-              />
-            </label>
+          <div className="mt-2">
+            <CurrencyPicker
+              value={currency}
+              onChange={setCurrency}
+              selectClass={selectClass}
+            />
+          </div>
+        </Card>
+      )}
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Dryer
-              </span>
+      <Card>
+        <SectionTitle title="How do you pay?" note={`up to ${PAYMENT_NOTE_MAX} characters`} />
 
-              <input
-                value={dryerAmount}
-                onChange={(e) => setDryerAmount(e.target.value)}
-                inputMode="decimal"
-                placeholder="2.00"
-                className={selectClass}
-              />
-            </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {PAYMENT_KEYS.map((option) => (
+            <Toggle
+              key={option.value}
+              label={option.label}
+              value={payments.includes(option.value)}
+              onChange={() => toggleIn(payments, setPayments, option.value)}
+            />
+          ))}
+        </div>
+
+        {payments.includes("card") && (
+          <div className="mt-3 border-t border-slate-100 pt-3">
+            <p className="mb-2 text-xs font-semibold text-slate-500">
+              Which cards?
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {CARD_KINDS.map((option) => (
+                <Toggle
+                  key={option.value}
+                  label={option.label}
+                  value={payments.includes(option.value)}
+                  onChange={() => toggleIn(payments, setPayments, option.value)}
+                />
+              ))}
+            </div>
           </div>
         )}
 
-        <p className="mt-2 text-xs text-slate-500">
-          Optional, but a price is the thing most people come for.
-        </p>
+        <label className="mt-3 block">
+          <span className="mb-1 block text-xs font-semibold text-slate-500">
+            Anything else?
+          </span>
+
+          <input
+            value={paymentNote}
+            onChange={(e) => setPaymentNote(e.target.value)}
+            maxLength={PAYMENT_NOTE_MAX}
+            placeholder="Exact change only"
+            className={selectClass}
+          />
+        </label>
       </Card>
 
       {isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Coffee type
+          </h2>
+
+          <div className="grid grid-cols-3 gap-2">
+            {COFFEE_KINDS.map((option) => (
+              <Toggle
+                key={option.key}
+                label={option.label}
+                value={coffeeKind === option.key}
+                onChange={() => setCoffeeKind(option.key)}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {isCoffee && (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
             Milk / PBM
-          </h3>
+          </h2>
 
           <div className="flex flex-wrap gap-2">
-            {MILKS.map((option) => {
-              const on = milks.includes(option.key);
-
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(milks, setMilks, option.key)}
-                  className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-700"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+            {MILKS.map((option) => (
+              <Toggle
+                key={option.key}
+                label={option.label}
+                value={milks.includes(option.key)}
+                onChange={() => toggleIn(milks, setMilks, option.key)}
+              />
+            ))}
           </div>
         </Card>
       )}
 
       {isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">Decaf</h3>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Decaf
+          </h2>
 
-          <div className="flex flex-wrap gap-2">
-            <Toggle label="🌙 Decaf" value={hasDecaf} onChange={setHasDecaf} />
-          </div>
+          <Toggle
+            label="Decaf available"
+            value={hasDecaf}
+            onChange={setHasDecaf}
+          />
         </Card>
       )}
 
       {isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">Beans</h3>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Beans
+          </h2>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-wrap gap-2">
             <Toggle
-              label="🫘 Beans for sale"
+              label="Beans for sale"
               value={sellsBeans}
               onChange={setSellsBeans}
             />
 
             <Toggle
-              label="🔥 Has a roaster"
+              label="Has a roaster"
               value={hasRoaster}
               onChange={setHasRoaster}
             />
@@ -701,14 +701,14 @@ export function NewPlaceForm({
 
           {hasRoaster && (
             <label className="mt-3 block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Roaster name
+              <span className="mb-1 block text-xs font-semibold text-slate-500">
+                Which roaster?
               </span>
 
               <input
                 value={roasterName}
                 onChange={(e) => setRoasterName(e.target.value)}
-                placeholder="Tim Wendelboe"
+                placeholder="Roaster name"
                 className={selectClass}
               />
             </label>
@@ -718,23 +718,18 @@ export function NewPlaceForm({
 
       {isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">Food</h3>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Food
+          </h2>
 
           <div className="flex flex-wrap gap-2">
             {FOOD.map((option) => (
-              <button
+              <Toggle
                 key={option.key}
-                type="button"
-                onClick={() => toggleIn(food, setFood, option.key)}
-                aria-pressed={food.includes(option.key)}
-                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                  food.includes(option.key)
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                {option.emoji} {option.label}
-              </button>
+                label={`${option.emoji} ${option.label}`}
+                value={food.includes(option.key)}
+                onChange={() => toggleIn(food, setFood, option.key)}
+              />
             ))}
           </div>
         </Card>
@@ -742,29 +737,20 @@ export function NewPlaceForm({
 
       {isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
-            Ambience
-          </h3>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Ambiance
+          </h2>
 
           <div className="flex flex-wrap gap-2">
             {AMBIENCE.map((option) => (
-              <button
+              <Toggle
                 key={option.key}
-                type="button"
-                onClick={() => toggleIn(ambience, setAmbience, option.key)}
-                aria-pressed={ambience.includes(option.key)}
-                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                  ambience.includes(option.key)
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                {option.emoji} {option.label}
-              </button>
+                label={`${option.emoji} ${option.label}`}
+                value={ambience.includes(option.key)}
+                onChange={() => toggleIn(ambience, setAmbience, option.key)}
+              />
             ))}
 
-            {/* Laptop-friendly is a way of sitting, not a drink, so it
-                is asked alongside the room rather than the cup. */}
             <Toggle
               label="💻 Laptop-friendly"
               value={laptop}
@@ -776,25 +762,18 @@ export function NewPlaceForm({
 
       {!isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
             Machines
-          </h3>
+          </h2>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-wrap gap-2">
             {MACHINE_SIZES.map((option) => (
-              <button
+              <Toggle
                 key={option.key}
-                type="button"
-                onClick={() => toggleIn(machineSizes, setMachineSizes, option.key)}
-                aria-pressed={machineSizes.includes(option.key)}
-                className={`min-h-11 rounded-xl border text-sm font-bold transition ${
-                  machineSizes.includes(option.key)
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                {option.label}
-              </button>
+                label={option.label}
+                value={machineSizes.includes(option.key)}
+                onChange={() => toggleIn(machineSizes, setMachineSizes, option.key)}
+              />
             ))}
           </div>
         </Card>
@@ -802,99 +781,17 @@ export function NewPlaceForm({
 
       {!isCoffee && (
         <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
-            Timing
-          </h3>
+          <SectionTitle title="Detergent" note="bought there or already included" />
 
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Wash takes
-              </span>
-
-              <select
-                value={washMinutes}
-                onChange={(e) => setWashMinutes(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">—</option>
-
-                {DURATIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {d} min
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Dryer takes
-              </span>
-
-              <select
-                value={dryerMinutes}
-                onChange={(e) => setDryerMinutes(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">—</option>
-
-                {DURATIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {d} min
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="mt-3">
+          <div className="mt-2 flex flex-wrap gap-2">
             <Toggle
-              label="🕛 Open 24 hours"
-              value={open24h}
-              onChange={setOpen24h}
-            />
-          </div>
-
-          {!open24h && (
-            <label className="mt-3 block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Last entry
-              </span>
-
-              <select
-                value={lastEntry}
-                onChange={(e) => setLastEntry(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">—</option>
-
-                {ENTRY_TIMES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </Card>
-      )}
-
-      {!isCoffee && (
-        <Card>
-          <h3 className="mb-3 text-sm font-semibold text-slate-700">
-            Detergent
-          </h3>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Toggle
-              label="🧼 Included in the price"
+              label="🧼 Included"
               value={detergentIncluded}
               onChange={setDetergentIncluded}
             />
 
             <Toggle
-              label="🛒 Can buy it there"
+              label="🛒 Buy it there"
               value={detergentPurchasable}
               onChange={setDetergentPurchasable}
             />
@@ -902,15 +799,15 @@ export function NewPlaceForm({
 
           {detergentPurchasable && !detergentIncluded && (
             <label className="mt-3 block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Detergent price
+              <span className="mb-1 block text-xs font-semibold text-slate-500">
+                Price
               </span>
 
               <input
                 value={detergentPrice}
                 onChange={(e) => setDetergentPrice(e.target.value)}
                 inputMode="decimal"
-                placeholder="0.50"
+                placeholder="1.00"
                 className={selectClass}
               />
             </label>
@@ -918,205 +815,158 @@ export function NewPlaceForm({
         </Card>
       )}
 
-      <Card>
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Payment</h3>
+      {!isCoffee && (
+        <Card>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+            Opening hours
+          </h2>
 
-        <div className="flex flex-wrap gap-2">
-          {PAYMENT_KEYS.map((key) => {
-            const on = payments.includes(key.value);
-
-            return (
-              <button
-                key={key.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => {
-                  /* Leaving Cards takes the card detail with it: a row
-                     saying "Visa" under a place that does not take
-                     cards is worse than no row at all. */
-                  if (key.value === "card" && on) {
-                    setPayments(
-                      payments.filter(
-                        (p) =>
-                          p !== "card" &&
-                          !CARD_KINDS.some((c) => c.value === p)
-                      )
-                    );
-                    return;
-                  }
-
-                  toggleIn(payments, setPayments, key.value);
-                }}
-                className={`min-h-10 rounded-full border px-3 text-sm font-semibold transition ${
-                  on
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                {key.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {payments.includes("card") && (
-          <div className="mt-2 flex flex-wrap gap-2 border-l-2 border-slate-200 pl-2">
-            {CARD_KINDS.map((key) => {
-              const on = payments.includes(key.value);
-
-              return (
-                <button
-                  key={key.value}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(payments, setPayments, key.value)}
-                  className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-600"
-                  }`}
-                >
-                  {key.label}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-2">
+            <Toggle
+              label="Open 24h"
+              value={open24h}
+              onChange={setOpen24h}
+            />
           </div>
-        )}
 
-        <label className="mt-3 block">
-          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Or add your own — {PAYMENT_NOTE_MAX} characters at most
-          </span>
+          {!open24h && (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">
+                  Last entry
+                </span>
 
-          <input
-            value={paymentNote}
-            onChange={(e) =>
-              setPaymentNote(e.target.value.slice(0, PAYMENT_NOTE_MAX))
-            }
-            maxLength={PAYMENT_NOTE_MAX}
-            placeholder="Exact change only, tokens at the counter…"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
-          />
-        </label>
-      </Card>
+                <select
+                  value={lastEntry}
+                  onChange={(e) => setLastEntry(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">Not recorded</option>
+
+                  {ENTRY_TIMES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">
+                  Wash cycle
+                </span>
+
+                <select
+                  value={washMinutes}
+                  onChange={(e) => setWashMinutes(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">Not recorded</option>
+
+                  {DURATIONS.map((d) => (
+                    <option key={d} value={d}>
+                      {d} min
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">
+                  Dryer cycle
+                </span>
+
+                <select
+                  value={dryerMinutes}
+                  onChange={(e) => setDryerMinutes(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">Not recorded</option>
+
+                  {DURATIONS.map((d) => (
+                    <option key={d} value={d}>
+                      {d} min
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card>
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">
-          Amenities
-        </h3>
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
-          <Toggle label="🔌 Power" value={power} onChange={setPower} />
-          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
-          <Toggle label="🪑 Seating" value={seating} onChange={setSeating} />
-          <Toggle label="🚻 Toilets" value={toilets} onChange={setToilets} />
-        </div>
-      </Card>
-
-      <Card>
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">
-          Photos
-        </h3>
+        <SectionTitle title="Photos" note="up to 5" />
 
         <input
-          id="photos"
           type="file"
           accept="image/*"
           multiple
-          className="hidden"
           onChange={(e) => handlePhotos(e.target.files)}
+          className="mt-2 block w-full text-sm text-slate-600"
         />
 
-        <label
-          htmlFor="photos"
-          className="flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-700 transition hover:bg-slate-50"
-        >
-          {compressing ? "Compressing…" : "📷 Add up to 5 photos"}
-        </label>
-
-        {photos.length > 0 && (
-          <ul className="mt-3 space-y-1 text-sm text-slate-600">
-            {photos.map((photo, index) => (
-              <li
-                key={`${photo.name}-${photo.size}-${index}`}
-                className="flex items-center justify-between gap-3"
-              >
-                <span className="min-w-0 truncate">{photo.name}</span>
-
-                <span className="shrink-0 text-xs text-slate-400">
-                  {Math.round(photo.size / 1024)} KB
-                </span>
-              </li>
-            ))}
-          </ul>
+        {compressing && (
+          <p className="mt-2 text-xs text-slate-500">Compressing…</p>
         )}
 
-        <p className="mt-2 text-xs text-slate-500">
-          Up to {MAX_INPUT_MB} MB each. Each photo is squared, then compressed
-          to 1400px before upload.
-        </p>
+        {photos.length > 0 && (
+          <p className="mt-2 text-xs text-slate-500">
+            {photos.length} photo{photos.length === 1 ? "" : "s"} ready
+          </p>
+        )}
       </Card>
 
       <Card>
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Anything useful to know?
-          </span>
+        <SectionTitle title="Amenities" note="what else is there" />
 
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            placeholder="Cash only, bring coins. Machines take about 30 minutes."
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
+          <Toggle label="🔌 Power" value={power} onChange={setPower} />
+          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
+
+          <Toggle
+            label={isCoffee ? "🪑 Seating" : "🚻 Toilets"}
+            value={isCoffee ? seating : toilets}
+            onChange={isCoffee ? setSeating : setToilets}
           />
-        </label>
-
-        <label className="mt-4 block">
-          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Website
-          </span>
-
-          <input
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            placeholder="https://"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
-          />
-        </label>
+        </div>
       </Card>
 
-      {chainHit && !chainConfirmed && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-900">
-            “{chainHit}” looks like a chain.
-          </p>
+      <Card>
+        <SectionTitle title="Description" />
 
-          <p className="mt-1 text-sm text-amber-800">
-            coffee&apos;n&apos;laundry keeps independent places — the whole
-            point is that someone chose this one. If it genuinely is
-            independent, or the chain does something worth the trip, carry on.
-          </p>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          placeholder="What makes this place worth the trip?"
+          className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
+        />
+      </Card>
 
-          <button
-            type="button"
-            onClick={() => setChainConfirmed(true)}
-            className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-amber-900 px-4 text-sm font-semibold text-white transition hover:bg-amber-800"
-          >
-            It&apos;s worth listing anyway
-          </button>
-        </div>
+      {chainHit && (
+        <Card>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={chainConfirmed}
+              onChange={(e) => setChainConfirmed(e.target.checked)}
+              className="mt-1"
+            />
+
+            <span className="text-sm text-slate-700">
+              This looks like a chain. Tick to confirm it is the
+              independent place you meant to add.
+            </span>
+          </label>
+        </Card>
       )}
 
       {error && <ErrorBanner message={error} />}
 
-      <Button
-        type="submit"
-        disabled={!canSubmit || (Boolean(chainHit) && !chainConfirmed)}
-        className="w-full"
-      >
-        {loading ? "Saving…" : "Add this place"}
+      <Button type="submit" disabled={!canSubmit} className="w-full">
+        Add the place
       </Button>
     </form>
   );
