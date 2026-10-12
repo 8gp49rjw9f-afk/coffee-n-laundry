@@ -32,7 +32,6 @@ export const FIELD_KEYS = [
   /* coffee */
   "coffee_kind",
   "espresso_price",
-  "filter_price",
   "flat_white_price",
   "beans",
   "roaster_available",
@@ -98,4 +97,11 @@ export type FieldKey = (typeof FIELD_KEYS)[number];
  *   milk           — WAS unused, and is now live: it means COW MILK,
  *                    sitting beside the four alternatives above. The
  *                    form offers it and createPlace writes it.
+ *   filter_price   — RETIRED, and deliberately absent from the list
+ *                    above. The price row left the page when Filter
+ *                    coffee stopped being offered, so nothing writes
+ *                    this key any more. It stays in the enum for the
+ *                    same reason as the rest: removing it means
+ *                    rebuilding the type. Rows already written under
+ *                    it keep their value_snapshot and still render.
  */
