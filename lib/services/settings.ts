@@ -87,9 +87,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
  * these are two caches rather than one. It is an emergency lever:
  * the moment it is flipped, the site should be resting. Under the
  * single minute-long cache it took up to sixty seconds to bite,
- * repeated per warm instance on Vercel — long enough that flipping
- * it looked like it did nothing at all, which is exactly what it
- * looked like.
+ * repeated per warm instance on Vercel.
  *
  * So the switch gets its own short window. Five seconds is fast
  * enough that a person who flips it, reloads and finds the site
@@ -150,7 +148,7 @@ export async function getSettings(): Promise<SiteSettings> {
  * what lifts a maintenance mode, since that is the one moment the
  * site most needs to stay closed.
  */
-async function readMaintenanceMode(): Promise<boolean> {
+export async function readMaintenanceMode(): Promise<boolean> {
   if (cachedMaintenance !== null && Date.now() - cachedMaintenanceAt < MAINTENANCE_TTL) {
     return cachedMaintenance;
   }
@@ -164,7 +162,15 @@ async function readMaintenanceMode(): Promise<boolean> {
       .eq("id", 1)
       .single();
 
-    if (error || !data) {
+    if (error) {
+      console.error("[readMaintenanceMode]", error.message);
+
+      return cachedMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
+    }
+
+    if (!data) {
+      console.error("[readMaintenanceMode] no site_settings row with id = 1");
+
       return cachedMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
     }
 
@@ -172,7 +178,9 @@ async function readMaintenanceMode(): Promise<boolean> {
     cachedMaintenanceAt = Date.now();
 
     return cachedMaintenance;
-  } catch {
+  } catch (error) {
+    console.error("[readMaintenanceMode] threw:", error);
+
     return cachedMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
   }
 }
