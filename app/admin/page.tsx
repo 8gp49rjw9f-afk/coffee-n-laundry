@@ -157,12 +157,20 @@ export default async function AdminPage({
       {active === "users" && <UserSearch term={term} />}
 
       {active === "admins" && master && (
-        <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} self={admin.email} />
+        <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} adminsSelf={admin.email} />
       )}
 
+      {/*
+       * Two windows, and the sentence has to say both. Everything the
+       * app reads lives behind a minute of cache; the maintenance
+       * switch is read on a five-second window of its own, because an
+       * emergency lever that takes a minute to bite is not one. Saying
+       * only "once a minute" here made flipping the switch look like
+       * it had done nothing.
+       */}
       <p className="pb-8 text-center text-xs text-slate-400">
-        Settings are read by the app once a minute, so a change lands within
-        that window.
+        Most settings are read by the app once a minute. The maintenance
+        switch takes effect within a few seconds.
       </p>
     </main>
   );
