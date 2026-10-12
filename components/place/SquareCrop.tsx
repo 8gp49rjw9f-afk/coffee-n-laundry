@@ -21,6 +21,13 @@ import { Button } from "@/components/ui";
  * The frame is capped by the shorter of the two available sides. On a
  * laptop the width is generous and the height is not, so a square
  * sized from the width alone would run off the bottom of the screen.
+ *
+ * THE CONTROLS ARE AS WIDE AS THE SQUARE, not as wide as the screen.
+ * They used to stretch the full viewport, which made the slider and
+ * the confirm button wider than the thing they act on and left them
+ * looking unattached to it. The stage reports the side it settled on
+ * and the control block below is pinned to that same width, so the
+ * three line up as one column.
  */
 
 const OUTPUT = 1400; // the square side, in pixels
@@ -48,6 +55,11 @@ export function SquareCrop({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
+
+  /* Why the confirm button cannot run yet, said in words. "" means
+     it can. A photo that never finished loading used to leave the
+     button reading "Preparing…" for ever, with no way to tell why. */
+  const [blocked, setBlocked] = useState("");
 
   const frameRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -281,59 +293,84 @@ export function SquareCrop({
   async function apply() {
     const image = imageRef.current;
 
-    if (!image || frameSide === 0 || natural.width === 0) return;
+    if (!image) {
+      setBlocked("The photo is not ready yet. Give it a moment.");
+      return;
+    }
 
+    if (natural.width === 0) {
+      setBlocked("The photo has not finished loading. Try again.");
+      return;
+    }
+
+    if (frameSide === 0) {
+      setBlocked("The crop area has no size. Rotate the device and try again.");
+      return;
+    }
+
+    setBlocked("");
     setBusy(true);
 
-    const side = baseScale * zoom;
+    try {
+      const side = baseScale * zoom;
 
-    /* Top-left of the frame, in image coordinates. */
-    const left = (natural.width * side) / 2 - frameSide / 2 - offset.x;
-    const top = (natural.height * side) / 2 - frameSide / 2 - offset.y;
+      /* Top-left of the frame, in image coordinates. */
+      const left = (natural.width * side) / 2 - frameSide / 2 - offset.x;
+      const top = (natural.height * side) / 2 - frameSide / 2 - offset.y;
 
-    const sourceSide = frameSide / side;
-    const sourceX = left / side;
-    const sourceY = top / side;
+      const sourceSide = frameSide / side;
+      const sourceX = left / side;
+      const sourceY = top / side;
 
-    const canvas = document.createElement("canvas");
-    canvas.width = OUTPUT;
-    canvas.height = OUTPUT;
+      const canvas = document.createElement("canvas");
+      canvas.width = OUTPUT;
+      canvas.height = OUTPUT;
 
-    const context = canvas.getContext("2d");
+      const context = canvas.getContext("2d");
 
-    if (!context) {
+      if (!context) {
+        setBlocked("This browser refused to draw the photo. Try another one.");
+        return;
+      }
+
+      context.imageSmoothingQuality = "high";
+      context.drawImage(
+        image,
+        sourceX,
+        sourceY,
+        sourceSide,
+        sourceSide,
+        0,
+        0,
+        OUTPUT,
+        OUTPUT
+      );
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.92)
+      );
+
+      if (!blob) {
+        setBlocked("The crop came out empty. Try again.");
+        return;
+      }
+
+      onDone(
+        new File([blob], file.name.replace(/\.[^.]+$/, "") + "-square.jpg", {
+          type: "image/jpeg",
+        })
+      );
+    } finally {
+      /* Whatever happened above, the button must not stay stuck on
+         "Preparing…" — that is what froze this screen before. */
       setBusy(false);
-      return;
     }
-
-    context.imageSmoothingQuality = "high";
-    context.drawImage(
-      image,
-      sourceX,
-      sourceY,
-      sourceSide,
-      sourceSide,
-      0,
-      0,
-      OUTPUT,
-      OUTPUT
-    );
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.92)
-    );
-
-    if (!blob) {
-      setBusy(false);
-      return;
-    }
-
-    onDone(
-      new File([blob], file.name.replace(/\.[^.]+$/, "") + "-square.jpg", {
-        type: "image/jpeg",
-      })
-    );
   }
+
+  /* The controls follow the square, so the three line up as a column.
+     Falls back to the full width until the frame has been measured. */
+  const controlWidth =
+    frameSide > 0 ? Math.min(frameSide, 520) : undefined;
 
   return (
     <div
@@ -410,30 +447,43 @@ export function SquareCrop({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-3 px-4 pb-4 pt-3">
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-semibold text-white/80">
-            Zoom
-          </span>
+      {/* The control column is pinned to the square's width, not the
+          screen's. */}
+      <div className="flex shrink-0 justify-center px-4">
+        <div
+          className="w-full space-y-3 pb-4 pt-3"
+          style={{ maxWidth: controlWidth }}
+        >
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-white/80">
+              Zoom
+            </span>
 
-          <input
-            type="range"
-            min={1}
-            max={MAX_ZOOM}
-            step={0.01}
-            value={zoom}
-            onChange={(event) => setZoom(Number(event.target.value))}
-            className="w-full accent-white"
-          />
-        </label>
+            <input
+              type="range"
+              min={1}
+              max={MAX_ZOOM}
+              step={0.01}
+              value={zoom}
+              onChange={(event) => setZoom(Number(event.target.value))}
+              className="w-full accent-white"
+            />
+          </label>
 
-        <p className="text-center text-xs text-white/60">
-          Drag to move, pinch or scroll to zoom, or double-click.
-        </p>
+          <p className="text-center text-xs text-white/60">
+            Drag to move, pinch or scroll to zoom, or double-click.
+          </p>
 
-        <Button onClick={apply} disabled={busy} className="w-full">
-          {busy ? "Preparing…" : "Use this square"}
-        </Button>
+          {blocked && (
+            <p className="rounded-xl bg-rose-950/80 px-3 py-2 text-center text-xs font-semibold text-rose-200">
+              {blocked}
+            </p>
+          )}
+
+          <Button onClick={apply} disabled={busy} className="w-full">
+            {busy ? "Preparing…" : "Use this square"}
+          </Button>
+        </div>
       </div>
     </div>
   );
