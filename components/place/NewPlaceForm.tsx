@@ -472,7 +472,7 @@ export function NewPlaceForm({
             setType("laundry");
             setStep("notice");
           }}
-          className="flex flex-col items-center rounded-2xl border-2 border-sky-600 bg-white p-8 transition hover:border-sky-600 hover:shadow-lg"
+          className="flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-white p-8 transition hover:border-sky-600 hover:shadow-lg"
         >
           <span className="text-5xl">🧺</span>
           <span className="mt-3 text-lg font-bold text-slate-900">Laundry</span>
@@ -706,7 +706,7 @@ export function NewPlaceForm({
               <select
                 value={dryerMinutes}
                 onChange={(e) => setDryerMinutes(e.target.value)}
-                className="selectClass"
+                className={selectClass}
               >
                 <option value="">Not recorded</option>
 
