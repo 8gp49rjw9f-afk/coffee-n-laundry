@@ -27,16 +27,9 @@ export interface MePoint {
 }
 
 /*
- * How tall the place card is on a phone, in pixels.
- *
- * A fixed number rather than a class, because two other things have to
- * know it: the map nudges the selected pin up by half of it, and the
- * controls lift clear of it. A CSS class cannot be read back from the
- * map's own code.
- *
- * 33vh of a 844px phone is about 280px, so this is the middle of that
- * range — a third of the screen, and enough for the banner, the name,
- * the facts and the two buttons before it starts scrolling.
+ * How tall the place card is on a phone, in pixels. The map needs the
+ * same number to lift its controls clear of the card — a CSS class
+ * cannot be read back from here.
  */
 const PHONE_DRAWER_PX = 300;
 
@@ -147,26 +140,24 @@ function ZoomBar({
   );
 }
 
-function FlyToSelected({ place }: { place: PlaceWithFreshness | null }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!place) return;
-
-    map.panTo([place.latitude, place.longitude], { animate: true });
-  }, [map, place]);
-
-  return null;
-}
-
 /*
- * Flying to the viewer's own position. The map only reads its `center`
- * prop at creation, so recentring an already-mounted map means calling
- * flyTo — not changing a prop.
+ * NOTHING MOVES THE MAP WHEN A PLACE IS PICKED.
  *
- * `request` is a counter, not the point: pressing the button twice
- * with the same coordinates has to fly twice.
+ * There used to be two travellers here: FlyToSelected, which panned to
+ * the chosen pin, and NudgeForDrawer, which lifted the view by half the
+ * drawer's height so the pin was not hidden under the card.
+ *
+ * Both did more harm than good. panBy moves the whole view, so every
+ * other pin left the frame — and worse, the pan fires `moveend`, which
+ * makes MapState recompute the bounds, which re-filters the visible
+ * list WHILE the animation is still running. On a phone the pins
+ * appeared to blink out and come back.
+ *
+ * A tap on a pin means "tell me about this one", not "take me there".
+ * The map stays exactly where it was. Pressing Directions opens the
+ * navigation app, which is the place for moving the view.
  */
+
 function FlyToMe({
   target,
   request,
@@ -186,33 +177,6 @@ function FlyToMe({
 }
 
 /*
- * When a place is chosen on a phone, the card covers the bottom of the
- * map and the pin being looked at is often underneath it. panBy lifts
- * the map's own view by half the card's height, so the selected pin
- * ends up in the part that is still visible.
- *
- * It moves the CONTAINER, not the marker's coordinates, so the pin
- * never lies about where the place is.
- */
-function NudgeForDrawer({
-  place,
-  drawerPx,
-}: {
-  place: PlaceWithFreshness | null;
-  drawerPx: number;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!place || drawerPx <= 0) return;
-
-    map.panBy([0, drawerPx / 2], { animate: true });
-  }, [map, place, drawerPx]);
-
-  return null;
-}
-
-/*
  * The map. Two MapContainers, one per breakpoint: React cannot mount
  * the same element in two places, so a shared instance would
  * initialise inside whichever one was hidden — Leaflet renders into a
@@ -226,7 +190,6 @@ function NudgeForDrawer({
 function TheMap({
   places,
   visible,
-  selected,
   me,
   request,
   locating,
@@ -240,7 +203,6 @@ function TheMap({
 }: {
   places: PlaceWithFreshness[];
   visible: PlaceWithFreshness[];
-  selected: PlaceWithFreshness | null;
   me: MePoint | null;
   request: number;
   locating: boolean;
@@ -282,9 +244,12 @@ function TheMap({
       >
         <MapState onZoom={onZoom} onBounds={onBounds} />
         <MapResizeFix trigger={panelOpen} />
-        <FlyToSelected place={selected} />
+
+        {/*
+         * Only the viewer's own position moves the map, and only when
+         * they press "Where am I?" — never a place selection.
+         */}
         <FlyToMe target={me} request={request} />
-        <NudgeForDrawer place={selected} drawerPx={drawerPx} />
 
         {/* The zoom bar calls into the map, so it lives HERE and only
             here. A copy outside MapContainer has no Leaflet context
@@ -403,11 +368,6 @@ export default function WorldMap({
   const [zoom, setZoom] = useState(2);
   const [bounds, setBounds] = useState<BoundsLike | null>(null);
 
-  const selected = useMemo(
-    () => places.find((p) => p.id === selectedId) ?? null,
-    [places, selectedId]
-  );
-
   const panelOpen = Boolean(panel);
 
   const visible = useMemo(() => {
@@ -432,13 +392,8 @@ export default function WorldMap({
        * The card first sat ABOVE the map in normal flow, 60vh of it,
        * with the map capped at 58vh — 118% of the screen, so opening a
        * place pushed the map off the bottom and every other pin seemed
-       * to vanish. It then became an overlay at 55vh, which kept the
-       * pins but buried most of the map.
-       *
-       * It is a third now: the map is the point of this page, and a
-       * third is enough to read what a place is, to press Directions
-       * or through to the full page — where the photos and every fact
-       * live. The card scrolls inside itself if it needs more room.
+       * to vanish. It is an overlay of a third of the screen now, over
+       * a map that keeps its full height.
        */}
 
       <div className="md:hidden">
@@ -449,7 +404,6 @@ export default function WorldMap({
           <TheMap
             places={places}
             visible={visible}
-            selected={selected}
             me={me ?? null}
             request={request}
             locating={locating}
@@ -493,7 +447,6 @@ export default function WorldMap({
           <TheMap
             places={places}
             visible={visible}
-            selected={selected}
             me={me ?? null}
             request={request}
             locating={locating}
