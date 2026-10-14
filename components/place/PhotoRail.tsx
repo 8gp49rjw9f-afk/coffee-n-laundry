@@ -17,24 +17,14 @@ import type { PlacePhoto } from "@/lib/types";
  * there were more photos to the right, and a rail that does not look
  * scrollable is one nobody tries to scroll.
  *
- * So this file now does three things it did not:
+ * So this rail does three things the old strip did not:
  *
- *   - the rail bleeds to both edges of the screen, so a card is never
- *     cut off mid-width by the page's own padding;
+ *   - the cards are narrow enough that one is always cut off at the
+ *     edge of the screen — the clearest invitation to swipe there is;
  *   - a row of dots sits under it, phone only, one per photo;
  *   - the dots follow the scroll (measured, not computed) and tapping
  *     one jumps the rail to that photo.
- *
- * Examples (photo 2 of 3) just under a card, in `processing`, keyed by
- * `recipe_type`, in that order. No recipe means no cross-agent, so the
- * panel is absent rather than empty.
  */
-
-const PHOTO_OPTIONS = {
-  maxSizeMB: 0.4,
-  maxWidthOrHeight: 1400,
-  useWebWorker: true,
-};
 
 /*
  * Built by hand, and in UTC: toLocaleDateString renders differently on
@@ -63,12 +53,15 @@ function formatPhotoDate(iso: string) {
 }
 
 /*
- * What the rail looks like on a phone. Two and a bit cards are visible
- * on purpose: a card cut off at the edge is the clearest possible
- * invitation to swipe, better than any arrow.
+ * Two and a half cards on a phone, three on a laptop.
+ *
+ * 38% means the third card starts before the right edge — the swipe
+ * is discovered by looking, not by trying. The laptop figure is a
+ * third of the rail minus the two gaps. Both are basis rather than
+ * width so the flex row can shrink them if it ever has to.
  */
 const PHONE_CARD = "basis-[38%] shrink-0 grow-0";
-const DESKTOP_CARD = "sm:basis-[calc((100%-2rem)/3)]";
+const DESKTOP_CARD = "sm:basis-[calc((100%-1.5rem)/3)]";
 
 export function PhotoRail({
   photos,
@@ -105,16 +98,16 @@ export function PhotoRail({
   function syncActive(event: React.UIEvent<HTMLUListElement>) {
     const rail = event.currentTarget;
 
-    /* The card width is a percentage of the rail, so it is read from
-       the element rather than assumed: 38% on a phone, a third on a
-       laptop, and this file knows neither number. */
-
+    /*
+     * The card width is a percentage of the rail, so it is read from
+     * the element rather than assumed: 38% on a phone, a third on a
+     * laptop, and this file knows neither number.
+     */
     const card = rail.querySelector("li");
 
     if (!card) return;
 
     const step = card.getBoundingClientRect().width + 12;
-
     const index = Math.round(rail.scrollLeft / step);
 
     setActive(Math.min(index, sorted.length - 1));
@@ -122,7 +115,6 @@ export function PhotoRail({
 
   function jumpTo(index: number) {
     const rail = document.getElementById(`photo-rail-${placeId}`);
-
     const card = rail?.querySelectorAll("li")[index];
 
     if (!rail || !card) return;
@@ -136,7 +128,7 @@ export function PhotoRail({
   return (
     <div className="space-y-2">
       {/* The rail bleeds past the page padding, so a card is never
-          clipped by it. */}
+          clipped by the container it sits in. */}
       <ul
         id={`photo-rail-${placeId}`}
         onScroll={syncActive}
@@ -150,7 +142,7 @@ export function PhotoRail({
             <button
               type="button"
               onClick={() => setLightbox(index)}
-              className="block w-full overflow-hidden rounded-xl bg-slate-100"
+              className="block w-full overflow-hidden rounded-xl border border-slate-200 bg-white"
               aria-label={photo.caption ?? `Photo ${index + 1}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -162,7 +154,7 @@ export function PhotoRail({
               />
             </button>
 
-            <div className="mt-1 flex items-center justify-between gap-2">
+            <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
               <span className="truncate text-[10px] text-slate-400">
                 {formatPhotoDate(photo.created_at)}
               </span>
@@ -171,14 +163,14 @@ export function PhotoRail({
                 <button
                   type="button"
                   onClick={() => startTransition(() => makeCover(photo.id))}
-                  className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 hover:bg-slate-100"
+                  className="shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 >
                   Set cover
                 </button>
               )}
 
               {photo.is_primary && (
-                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                <span className="shrink-0 text-[10px] font-semibold text-slate-400">
                   Cover
                 </span>
               )}
