@@ -397,18 +397,26 @@ export default function WorldMap({
 
   return (
     <>
-      {/* ---------- phone: panel first, map below ---------- */}
+      {/*
+       * ---------- phone: the map, with the card as a drawer ----------
+       *
+       * The card used to sit ABOVE the map, in normal flow, taking up
+       * to 60vh while the map below it was capped at 58vh. On a phone
+       * that is 118% of the screen: opening a place pushed the map off
+       * the bottom entirely, so every other pin seemed to vanish —
+       * they were still there, below the fold.
+       *
+       * Now the map keeps its full height and the card floats over it,
+       * anchored to the bottom like every map app does it. Pins stay
+       * visible above the drawer, which is the whole point of tapping
+       * one. max-h-[55vh] leaves the top of the map readable; if the
+       * card is taller it scrolls inside itself.
+       */}
 
-      <div className="space-y-3 md:hidden">
-        {panelOpen && (
-          <div className="max-h-[60vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            {panel}
-          </div>
-        )}
-
+      <div className="md:hidden">
         <div
           className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-          style={{ height: "min(58vh, 520px)" }}
+          style={{ height: "min(70vh, 620px)" }}
         >
           <TheMap
             places={places}
@@ -424,6 +432,23 @@ export default function WorldMap({
             onZoom={setZoom}
             onBounds={setBounds}
           />
+
+          {/*
+           * The drawer. z-[600] puts it above the map's own controls
+           * (z-[500]) and above Leaflet's panes (400), so nothing on
+           * the map draws over the card.
+           */}
+          {panelOpen && (
+            <div className="absolute inset-x-0 bottom-0 z-[600] max-h-[55vh] overflow-y-auto overscroll-contain rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-4px_16px_rgba(0,0,0,0.12)]">
+              {/* A short grip, so the card reads as something laid over
+                  the map rather than part of it. */}
+              <div className="sticky top-0 flex justify-center bg-white/95 pb-1 pt-2 backdrop-blur">
+                <span className="h-1 w-10 rounded-full bg-slate-300" aria-hidden />
+              </div>
+
+              {panel}
+            </div>
+          )}
         </div>
       </div>
 
