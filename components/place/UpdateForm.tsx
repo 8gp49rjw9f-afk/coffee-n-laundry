@@ -90,34 +90,42 @@ const MACHINE_SIZES = [
   { key: "large", label: "Large" },
 ];
 
+/*
+ * ONE BUTTON SHAPE FOR THE WHOLE FORM, and it is the one the coffee
+ * rows use.
+ *
+ * The coffee sections — Coffee type, Milk, Food, Ambiance — write
+ * their buttons inline rather than through this component, and they
+ * were left at the small size while this one was enlarged. The
+ * result was one form with two heights and two type sizes: the same
+ * kind of choice looked different depending on which card it was in.
+ *
+ * Both are the same shape now: 44px tall, 14px text. The inline
+ * buttons below were changed with it. min-h-11 is the shortest
+ * height that stays comfortable under a thumb, which matters more
+ * than fitting one extra chip per line.
+ */
+const BUTTON_SHAPE =
+  "min-h-11 rounded-xl border px-4 text-sm font-semibold transition";
+
+const BUTTON_OFF = "border-slate-300 bg-white text-slate-700";
+const BUTTON_ON = "border-slate-900 bg-slate-900 text-white";
+
 function Toggle({
   label,
   value,
   onChange,
-  size = "lg",
 }: {
   label: string;
   value: boolean;
   onChange: (next: boolean) => void;
-  /* "sm" is the form's default weight; "lg" is the roomier shape
-     used where the buttons sit alone or in a short row. */
-  size?: "sm" | "lg";
 }) {
-  const shape =
-    size === "lg"
-      ? "min-h-11 rounded-xl px-4 text-sm"
-      : "min-h-9 rounded-lg px-2.5 text-xs";
-
   return (
     <button
       type="button"
       onClick={() => onChange(!value)}
       aria-pressed={value}
-      className={`${shape} border font-semibold transition ${
-        value
-          ? "border-slate-900 bg-slate-900 text-white"
-          : "border-slate-300 bg-white text-slate-700"
-      }`}
+      className={`${BUTTON_SHAPE} ${value ? BUTTON_ON : BUTTON_OFF}`}
     >
       {label}
     </button>
@@ -584,20 +592,14 @@ export function UpdateForm({
             Coffee type
           </h2>
 
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {COFFEE_KINDS.map((option) => (
-              <button
+              <Toggle
                 key={option.key}
-                type="button"
-                onClick={() => setCoffeeKind(option.key)}
-                className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                  coffeeKind === option.key
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
-              >
-                {option.label}
-              </button>
+                label={option.label}
+                value={coffeeKind === option.key}
+                onChange={() => setCoffeeKind(option.key)}
+              />
             ))}
           </div>
         </Card>
@@ -608,7 +610,7 @@ export function UpdateForm({
           How do you pay?
         </h2>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {paymentKeysFor(isCoffee).map((option) => {
             const on = payments.includes(option.value);
 
@@ -634,11 +636,7 @@ export function UpdateForm({
 
                   toggleIn(payments, setPayments, option.value);
                 }}
-                className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                  on
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
-                }`}
+                className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
               >
                 {option.label}
               </button>
@@ -647,7 +645,7 @@ export function UpdateForm({
         </div>
 
         {payments.includes("card") && (
-          <div className="mt-2 flex flex-wrap gap-1.5 border-l-2 border-slate-200 pl-2">
+          <div className="mt-3 flex flex-wrap gap-2 border-l-2 border-slate-200 pl-3">
             {CARD_KINDS.map((option) => {
               const on = payments.includes(option.value);
 
@@ -657,11 +655,7 @@ export function UpdateForm({
                   type="button"
                   aria-pressed={on}
                   onClick={() => toggleIn(payments, setPayments, option.value)}
-                  className={`min-h-8 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-200 bg-white text-slate-600"
-                  }`}
+                  className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
                 >
                   {option.label}
                 </button>
@@ -670,7 +664,7 @@ export function UpdateForm({
           </div>
         )}
 
-        <label className="mt-2 block">
+        <label className="mt-3 block">
           <span className="mb-1 block text-xs font-medium text-slate-500">
             Or add your own — {PAYMENT_NOTE_MAX} characters at most
           </span>
@@ -697,7 +691,7 @@ export function UpdateForm({
             Milk / PBM
           </h3>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {MILKS.map((option) => {
               const on = milks.includes(option.key);
 
@@ -707,11 +701,7 @@ export function UpdateForm({
                   type="button"
                   aria-pressed={on}
                   onClick={() => toggleIn(milks, setMilks, option.key)}
-                  className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-700"
-                  }`}
+                  className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
                 >
                   {option.label}
                 </button>
@@ -723,7 +713,7 @@ export function UpdateForm({
             Decaf
           </h3>
 
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             <Toggle
               label="🌙 Decaf"
               value={hasDecaf}
@@ -741,7 +731,7 @@ export function UpdateForm({
             Beans
           </h3>
 
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             <Toggle
               label="🫘 Beans for sale"
               value={sellsBeans}
@@ -773,7 +763,7 @@ export function UpdateForm({
             Food
           </h3>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {FOOD.map((option) => {
               const on = food.includes(option.key);
 
@@ -783,11 +773,7 @@ export function UpdateForm({
                   type="button"
                   aria-pressed={on}
                   onClick={() => toggleIn(food, setFood, option.key)}
-                  className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-700"
-                  }`}
+                  className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
                 >
                   {option.emoji} {option.label}
                 </button>
@@ -799,7 +785,7 @@ export function UpdateForm({
             Ambiance
           </h3>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {AMBIENCE.map((option) => {
               const on = ambience.includes(option.key);
 
@@ -809,11 +795,7 @@ export function UpdateForm({
                   type="button"
                   aria-pressed={on}
                   onClick={() => toggleIn(ambience, setAmbience, option.key)}
-                  className={`min-h-9 rounded-lg border px-2.5 text-xs font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-700"
-                  }`}
+                  className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
                 >
                   {option.emoji} {option.label}
                 </button>
@@ -836,27 +818,16 @@ export function UpdateForm({
           </p>
 
           <div className="grid grid-cols-3 gap-2">
-            {MACHINE_SIZES.map((option) => {
-              const on = machineSizes.includes(option.key);
-
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() =>
-                    toggleIn(machineSizes, setMachineSizes, option.key)
-                  }
-                  className={`min-h-11 rounded-xl border text-sm font-semibold transition ${
-                    on
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-300 bg-white text-slate-700"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+            {MACHINE_SIZES.map((option) => (
+              <Toggle
+                key={option.key}
+                label={option.label}
+                value={machineSizes.includes(option.key)}
+                onChange={() =>
+                  toggleIn(machineSizes, setMachineSizes, option.key)
+                }
+              />
+            ))}
           </div>
         </Card>
       )}
@@ -869,7 +840,7 @@ export function UpdateForm({
             Detergent
           </h2>
 
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             <Toggle
               label="🧼 Detergent included"
               value={detergentIncluded}
@@ -909,7 +880,7 @@ export function UpdateForm({
             Opening hours
           </h2>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             <Toggle
               label="🕛 Open 24 hours"
               value={open24h}
@@ -949,14 +920,10 @@ export function UpdateForm({
           Amenities
         </h2>
 
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
           <Toggle label="🔌 Power" value={power} onChange={setPower} />
-          <Toggle
-            label="🅿️ Parking"
-            value={parking}
-            onChange={setParking}
-          />
+          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
 
           <Toggle
             label={isCoffee ? "🪑 Seating" : "🚻 Toilets"}
