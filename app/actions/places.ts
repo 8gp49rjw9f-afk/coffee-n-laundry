@@ -375,7 +375,24 @@ export async function createPlace(formData: FormData): Promise<void> {
     if (ambience.length > 0) push("ambience", ambience.join(", "));
     if (food.length > 0) push("food", food.join(", "));
     if (readBool(formData.get("has_decaf"))) push("decaf", "yes");
-    if (readBool(formData.get("has_milk"))) push("milk", "yes");
+
+    /*
+     * NO SNAPSHOT FOR THE MILK LINE, AND THAT IS THE POINT.
+     *
+     * `milk` is the one coffee key that is NOT a yes/no on the page.
+     * CoffeeTable renders it as the list of milks the café actually
+     * pours — Oat, Soy, Coconut, Almond — read from the four columns.
+     *
+     * But a snapshot wins over that list (`check?.value_snapshot ??
+     * row.fallback(facts)`), and this line used to write "yes"
+     * whenever cow milk was ticked. So ticking Cow replaced the list
+     * with the word "yes": the four plant milks disappeared and the
+     * row said nothing useful.
+     *
+     * Each milk has its own key below — `oat_milk`, `soy_milk` and so
+     * on — which is where a per-milk confirmation belongs. `milk` is
+     * left to the fallback, which builds the list from the columns.
+     */
     if (readBool(formData.get("has_oat_milk"))) push("oat_milk", "yes");
     if (readBool(formData.get("has_soy_milk"))) push("soy_milk", "yes");
     if (readBool(formData.get("has_coconut_milk"))) push("coconut_milk", "yes");
