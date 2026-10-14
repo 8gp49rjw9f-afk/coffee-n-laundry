@@ -8,7 +8,7 @@ import {
 } from "@/lib/database/places";
 
 import { PlaceHeader } from "@/components/place/PlaceHeader";
-import { PhotoRail } from "@/components/place/PhotoRail";
+import { PhotoStrip } from "@/components/place/PhotoStrip";
 import { CoffeeTable } from "@/components/place/CoffeeTable";
 import { LaundryTable } from "@/components/place/LaundryTable";
 import { UpdateTimeline } from "@/components/place/UpdateTimeline";
@@ -134,11 +134,11 @@ export default async function PlacePage({
       />
 
       {/*
-       * The photo rail, which scrolls sideways on a phone and shows
-       * dots underneath. It replaces PhotoStrip here; that file is
-       * left in the tree untouched, so putting it back is one line.
+       * The photo strip. Cards are 38% wide on a phone — narrow enough
+       * that one is always cut off at the edge, which is what tells you
+       * the rail swipes — with a row of dots underneath.
        */}
-      <PhotoRail
+      <PhotoStrip
         photos={place.photos}
         bucketUrl={place.photo_bucket_url}
         placeId={place.id}
