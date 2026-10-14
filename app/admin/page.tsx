@@ -157,7 +157,7 @@ export default async function AdminPage({
       {active === "users" && <UserSearch term={term} />}
 
       {active === "admins" && master && (
-        <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} adminsSelf={admin.email} />
+        <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} self={admin.email} />
       )}
 
       {/*
