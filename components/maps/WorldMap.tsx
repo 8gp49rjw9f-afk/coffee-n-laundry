@@ -73,7 +73,7 @@ function MapState({
 
 /*
  * The zoom bar: one horizontal rail, minus on the left, plus on the
- * right. It sits at bottom-left by absolute positioning, so its place
+ * right. It sits at bottom-LEFT by absolute positioning, so its place
  * on screen does not depend on where it is mounted.
  *
  * The end stops are disabled rather than silently inert: a button that
@@ -295,16 +295,20 @@ function TheMap({
       </MapContainer>
 
       {/*
-        The controls stack up the bottom-left corner: the zoom bar on
-        the bottom row, "Where am I" directly above it.
+        TWO CORNERS, NOT ONE STACK.
 
-        Above rather than beside, because the two are different kinds
-        of action — one changes how close you are looking, the other
-        goes and finds you — and sitting them side by side invited
-        reading them as one control.
+        The zoom bar sits bottom-left and "Where am I?" bottom-right.
+        They used to share the left corner, the button above the bar,
+        with a worked-out gap between them: bottom-16 clears a 40px
+        bar starting at bottom-3. That arithmetic held on a desktop
+        and not on a phone, where Safari's own toolbar eats part of
+        the viewport height and the button landed on top of the + and
+        −.
 
-        bottom-16 clears the bar: h-10 (2.5rem) starting at bottom-3
-        (0.75rem) ends at 3.25rem, so 4rem leaves a small gap.
+        Opposite corners cannot collide, whatever the screen height
+        happens to be — which is the whole reason for moving it. The
+        badge counter already owns bottom-right when pins are hidden,
+        so the button goes above it rather than beside it.
 
         z-[500] is deliberate: globals.css pins Leaflet's panes at
         400 with !important, so anything below that is drawn under
@@ -315,7 +319,7 @@ function TheMap({
         onClick={onWhereAmI}
         disabled={locating}
         aria-label="Zoom to where I am"
-        className={`${ownBreakpoint} absolute bottom-16 left-3 z-[500] min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70`}
+        className={`${ownBreakpoint} absolute bottom-3 right-3 z-[500] min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70`}
       >
         <span className="text-base">{locating ? "⏳" : "📍"}</span>
         <span className="hidden sm:inline">
@@ -323,10 +327,15 @@ function TheMap({
         </span>
       </button>
 
-      {/* How many pins are drawn — the counter for a zoomed-out view. */}
+      {/*
+       * How many pins are drawn — the counter for a zoomed-out view.
+       * It keeps the bottom-right corner but moves up to clear the
+       * button that now lives there, and is not rendered at all when
+       * nothing is hidden, so the corner stays quiet.
+       */}
       {visible.length < places.length && (
         <div
-          className={`${ownBreakpoint} pointer-events-none absolute bottom-3 right-3 z-[500] rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow`}
+          className={`${ownBreakpoint} pointer-events-none absolute bottom-16 right-3 z-[500] rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow`}
         >
           {visible.length} of {places.length} pins · zoom in
         </div>
