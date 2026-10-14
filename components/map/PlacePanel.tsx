@@ -83,13 +83,24 @@ export function PlacePanel({
     if (place.detergent_included) facts.push("Detergent included");
   }
 
-
   return (
     <div>
-      {/* The cover photo fills the top of the card, edge to edge. It is
-          already square (the upload crops it so), so it does not need
-          a square frame around it — the card's own width is the frame. */}
-      <div className="w-full overflow-hidden bg-slate-100">
+      {/*
+       * The cover photo, with the close button ON it.
+       *
+       * The ✕ used to sit in the text block below, beside the name.
+       * On a phone the photo is square and full width — about 390px on
+       * a 390px screen — while the card is only 300px tall, so the
+       * photo filled the whole drawer and the button sat below the
+       * bottom edge: reachable only by scrolling, which nobody does to
+       * look for a way out.
+       *
+       * It is an overlay now, top-right, on a dark translucent disc so
+       * it stays readable over a pale photo and a dark one alike. It
+       * floats rather than sits in the flow, so it costs no height and
+       * the photo is not pushed up by it.
+       */}
+      <div className="relative w-full overflow-hidden bg-slate-100">
         {place.primary_photo_path ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
@@ -102,34 +113,31 @@ export function PlacePanel({
             {isCoffee ? "☕" : "🧺"}
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-slate-900/60 text-lg text-white backdrop-blur transition hover:bg-slate-900/80"
+        >
+          ✕
+        </button>
       </div>
 
       <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-              {isCoffee ? "☕ Coffee" : "🧺 Laundromat"}
-            </p>
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+          {isCoffee ? "☕ Coffee" : "🧺 Laundromat"}
+        </p>
 
-            <h2 className="mt-1 truncate text-xl font-bold text-slate-900">
-              {place.name}
-            </h2>
+        <h2 className="mt-1 truncate text-xl font-bold text-slate-900">
+          {place.name}
+        </h2>
 
-            <p className="mt-1 truncate text-sm text-slate-500">
-              {[place.address, place.city, place.country]
-                .filter(Boolean)
-                .join(" · ") || "No address yet"}
-            </p>
-          </div>
-
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="h-9 w-9 shrink-0 rounded-full bg-slate-100 text-lg hover:bg-slate-200"
-          >
-            ✕
-          </button>
-        </div>
+        <p className="mt-1 truncate text-sm text-slate-500">
+          {[place.address, place.city, place.country]
+            .filter(Boolean)
+            .join(" · ") || "No address yet"}
+        </p>
 
         {/* Prices — the first thing anyone looks for */}
 
