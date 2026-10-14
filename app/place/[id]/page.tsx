@@ -150,11 +150,22 @@ export default async function PlacePage({
             roaster: place.coffee?.roaster ?? null,
             sells_beans: place.coffee?.sells_beans ?? null,
             has_roaster: place.coffee?.has_roaster ?? null,
-            has_decaf: place.coffee?.has_decaf ?? null,
+
+            /*
+             * All five milks, cow included. The interface declared only
+             * the four plant ones, so the milk row could not name
+             * dairy even though the column exists and the form asks
+             * for it — a café that pours cow milk and nothing else
+             * showed an empty line.
+             */
+            has_milk: place.coffee?.has_milk ?? null,
             has_oat_milk: place.coffee?.has_oat_milk ?? null,
             has_soy_milk: place.coffee?.has_soy_milk ?? null,
             has_coconut_milk: place.coffee?.has_coconut_milk ?? null,
             has_almond_milk: place.coffee?.has_almond_milk ?? null,
+
+            has_decaf: place.coffee?.has_decaf ?? null,
+
             ambience: place.coffee?.ambience ?? [],
             food: place.coffee?.food ?? [],
             laptop_friendly: place.coffee?.laptop_friendly ?? null,
