@@ -27,6 +27,20 @@ export interface MePoint {
 }
 
 /*
+ * How tall the place card is on a phone, in pixels.
+ *
+ * A fixed number rather than a class, because two other things have to
+ * know it: the map nudges the selected pin up by half of it, and the
+ * controls lift clear of it. A CSS class cannot be read back from the
+ * map's own code.
+ *
+ * 33vh of a 844px phone is about 280px, so this is the middle of that
+ * range — a third of the screen, and enough for the banner, the name,
+ * the facts and the two buttons before it starts scrolling.
+ */
+const PHONE_DRAWER_PX = 300;
+
+/*
  * Anything that calls useMap() has to be a CHILD of MapContainer.
  * React-Leaflet provides the map through context, and context only
  * flows downwards — a sibling of the container never sees it.
@@ -172,13 +186,13 @@ function FlyToMe({
 }
 
 /*
- * When a place is chosen on a phone, the drawer covers the bottom third
- * of the map. The pin being looked at is very often underneath it.
+ * When a place is chosen on a phone, the card covers the bottom of the
+ * map and the pin being looked at is often underneath it. panBy lifts
+ * the map's own view by half the card's height, so the selected pin
+ * ends up in the part that is still visible.
  *
- * panBy pushes the map's own view up by half the drawer's height, so
- * the selected pin ends up in the part that is still visible. It is
- * done to the CONTAINER, not to the marker's coordinates, so the pin
- * does not lie about where the place is.
+ * It moves the CONTAINER, not the marker's coordinates, so the pin
+ * never lies about where the place is.
  */
 function NudgeForDrawer({
   place,
@@ -192,7 +206,6 @@ function NudgeForDrawer({
   useEffect(() => {
     if (!place || drawerPx <= 0) return;
 
-    /* Half the drawer, so the pin sits in the middle of what remains. */
     map.panBy([0, drawerPx / 2], { animate: true });
   }, [map, place, drawerPx]);
 
@@ -243,8 +256,8 @@ function TheMap({
      shown, so only one set is ever on screen. */
   const ownBreakpoint = breakpoint === "phone" ? "md:hidden" : "hidden md:flex";
 
-  /* The controls sit above the drawer while it is open, so the zoom bar
-     and "Where am I?" are never buried under the card. */
+  /* The controls lift clear of the card while it is open, so the
+     button is never buried under it. */
   const lift = drawerPx > 0 ? { bottom: drawerPx + 12 } : undefined;
 
   return (
@@ -323,12 +336,7 @@ function TheMap({
       </MapContainer>
 
       {/*
-        The map's own controls, lifted clear of the drawer.
-
-        The zoom bar is inside the MapContainer and cannot read the
-        drawer's height from here; it keeps its own corner. This button
-        and the pin counter do move, because they are siblings of the
-        map rather than children of it.
+        The map's own controls, lifted clear of the card.
 
         z-[500] is deliberate: globals.css pins Leaflet's panes at
         400 with !important, so anything below that is drawn under
@@ -421,24 +429,17 @@ export default function WorldMap({
       {/*
        * ---------- phone: the map, with the card as a short drawer ----------
        *
-       * A THIRD OF THE SCREEN, measured, not a fraction of the map.
-       *
        * The card first sat ABOVE the map in normal flow, 60vh of it,
        * with the map capped at 58vh — 118% of the screen, so opening a
        * place pushed the map off the bottom and every other pin seemed
        * to vanish. It then became an overlay at 55vh, which kept the
        * pins but buried most of the map.
        *
-       * It is a third now. The map is the point of this page, and a
-       * third is enough to read what a place is, what it costs to get
-       * there, and to press through to the full page — where the
-       * photos and every fact live. The drawer scrolls inside itself
-       * if the content needs more.
-       *
-       * The height is computed rather than set in vh so the same
-       * number can be handed to the map: the pin you tapped is nudged
-       * above the drawer, and the controls move up with it.
-       */
+       * It is a third now: the map is the point of this page, and a
+       * third is enough to read what a place is, to press Directions
+       * or through to the full page — where the photos and every fact
+       * live. The card scrolls inside itself if it needs more room.
+       */}
 
       <div className="md:hidden">
         <div
@@ -462,7 +463,7 @@ export default function WorldMap({
           />
 
           {/*
-           * The drawer. z-[600] puts it above the map's own controls
+           * The card. z-[600] puts it above the map's own controls
            * (z-[500]) and above Leaflet's panes (400).
            */}
           {panelOpen && (
