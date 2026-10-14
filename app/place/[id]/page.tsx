@@ -8,7 +8,7 @@ import {
 } from "@/lib/database/places";
 
 import { PlaceHeader } from "@/components/place/PlaceHeader";
-import { PhotoStrip } from "@/components/place/PhotoStrip";
+import { PhotoRail } from "@/components/place/PhotoRail";
 import { CoffeeTable } from "@/components/place/CoffeeTable";
 import { LaundryTable } from "@/components/place/LaundryTable";
 import { UpdateTimeline } from "@/components/place/UpdateTimeline";
@@ -133,7 +133,12 @@ export default async function PlacePage({
         canDelete={Boolean(admin)}
       />
 
-      <PhotoStrip
+      {/*
+       * The photo rail, which scrolls sideways on a phone and shows
+       * dots underneath. It replaces PhotoStrip here; that file is
+       * left in the tree untouched, so putting it back is one line.
+       */}
+      <PhotoRail
         photos={place.photos}
         bucketUrl={place.photo_bucket_url}
         placeId={place.id}
