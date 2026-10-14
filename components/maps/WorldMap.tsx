@@ -35,11 +35,6 @@ export interface MePoint {
  * anywhere else throws "No context provided", which takes the whole
  * page to the error boundary. ZoomBar is therefore mounted ONCE,
  * inside the map, and nowhere else.
- *
- * There is no crosshair on this map, on purpose. A crosshair means
- * "the centre is the answer" — true for the pin picker, where the map
- * moves under a fixed point, and false here, where the map is being
- * read rather than aimed with.
  */
 
 function MapState({
@@ -73,8 +68,7 @@ function MapState({
 
 /*
  * The zoom bar: one horizontal rail, minus on the left, plus on the
- * right. It sits at bottom-LEFT by absolute positioning, so its place
- * on screen does not depend on where it is mounted.
+ * right, bottom-left by absolute positioning.
  *
  * The end stops are disabled rather than silently inert: a button that
  * looks pressable when it is not is a small lie.
@@ -178,6 +172,34 @@ function FlyToMe({
 }
 
 /*
+ * When a place is chosen on a phone, the drawer covers the bottom third
+ * of the map. The pin being looked at is very often underneath it.
+ *
+ * panBy pushes the map's own view up by half the drawer's height, so
+ * the selected pin ends up in the part that is still visible. It is
+ * done to the CONTAINER, not to the marker's coordinates, so the pin
+ * does not lie about where the place is.
+ */
+function NudgeForDrawer({
+  place,
+  drawerPx,
+}: {
+  place: PlaceWithFreshness | null;
+  drawerPx: number;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!place || drawerPx <= 0) return;
+
+    /* Half the drawer, so the pin sits in the middle of what remains. */
+    map.panBy([0, drawerPx / 2], { animate: true });
+  }, [map, place, drawerPx]);
+
+  return null;
+}
+
+/*
  * The map. Two MapContainers, one per breakpoint: React cannot mount
  * the same element in two places, so a shared instance would
  * initialise inside whichever one was hidden — Leaflet renders into a
@@ -199,6 +221,7 @@ function TheMap({
   onSelect,
   onWhereAmI,
   panelOpen,
+  drawerPx,
   onZoom,
   onBounds,
 }: {
@@ -212,12 +235,17 @@ function TheMap({
   onSelect: (id: string) => void;
   onWhereAmI: () => void;
   panelOpen: boolean;
+  drawerPx: number;
   onZoom: (z: number) => void;
   onBounds: (b: BoundsLike) => void;
 }) {
   /* Each copy hides its controls at the breakpoint where its twin is
      shown, so only one set is ever on screen. */
   const ownBreakpoint = breakpoint === "phone" ? "md:hidden" : "hidden md:flex";
+
+  /* The controls sit above the drawer while it is open, so the zoom bar
+     and "Where am I?" are never buried under the card. */
+  const lift = drawerPx > 0 ? { bottom: drawerPx + 12 } : undefined;
 
   return (
     /* The wrapper is relative so the overlays can sit over the map
@@ -243,6 +271,7 @@ function TheMap({
         <MapResizeFix trigger={panelOpen} />
         <FlyToSelected place={selected} />
         <FlyToMe target={me} request={request} />
+        <NudgeForDrawer place={selected} drawerPx={drawerPx} />
 
         {/* The zoom bar calls into the map, so it lives HERE and only
             here. A copy outside MapContainer has no Leaflet context
@@ -264,8 +293,7 @@ function TheMap({
         ))}
 
         {/* Where you are, exactly: a dot with a soft ring around it, the
-            way every map app draws it. The ring says "somewhere around
-            here"; the dot says where. */}
+            way every map app draws it. */}
         {me && (
           <>
             <CircleMarker
@@ -295,20 +323,12 @@ function TheMap({
       </MapContainer>
 
       {/*
-        TWO CORNERS, NOT ONE STACK.
+        The map's own controls, lifted clear of the drawer.
 
-        The zoom bar sits bottom-left and "Where am I?" bottom-right.
-        They used to share the left corner, the button above the bar,
-        with a worked-out gap between them: bottom-16 clears a 40px
-        bar starting at bottom-3. That arithmetic held on a desktop
-        and not on a phone, where Safari's own toolbar eats part of
-        the viewport height and the button landed on top of the + and
-        −.
-
-        Opposite corners cannot collide, whatever the screen height
-        happens to be — which is the whole reason for moving it. The
-        badge counter already owns bottom-right when pins are hidden,
-        so the button goes above it rather than beside it.
+        The zoom bar is inside the MapContainer and cannot read the
+        drawer's height from here; it keeps its own corner. This button
+        and the pin counter do move, because they are siblings of the
+        map rather than children of it.
 
         z-[500] is deliberate: globals.css pins Leaflet's panes at
         400 with !important, so anything below that is drawn under
@@ -319,7 +339,10 @@ function TheMap({
         onClick={onWhereAmI}
         disabled={locating}
         aria-label="Zoom to where I am"
-        className={`${ownBreakpoint} absolute bottom-3 right-3 z-[500] min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white disabled:opacity-70`}
+        style={ownBreakpoint === "md:hidden" ? lift : undefined}
+        className={`${ownBreakpoint} absolute right-3 z-[500] min-h-10 items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-slate-700 shadow-lg backdrop-blur transition-all hover:bg-white disabled:opacity-70 ${
+          drawerPx > 0 ? "" : "bottom-3"
+        }`}
       >
         <span className="text-base">{locating ? "⏳" : "📍"}</span>
         <span className="hidden sm:inline">
@@ -327,15 +350,13 @@ function TheMap({
         </span>
       </button>
 
-      {/*
-       * How many pins are drawn — the counter for a zoomed-out view.
-       * It keeps the bottom-right corner but moves up to clear the
-       * button that now lives there, and is not rendered at all when
-       * nothing is hidden, so the corner stays quiet.
-       */}
+      {/* How many pins are drawn — only when something is hidden. */}
       {visible.length < places.length && (
         <div
-          className={`${ownBreakpoint} pointer-events-none absolute bottom-16 right-3 z-[500] rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow`}
+          style={ownBreakpoint === "md:hidden" ? lift : undefined}
+          className={`${ownBreakpoint} pointer-events-none absolute right-3 z-[500] rounded-lg bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow ${
+            drawerPx > 0 ? "" : "bottom-16"
+          }`}
         >
           {visible.length} of {places.length} pins · zoom in
         </div>
@@ -398,25 +419,31 @@ export default function WorldMap({
   return (
     <>
       {/*
-       * ---------- phone: the map, with the card as a drawer ----------
+       * ---------- phone: the map, with the card as a short drawer ----------
        *
-       * The card used to sit ABOVE the map, in normal flow, taking up
-       * to 60vh while the map below it was capped at 58vh. On a phone
-       * that is 118% of the screen: opening a place pushed the map off
-       * the bottom entirely, so every other pin seemed to vanish —
-       * they were still there, below the fold.
+       * A THIRD OF THE SCREEN, measured, not a fraction of the map.
        *
-       * Now the map keeps its full height and the card floats over it,
-       * anchored to the bottom like every map app does it. Pins stay
-       * visible above the drawer, which is the whole point of tapping
-       * one. max-h-[55vh] leaves the top of the map readable; if the
-       * card is taller it scrolls inside itself.
-       */}
+       * The card first sat ABOVE the map in normal flow, 60vh of it,
+       * with the map capped at 58vh — 118% of the screen, so opening a
+       * place pushed the map off the bottom and every other pin seemed
+       * to vanish. It then became an overlay at 55vh, which kept the
+       * pins but buried most of the map.
+       *
+       * It is a third now. The map is the point of this page, and a
+       * third is enough to read what a place is, what it costs to get
+       * there, and to press through to the full page — where the
+       * photos and every fact live. The drawer scrolls inside itself
+       * if the content needs more.
+       *
+       * The height is computed rather than set in vh so the same
+       * number can be handed to the map: the pin you tapped is nudged
+       * above the drawer, and the controls move up with it.
+       */
 
       <div className="md:hidden">
         <div
           className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-          style={{ height: "min(70vh, 620px)" }}
+          style={{ height: "min(72vh, 640px)" }}
         >
           <TheMap
             places={places}
@@ -429,23 +456,20 @@ export default function WorldMap({
             onSelect={onSelect}
             onWhereAmI={whereAmI}
             panelOpen={panelOpen}
+            drawerPx={panelOpen ? PHONE_DRAWER_PX : 0}
             onZoom={setZoom}
             onBounds={setBounds}
           />
 
           {/*
            * The drawer. z-[600] puts it above the map's own controls
-           * (z-[500]) and above Leaflet's panes (400), so nothing on
-           * the map draws over the card.
+           * (z-[500]) and above Leaflet's panes (400).
            */}
           {panelOpen && (
-            <div className="absolute inset-x-0 bottom-0 z-[600] max-h-[55vh] overflow-y-auto overscroll-contain rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-4px_16px_rgba(0,0,0,0.12)]">
-              {/* A short grip, so the card reads as something laid over
-                  the map rather than part of it. */}
-              <div className="sticky top-0 flex justify-center bg-white/95 pb-1 pt-2 backdrop-blur">
-                <span className="h-1 w-10 rounded-full bg-slate-300" aria-hidden />
-              </div>
-
+            <div
+              className="absolute inset-x-0 bottom-0 z-[600] overflow-y-auto overscroll-contain rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-4px_16px_rgba(0,0,0,0.12)]"
+              style={{ height: PHONE_DRAWER_PX }}
+            >
               {panel}
             </div>
           )}
@@ -476,6 +500,7 @@ export default function WorldMap({
             onSelect={onSelect}
             onWhereAmI={whereAmI}
             panelOpen={panelOpen}
+            drawerPx={0}
             onZoom={setZoom}
             onBounds={setBounds}
           />
