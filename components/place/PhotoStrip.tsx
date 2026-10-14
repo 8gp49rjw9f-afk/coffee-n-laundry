@@ -113,8 +113,9 @@ export function PhotoStrip({
 
   /*
    * Which photo the rail is showing, for the dots. It is an index into
-   * `ordered`, derived from the scroll offset rather than from a click,
-   * so it stays right when the rail is flicked instead of tapped.
+   * `ordered`, derived from the scroll position rather than from a
+   * click, so it stays right when the rail is flicked instead of
+   * tapped.
    */
   const [visibleIndex, setVisibleIndex] = useState(0);
 
@@ -154,28 +155,36 @@ export function PhotoStrip({
   }, [openIndex, ordered.length]);
 
   /*
-   * Which card is under the left edge of the rail.
+   * WHICH CARD THE DOTS POINT AT — the CENTRE, not the left edge.
    *
-   * Measured from the children rather than computed from the scroll
-   * offset: the cards are a percentage of the rail on a phone and a
-   * third of it on a laptop, so their width is not a number this file
-   * knows. Asking the element for its position when the scroll stops
-   * is exact on both, and it costs one read per settle rather than one
-   * per frame.
+   * The first version measured which card was flush with the rail's
+   * left edge. That is the right question for a list and the wrong one
+   * for a carousel: at 38% a card, two and a half are on screen at
+   * once, so at the very end of the rail the FIFTH card is visible on
+   * the right while the THIRD is still glued to the left edge. The
+   * dots stopped counting at 3 with five photos on screen, which is
+i   * exactly what was reported.
+   *
+   * The centre of the visible area is what a carousel means by
+   * "current": at the start the first card is centred, at the end the
+   * last one is. The card whose midpoint sits closest to that point
+   * wins. Measured, not computed — 38% on a phone, a third on a
+   * laptop, and this file knows neither number.
    */
   function syncVisible() {
     const rail = scrollRef.current;
 
     if (!rail) return;
 
-    const left = rail.scrollLeft;
+    const middle = rail.scrollLeft + rail.clientWidth / 2;
     const cards = Array.from(rail.querySelectorAll("li"));
 
     let nearest = 0;
     let smallest = Infinity;
 
     cards.forEach((card, index) => {
-      const gap = Math.abs(card.offsetLeft - rail.offsetLeft - left);
+      const cardMiddle = card.offsetLeft - rail.offsetLeft + card.clientWidth / 2;
+      const gap = Math.abs(cardMiddle - middle);
 
       if (gap < smallest) {
         smallest = gap;
@@ -200,7 +209,13 @@ export function PhotoStrip({
     rail.scrollBy({ left: direction * step, behavior: "smooth" });
   }
 
-  /* Tapping a dot jumps the rail to that photo. */
+  /*
+   * Tapping a dot centres that photo. Centring rather than left-aligning
+   * matters at the end of the rail: left-aligning the last card would
+   * ask the browser to scroll past the end, and it would land wherever
+   * the limit is — which would then light a different dot than the one
+   * tapped.
+   */
   function scrollToIndex(index: number) {
     const rail = scrollRef.current;
 
@@ -210,8 +225,11 @@ export function PhotoStrip({
 
     if (!card) return;
 
+    const cardMiddle =
+      card.offsetLeft - rail.offsetLeft + card.clientWidth / 2;
+
     rail.scrollTo({
-      left: card.offsetLeft - rail.offsetLeft,
+      left: cardMiddle - rail.clientWidth / 2,
       behavior: "smooth",
     });
   }
@@ -337,7 +355,7 @@ export function PhotoStrip({
               return (
                 <li
                   key={photo.id}
-                  className="w-[38%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
+                  className="w-[38%] shrink-0 snap-center sm:w-[calc((100%-2rem)/3)]"
                 >
                   {/*
                     The picture, with everything that belongs to it
