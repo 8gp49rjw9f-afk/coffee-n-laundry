@@ -37,12 +37,17 @@ import type { PlacePhoto } from "@/lib/types";
  * bottom-right corner: it costs no height, and it reads as belonging
  * to the picture rather than to the buttons.
  *
- * THE DOTS ARE FOR THE PHONE. The rail has always scrolled — it is a
- * flex row inside overflow-x-auto — but on a phone the arrows that
- * announce it are hidden (they are `hidden sm:flex`), so nothing said
- * there was more to the right. A photo peeking off the edge is a hint;
- * a row of dots is a statement. They are hidden from sm upwards, where
- * the arrows and the third-of-a-row layout already say it.
+ * THE DOTS ARE FOR THE PHONE, and so is the narrow card. The rail has
+ * always scrolled — it is a flex row inside overflow-x-auto — but on a
+ * phone the arrows that announce it are hidden (they are `hidden
+ * sm:flex`), so nothing said there was more to the right.
+ *
+ * Two things fix that, and both matter. The cards are 38% wide on a
+ * phone, so the third one is CUT OFF by the edge of the screen: that
+ * is the hint. And a row of dots sits underneath, one per photo, the
+ * current one following the scroll. A card peeking off the edge is a
+ * hint; a row of dots is a statement. Both disappear from sm upwards,
+ * where three cards fit and the arrows take over.
  */
 
 const PHOTO_OPTIONS = {
@@ -322,7 +327,7 @@ export function PhotoStrip({
         <div
           ref={scrollRef}
           onScroll={syncVisible}
-          className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+          className="-mx-4 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0"
         >
           <ul className="flex snap-x snap-mandatory gap-3">
             {ordered.map((photo, index) => {
@@ -332,7 +337,7 @@ export function PhotoStrip({
               return (
                 <li
                   key={photo.id}
-                  className="w-[62%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
+                  className="w-[38%] shrink-0 snap-start sm:w-[calc((100%-2rem)/3)]"
                 >
                   {/*
                     The picture, with everything that belongs to it
