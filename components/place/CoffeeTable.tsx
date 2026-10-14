@@ -27,6 +27,16 @@ export interface CoffeeFacts {
   sells_beans: boolean | null;
   has_roaster: boolean | null;
   has_decaf: boolean | null;
+
+  /*
+   * Cow milk, beside the four alternatives — the same five the form
+   * offers. `has_milk` was missing from this interface while the
+   * column existed in the database and createPlace wrote it, so the
+   * milk line could not name dairy. One of the five is worth as much
+   * as any other: a café that pours oat and nothing else, and one
+   * that pours only dairy, are both answering the same question.
+   */
+  has_milk: boolean | null;
   has_oat_milk: boolean | null;
   has_soy_milk: boolean | null;
   has_coconut_milk: boolean | null;
@@ -120,8 +130,8 @@ const ROWS: {
     /* The list, always — never an older "yes". */
     ignoreSnapshot: true,
     fallback: (p) => {
-      /* One line for all the plant milks: four separate rows pushed
-         the useful facts below the fold. Cow is included when it is
+      /* One line for all the milks: five separate rows pushed the
+         useful facts below the fold. Cow is included when it is
          ticked, so a café that pours dairy and nothing else says so
          rather than showing an empty row. */
       const found: string[] = [];
