@@ -108,6 +108,45 @@ const MACHINE_SIZES = [
   { key: "large", label: "Large" },
 ];
 
+/*
+ * ONE BUTTON SHAPE FOR THE WHOLE FORM.
+ *
+ * These controls used to come in two sizes — a big one for the rows
+ * that sat alone, a smaller one for the rows of five or six, on the
+ * theory that a dense row needs smaller buttons. On screen it read as
+ * an accident rather than a decision: the same kind of choice was a
+ * different height and a different type size depending on which card
+ * it lived in.
+ *
+ * So there is one shape now: 44px tall, 14px text. min-h-11 is the
+ * shortest height that stays comfortable under a thumb, which matters
+ * more here than fitting one extra chip per line.
+ */
+function Toggle({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      aria-pressed={value}
+      className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${
+        value
+          ? "border-slate-900 bg-slate-900 text-white"
+          : "border-slate-300 bg-white text-slate-700"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
     <div className="flex items-baseline gap-2 pt-2">
@@ -117,38 +156,6 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
 
       {note && <span className="text-xs text-slate-400">{note}</span>}
     </div>
-  );
-}
-
-function Toggle({
-  label,
-  value,
-  onChange,
-  size = "lg",
-}: {
-  label: string;
-  value: boolean;
-  onChange: (next: boolean) => void;
-  size?: "sm" | "lg";
-}) {
-  const shape =
-    size === "lg"
-      ? "min-h-11 rounded-xl px-4 text-sm"
-      : "min-h-9 rounded-lg px-2.5 text-xs";
-
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      aria-pressed={value}
-      className={`${shape} border font-semibold transition ${
-        value
-          ? "border-slate-900 bg-slate-900 text-white"
-          : "border-slate-300 bg-white text-slate-700"
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -732,7 +739,10 @@ export function NewPlaceForm({
       {/* ---------- 3. payment ---------- */}
 
       <Card>
-        <SectionTitle title="How do you pay?" note={`up to ${PAYMENT_NOTE_MAX} characters`} />
+        <SectionTitle
+          title="How do you pay?"
+          note={`up to ${PAYMENT_NOTE_MAX} characters`}
+        />
 
         <div className="mt-2 flex flex-wrap gap-2">
           {paymentKeysFor(isCoffee).map((option) => (
@@ -758,7 +768,6 @@ export function NewPlaceForm({
                   label={option.label}
                   value={payments.includes(option.value)}
                   onChange={() => toggleIn(payments, setPayments, option.value)}
-                  size="sm"
                 />
               ))}
             </div>
@@ -795,7 +804,6 @@ export function NewPlaceForm({
                 label={option.label}
                 value={coffeeKind === option.key}
                 onChange={() => setCoffeeKind(option.key)}
-                size="sm"
               />
             ))}
           </div>
@@ -815,7 +823,6 @@ export function NewPlaceForm({
                 label={option.label}
                 value={milks.includes(option.key)}
                 onChange={() => toggleIn(milks, setMilks, option.key)}
-                size="sm"
               />
             ))}
           </div>
@@ -886,7 +893,6 @@ export function NewPlaceForm({
                 label={`${option.emoji} ${option.label}`}
                 value={food.includes(option.key)}
                 onChange={() => toggleIn(food, setFood, option.key)}
-                size="sm"
               />
             ))}
           </div>
@@ -906,7 +912,6 @@ export function NewPlaceForm({
                 label={`${option.emoji} ${option.label}`}
                 value={ambience.includes(option.key)}
                 onChange={() => toggleIn(ambience, setAmbience, option.key)}
-                size="sm"
               />
             ))}
 
@@ -937,7 +942,9 @@ export function NewPlaceForm({
                 key={option.key}
                 label={option.label}
                 value={machineSizes.includes(option.key)}
-                onChange={() => toggleIn(machineSizes, setMachineSizes, option.key)}
+                onChange={() =>
+                  toggleIn(machineSizes, setMachineSizes, option.key)
+                }
               />
             ))}
           </div>
@@ -948,7 +955,10 @@ export function NewPlaceForm({
 
       {!isCoffee && (
         <Card>
-          <SectionTitle title="Detergent" note="bought there or already included" />
+          <SectionTitle
+            title="Detergent"
+            note="bought there or already included"
+          />
 
           <div className="mt-2 grid grid-cols-2 gap-2">
             <Toggle
@@ -991,11 +1001,7 @@ export function NewPlaceForm({
           </h2>
 
           <div className="grid grid-cols-2 gap-2">
-            <Toggle
-              label="Open 24h"
-              value={open24h}
-              onChange={setOpen24h}
-            />
+            <Toggle label="Open 24h" value={open24h} onChange={setOpen24h} />
             <span />
           </div>
 
@@ -1029,7 +1035,7 @@ export function NewPlaceForm({
       <Card>
         <SectionTitle title="Amenities" note="what else is there" />
 
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-2 flex flex-wrap gap-2">
           <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
           <Toggle label="🔌 Power" value={power} onChange={setPower} />
           <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
