@@ -36,6 +36,13 @@ import type { PlacePhoto } from "@/lib/types";
  * it showed, and the rail grew with it. The date is an overlay in the
  * bottom-right corner: it costs no height, and it reads as belonging
  * to the picture rather than to the buttons.
+ *
+ * THE DOTS ARE FOR THE PHONE. The rail has always scrolled — it is a
+ * flex row inside overflow-x-auto — but on a phone the arrows that
+ * announce it are hidden (they are `hidden sm:flex`), so nothing said
+ * there was more to the right. A photo peeking off the edge is a hint;
+ * a row of dots is a statement. They are hidden from sm upwards, where
+ * the arrows and the third-of-a-row layout already say it.
  */
 
 const PHOTO_OPTIONS = {
@@ -99,6 +106,13 @@ export function PhotoStrip({
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [cropping, setCropping] = useState<File | null>(null);
 
+  /*
+   * Which photo the rail is showing, for the dots. It is an index into
+   * `ordered`, derived from the scroll offset rather than from a click,
+   * so it stays right when the rail is flicked instead of tapped.
+   */
+  const [visibleIndex, setVisibleIndex] = useState(0);
+
   const fileInput = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +148,39 @@ export function PhotoStrip({
     };
   }, [openIndex, ordered.length]);
 
+  /*
+   * Which card is under the left edge of the rail.
+   *
+   * Measured from the children rather than computed from the scroll
+   * offset: the cards are a percentage of the rail on a phone and a
+   * third of it on a laptop, so their width is not a number this file
+   * knows. Asking the element for its position when the scroll stops
+   * is exact on both, and it costs one read per settle rather than one
+   * per frame.
+   */
+  function syncVisible() {
+    const rail = scrollRef.current;
+
+    if (!rail) return;
+
+    const left = rail.scrollLeft;
+    const cards = Array.from(rail.querySelectorAll("li"));
+
+    let nearest = 0;
+    let smallest = Infinity;
+
+    cards.forEach((card, index) => {
+      const gap = Math.abs(card.offsetLeft - rail.offsetLeft - left);
+
+      if (gap < smallest) {
+        smallest = gap;
+        nearest = index;
+      }
+    });
+
+    setVisibleIndex(nearest);
+  }
+
   function scrollBy(direction: -1 | 1) {
     const rail = scrollRef.current;
 
@@ -146,6 +193,22 @@ export function PhotoStrip({
       : rail.clientWidth * 0.8;
 
     rail.scrollBy({ left: direction * step, behavior: "smooth" });
+  }
+
+  /* Tapping a dot jumps the rail to that photo. */
+  function scrollToIndex(index: number) {
+    const rail = scrollRef.current;
+
+    if (!rail) return;
+
+    const card = rail.querySelectorAll("li")[index] as HTMLElement | undefined;
+
+    if (!card) return;
+
+    rail.scrollTo({
+      left: card.offsetLeft - rail.offsetLeft,
+      behavior: "smooth",
+    });
   }
 
   function pickReplacement(photoId: string) {
@@ -258,6 +321,7 @@ export function PhotoStrip({
       <div className="relative">
         <div
           ref={scrollRef}
+          onScroll={syncVisible}
           className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
         >
           <ul className="flex snap-x snap-mandatory gap-3">
@@ -380,6 +444,27 @@ export function PhotoStrip({
           </>
         )}
       </div>
+
+      {/*
+       * The dots. Phone only, from two photos upwards: one photo has
+       * nothing to point at. Tapping one scrolls the rail to it, which
+       * is a gesture the arrows could not offer on a touch screen.
+       */}
+      {ordered.length > 1 && (
+        <div className="flex justify-center gap-2 sm:hidden">
+          {ordered.map((photo, index) => (
+            <button
+              key={photo.id}
+              type="button"
+              onClick={() => scrollToIndex(index)}
+              aria-label={`Go to photo ${index + 1} of ${ordered.length}`}
+              className={`h-2.5 w-2.5 rounded-full transition ${
+                index === visibleIndex ? "bg-slate-500" : "bg-slate-300"
+              }`}
+            />
+          ))}
+        </div>
+      )}
 
       {open && (
         <div
