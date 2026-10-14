@@ -73,12 +73,20 @@ function formatDate(iso: string) {
  * Espresso and flat white only. Filter coffee was offered when a café
  * with a brew bar was the common case; it made a third price row that
  * almost every café left empty, so it is gone.
+ *
+ * The milk row carries `ignoreSnapshot`, and it is the only one that
+ * does. Its snapshot is always the word "yes" — see the note in
+ * createPlace — and taking that over the list is what made this row
+ * read "yes" instead of naming the milks. Older rows still hold one,
+ * written before the writer stopped, so the flag stays until they age
+ * out of the page entirely.
  */
 const ROWS: {
   key: string;
   label: string;
   emoji: string;
   fallback: (place: CoffeeFacts) => string | null;
+  ignoreSnapshot?: boolean;
 }[] = [
   {
     key: "coffee_kind",
@@ -109,11 +117,16 @@ const ROWS: {
     key: "milk",
     label: "Milk / PBM",
     emoji: "🥛",
+    /* The list, always — never an older "yes". */
+    ignoreSnapshot: true,
     fallback: (p) => {
       /* One line for all the plant milks: four separate rows pushed
-         the useful facts below the fold. */
+         the useful facts below the fold. Cow is included when it is
+         ticked, so a café that pours dairy and nothing else says so
+         rather than showing an empty row. */
       const found: string[] = [];
 
+      if (p.has_milk) found.push("Cow");
       if (p.has_oat_milk) found.push("Oat");
       if (p.has_soy_milk) found.push("Soy");
       if (p.has_coconut_milk) found.push("Coconut");
@@ -244,7 +257,11 @@ export function CoffeeTable({
       <ul className="divide-y divide-slate-100">
         {ROWS.map((row) => {
           const check = byField.get(row.key);
-          const value = check?.value_snapshot ?? row.fallback(facts);
+
+          const value = row.ignoreSnapshot
+            ? row.fallback(facts)
+            : (check?.value_snapshot ?? row.fallback(facts));
+
           const already = doneThisWeek.includes(row.key);
           const history = historyFor(row.key);
 
