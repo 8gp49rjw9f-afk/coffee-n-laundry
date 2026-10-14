@@ -83,177 +83,178 @@ export function PlacePanel({
     if (place.detergent_included) facts.push("Detergent included");
   }
 
+  /*
+   * THE CLOSE BUTTON IS FIXED, NOT SCROLLED AWAY.
+   *
+   * The card is a scrolling box: the photo is square and full width,
+   * and on a phone that is taller than the whole drawer. So anything
+   * placed inside the flow — over the photo or beside the name —
+   * travels up out of sight as soon as the card is scrolled, and the
+   * way out disappears.
+   *
+   * It is therefore a sibling of the scrolling content, pinned to the
+   * card's own top-right corner with `absolute`. The card is only
+   * 300px tall, so it is always on screen.
+   */
   return (
-    <div>
-      {/*
-       * The cover photo, with the close button ON it.
-       *
-       * The ✕ used to sit in the text block below, beside the name.
-       * On a phone the photo is square and full width — about 390px on
-       * a 390px screen — while the card is only 300px tall, so the
-       * photo filled the whole drawer and the button sat below the
-       * bottom edge: reachable only by scrolling, which nobody does to
-       * look for a way out.
-       *
-       * It is an overlay now, top-right, on a dark translucent disc so
-       * it stays readable over a pale photo and a dark one alike. It
-       * floats rather than sits in the flow, so it costs no height and
-       * the photo is not pushed up by it.
-       */}
-      <div className="relative w-full overflow-hidden bg-slate-100">
-        {place.primary_photo_path ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={`${bucketUrl}/${place.primary_photo_path}`}
-            alt={place.name}
-            className="aspect-square w-full object-cover"
-          />
-        ) : (
-          <div className="flex aspect-square w-full items-center justify-center bg-white text-6xl">
-            {isCoffee ? "☕" : "🧺"}
-          </div>
-        )}
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-slate-900/60 text-lg text-white backdrop-blur transition hover:bg-slate-900/80"
+      >
+        ✕
+      </button>
 
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-slate-900/60 text-lg text-white backdrop-blur transition hover:bg-slate-900/80"
-        >
-          ✕
-        </button>
-      </div>
+      <div>
+        {/* The cover photo fills the top of the card, edge to edge. */}
+        <div className="w-full overflow-hidden bg-slate-100">
+          {place.primary_photo_path ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={`${bucketUrl}/${place.primary_photo_path}`}
+              alt={place.name}
+              className="aspect-square w-full object-cover"
+            />
+          ) : (
+            <div className="flex aspect-square w-full items-center justify-center bg-white text-6xl">
+              {isCoffee ? "☕" : "🧺"}
+            </div>
+          )}
+        </div>
 
-      <div className="p-5">
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-          {isCoffee ? "☕ Coffee" : "🧺 Laundromat"}
-        </p>
+        <div className="p-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            {isCoffee ? "☕ Coffee" : "🧺 Laundromat"}
+          </p>
 
-        <h2 className="mt-1 truncate text-xl font-bold text-slate-900">
-          {place.name}
-        </h2>
+          <h2 className="mt-1 truncate text-xl font-bold text-slate-900">
+            {place.name}
+          </h2>
 
-        <p className="mt-1 truncate text-sm text-slate-500">
-          {[place.address, place.city, place.country]
-            .filter(Boolean)
-            .join(" · ") || "No address yet"}
-        </p>
+          <p className="mt-1 truncate text-sm text-slate-500">
+            {[place.address, place.city, place.country]
+              .filter(Boolean)
+              .join(" · ") || "No address yet"}
+          </p>
 
-        {/* Prices — the first thing anyone looks for */}
+          {/* Prices — the first thing anyone looks for */}
 
-        {!isCoffee && (place.wash_amount || place.dryer_amount) && (
-          <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
-            {place.wash_amount && (
-              <span className="rounded-lg bg-sky-50 px-2.5 py-1 text-sky-900">
-                🧺 {place.wash_amount} {place.wash_currency}
-              </span>
-            )}
+          {!isCoffee && (place.wash_amount || place.dryer_amount) && (
+            <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
+              {place.wash_amount && (
+                <span className="rounded-lg bg-sky-50 px-2.5 py-1 text-sky-900">
+                  🧺 {place.wash_amount} {place.wash_currency}
+                </span>
+              )}
 
-            {place.dryer_amount && (
-              <span className="rounded-lg bg-orange-50 px-2.5 py-1 text-orange-900">
-                🔥 {place.dryer_amount} {place.dryer_currency}
-              </span>
-            )}
-          </div>
-        )}
+              {place.dryer_amount && (
+                <span className="rounded-lg bg-orange-50 px-2.5 py-1 text-orange-900">
+                  🔥 {place.dryer_amount} {place.dryer_currency}
+                </span>
+              )}
+            </div>
+          )}
 
-        {/* Facts, one per chip */}
+          {/* Facts, one per chip */}
 
-        {facts.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5 text-sm">
-            {facts.map((fact) => (
+          {facts.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5 text-sm">
+              {facts.map((fact) => (
+                <span
+                  key={fact}
+                  className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700"
+                >
+                  {fact}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Payment and amenities */}
+
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(place.accepted_payments ?? []).slice(0, 5).map((key) => (
               <span
-                key={fact}
-                className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700"
+                key={key}
+                className="rounded-lg bg-slate-100 px-2 py-1 text-sm text-slate-700"
               >
-                {fact}
+                {paymentIcon(key)}
               </span>
             ))}
+
+            {place.has_wifi && (
+              <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">📶</span>
+            )}
+
+            {place.has_power && (
+              <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">🔌</span>
+            )}
+
+            {place.has_parking && (
+              <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">🅿️</span>
+            )}
           </div>
-        )}
 
-        {/* Payment and amenities */}
+          {/* Freshness — the whole point of the site */}
 
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {(place.accepted_payments ?? []).slice(0, 5).map((key) => (
-            <span
-              key={key}
-              className="rounded-lg bg-slate-100 px-2 py-1 text-sm text-slate-700"
-            >
-              {paymentIcon(key)}
-            </span>
-          ))}
-
-          {place.has_wifi && (
-            <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">📶</span>
-          )}
-
-          {place.has_power && (
-            <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">🔌</span>
-          )}
-
-          {place.has_parking && (
-            <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">🅿️</span>
-          )}
-        </div>
-
-        {/* Freshness — the whole point of the site */}
-
-        <p className="mt-3 text-xs text-slate-500">
-          {fresh != null && fresh <= 45 ? "✅ " : "🕓 "}
-          {freshLabel}
-          {place.last_verifier && ` · ${place.last_verifier}`}
-        </p>
-
-        {distanceLabel && (
-          <p className="mt-0.5 text-xs text-slate-500">📍 {distanceLabel} away</p>
-        )}
-
-        {/* The newest note, truncated */}
-
-        {place.latest_note && (
-          <p className="mt-3 line-clamp-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-            “{place.latest_note}”
+          <p className="mt-3 text-xs text-slate-500">
+            {fresh != null && fresh <= 45 ? "✅ " : "🕓 "}
+            {freshLabel}
+            {place.last_verifier && ` · ${place.last_verifier}`}
           </p>
-        )}
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <a
-            href={`https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex min-h-11 items-center justify-center rounded-xl bg-slate-900 px-4 font-semibold text-white hover:bg-slate-800"
-          >
-            🧭 Directions
-          </a>
+          {distanceLabel && (
+            <p className="mt-0.5 text-xs text-slate-500">📍 {distanceLabel} away</p>
+          )}
 
-          <a
-            href={`/place/${place.id}`}
-            className="flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50"
+          {/* The newest note, truncated */}
+
+          {place.latest_note && (
+            <p className="mt-3 line-clamp-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              “{place.latest_note}”
+            </p>
+          )}
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-h-11 items-center justify-center rounded-xl bg-slate-900 px-4 font-semibold text-white hover:bg-slate-800"
+            >
+              🧭 Directions
+            </a>
+
+            <a
+              href={`/place/${place.id}`}
+              className="flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50"
+            >
+              Full details →
+            </a>
+          </div>
+
+          <p className="mt-2 text-center text-[10px] text-slate-400">
+            {place.updates_count} updates · {place.photos_count} photos ·{" "}
+            {place.confirmations_count} confirmed
+          </p>
+
+          <button
+            onClick={() => {
+              const url = `${window.location.origin}/place/${place.id}`;
+
+              if (navigator.clipboard) {
+                navigator.clipboard.writeText(url);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }
+            }}
+            className="mt-1 w-full rounded-xl py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50"
           >
-            Full details →
-          </a>
+            {copied ? "Link copied ✓" : "Share this place"}
+          </button>
         </div>
-
-        <p className="mt-2 text-center text-[10px] text-slate-400">
-          {place.updates_count} updates · {place.photos_count} photos ·{" "}
-          {place.confirmations_count} confirmed
-        </p>
-
-        <button
-          onClick={() => {
-            const url = `${window.location.origin}/place/${place.id}`;
-
-            if (navigator.clipboard) {
-              navigator.clipboard.writeText(url);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            }
-          }}
-          className="mt-1 w-full rounded-xl py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50"
-        >
-          {copied ? "Link copied ✓" : "Share this place"}
-        </button>
       </div>
     </div>
   );
