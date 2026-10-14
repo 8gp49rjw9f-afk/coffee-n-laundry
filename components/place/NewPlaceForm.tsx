@@ -61,6 +61,10 @@ function clockTime(minutes: number) {
  *
  * Visa is not an alternative to Cards. It is a refinement of it, so it
  * lives underneath, and only appears once Cards is chosen.
+ *
+ * A laundry card is a laundromat's own stored-value card, sold at the
+ * counter and swiped on its machines. A café has nothing of the kind,
+ * so the option is filtered out for one — see paymentKeysFor below.
  */
 const PAYMENT_KEYS = [
   { value: "cash", label: "💵 Cash / Coins" },
@@ -68,6 +72,13 @@ const PAYMENT_KEYS = [
   { value: "online", label: "📱 Online App" },
   { value: "laundry_card", label: "🎟️ Laundry Card" },
 ];
+
+/* The laundromat-only option, removed for a café. */
+function paymentKeysFor(isCoffee: boolean) {
+  return isCoffee
+    ? PAYMENT_KEYS.filter((option) => option.value !== "laundry_card")
+    : PAYMENT_KEYS;
+}
 
 /* The card detail, asked only once Cards has been chosen. */
 const CARD_KINDS = [
@@ -302,10 +313,30 @@ export function NewPlaceForm({
 
     setCompressing(false);
 
-    if (queue.length > 0) {
-      setCropping(queue[0]);
-      setQueue((current) => current.slice(1));
-    }
+    /*
+     * The next photo in the queue, read with the updater form rather
+     * than off `queue` directly.
+     *
+     * `queue` here is the value captured when this callback was
+     * created, not the one live at the moment it runs. On a desktop
+     * the crop finishes fast enough that React has re-rendered in
+     * between, so the captured value happens to be current and the
+     * next photo opens. On iOS Safari the 1400×1400 canvas takes
+     * long enough that the render has not happened yet, the captured
+     * queue still reads as empty, and the strip simply stops — which
+     * looked like "I picked four photos and nothing happened".
+     *
+     * Taking the head inside the updater removes the timing from the
+     * question: whatever the queue holds when the update is applied
+     * is what gets used, and the rest is set back in the same pass.
+     */
+    setQueue((current) => {
+      if (current.length === 0) return current;
+
+      setCropping(current[0]);
+
+      return current.slice(1);
+    });
   }
 
   /* Taking one back before the form is sent. Filtering by position
@@ -441,7 +472,7 @@ export function NewPlaceForm({
             setType("laundry");
             setStep("notice");
           }}
-          className="flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-white p-8 transition hover:border-sky-600 hover:shadow-lg"
+          className="flex flex-col items-center rounded-2xl border-2 border-sky-600 bg-white p-8 transition hover:border-sky-600 hover:shadow-lg"
         >
           <span className="text-5xl">🧺</span>
           <span className="mt-3 text-lg font-bold text-slate-900">Laundry</span>
@@ -675,7 +706,7 @@ export function NewPlaceForm({
               <select
                 value={dryerMinutes}
                 onChange={(e) => setDryerMinutes(e.target.value)}
-                className={selectClass}
+                className="selectClass"
               >
                 <option value="">Not recorded</option>
 
@@ -704,7 +735,7 @@ export function NewPlaceForm({
         <SectionTitle title="How do you pay?" note={`up to ${PAYMENT_NOTE_MAX} characters`} />
 
         <div className="mt-2 flex flex-wrap gap-2">
-          {PAYMENT_KEYS.map((option) => (
+          {paymentKeysFor(isCoffee).map((option) => (
             <Toggle
               key={option.value}
               label={option.label}
