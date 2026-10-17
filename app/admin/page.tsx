@@ -14,7 +14,7 @@ import { AdminsPanel } from "@/components/admin/AdminsPanel";
 import { UserSearch } from "@/components/admin/UserSearch";
 
 import type { CreditRuleRow } from "@/components/admin/CreditRulesPanel";
-import type { ReportGroup } from "@/components/admin/ReportsPanel";
+import type { ReportGroup, FlaggedPlace } from "@/components/admin/ReportsPanel";
 import type { AdminRow } from "@/components/admin/AdminsPanel";
 
 /*
@@ -30,7 +30,7 @@ import type { AdminRow } from "@/components/admin/AdminsPanel";
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; q?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string; view?: string }>;
 }) {
   const admin = await currentAdmin();
 
@@ -53,6 +53,13 @@ export default async function AdminPage({
   const active = tabs.some((t) => t.key === query.tab)
     ? (query.tab as string)
     : "settings";
+
+  /*
+   * Two tables inside Moderation, chosen by `?view=`. It lives in the
+   * URL for the same reason the search term does: a view can then be
+   * shared or bookmarked, and the tab still works without JavaScript.
+   */
+  const view = query.view === "flagged" ? "flagged" : "reporting";
 
   /* The search term lives in the URL, which is what lets the field
      work without JavaScript and lets a result page be shared. */
@@ -106,6 +113,36 @@ export default async function AdminPage({
     }))
     .sort((a, b) => b.reports.length - a.reports.length);
 
+  /*
+   * The flagged table, read separately.
+   *
+   * It is deliberately NOT built from the reports above. A place that
+   * was flagged has had every report against it resolved — that is
+   * what flagging does — so once the decision is made the place
+   * vanishes from Reporting, and the button that would undo the flag
+   * vanishes with it. That left an admin who flagged a place by
+   * mistake with no way back except SQL.
+   *
+   * So this reads the places themselves, on `status`, which is the
+   * fact the flag actually recorded. `unverified` only: a place a
+   * moderator CLOSED is a different decision with a different button,
+   * and mixing the two in one list would blur which is which.
+   */
+  const { data: flaggedRows } = await supabase
+    .from("places")
+    .select("id, name, place_type, city, country, status")
+    .eq("status", "unverified")
+    .order("name")
+    .limit(200);
+
+  const flagged: FlaggedPlace[] = (flaggedRows ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    place_type: row.place_type,
+    city: row.city,
+    country: row.country,
+  }));
+
   /* `notify_email` comes along with the rest: the switch on each row
      renders from it, and without the column every switch would draw
      as off while the database says on. */
@@ -157,7 +194,9 @@ export default async function AdminPage({
         <CreditRulesPanel rules={(rules ?? []) as CreditRuleRow[]} />
       )}
 
-      {active === "moderation" && <ReportsPanel groups={groups} />}
+      {active === "moderation" && (
+        <ReportsPanel groups={groups} flagged={flagged} view={view} />
+      )}
 
       {active === "users" && <UserSearch term={term} />}
 
