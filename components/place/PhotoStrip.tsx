@@ -163,7 +163,7 @@ export function PhotoStrip({
    * once, so at the very end of the rail the FIFTH card is visible on
    * the right while the THIRD is still glued to the left edge. The
    * dots stopped counting at 3 with five photos on screen, which is
-i   * exactly what was reported.
+   * exactly what was reported.
    *
    * The centre of the visible area is what a carousel means by
    * "current": at the start the first card is centred, at the end the
@@ -183,7 +183,8 @@ i   * exactly what was reported.
     let smallest = Infinity;
 
     cards.forEach((card, index) => {
-      const cardMiddle = card.offsetLeft - rail.offsetLeft + card.clientWidth / 2;
+      const cardMiddle =
+        card.offsetLeft - rail.offsetLeft + card.clientWidth / 2;
       const gap = Math.abs(cardMiddle - middle);
 
       if (gap < smallest) {
