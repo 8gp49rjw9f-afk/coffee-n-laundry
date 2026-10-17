@@ -120,8 +120,127 @@ export async function reportPlace(formData: FormData): Promise<ReportResult> {
       .eq("id", placeId);
   }
 
+  /*
+   * And now the admins get told.
+   *
+   * A report was the one thing on this site that arrived nowhere: it
+   * went into `place_reports` and waited for somebody to open the
+   * moderation tab. On a quiet week that is fine; a reported place
+   * can sit wrong on the map for days because nobody thought to look.
+   *
+   * This is the same call the contact form makes, so it lands in the
+   * same inboxes and obeys the same per-admin switch — someone who
+   * turned notifications off does not start getting these either.
+   *
+   * LAST, AND NEVER FATAL. The report is already saved by the time
+   * this runs, so a failure here is only a missed notification, not a
+   * lost report. Swallowing it is deliberate: the person reporting a
+   * wrong wash price should not be told that the email bounced, and
+   * the row is on the moderation tab either way.
+   */
+  await notifyAdmins({ placeId, reason });
+
   revalidatePath(`/place/${placeId}`);
   revalidatePath("/");
 
   return { ok: true };
+}
+
+/*
+ * The notification itself, in its own function so the main path stays
+ * readable and so this can never throw into it.
+ *
+ * The recipients are read here rather than imported from the contact
+ * action: that module is `"use server"` too, and a helper it does not
+ * export cannot be reused. The query is the same one, with the same
+ * `notify_email` filter and the same service-key fallback.
+ */
+async function notifyAdmins({
+  placeId,
+  reason,
+}: {
+  placeId: string;
+  reason: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.CONTACT_FROM_EMAIL;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!apiKey || !from) return;
+
+  try {
+    let recipients: string[] = [];
+
+    if (url && serviceKey) {
+      const response = await fetch(
+        `${url}/rest/v1/admins?select=email&notify_email=is.true&limit=20`,
+        {
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          cache: "no-store",
+        }
+      );
+
+      if (response.ok) {
+        const rows = (await response.json()) as { email?: string }[];
+
+        recipients = rows
+          .map((row) => row.email)
+          .filter((value): value is string => Boolean(value));
+      } else {
+        console.error("[notifyAdmins]", response.status, await response.text());
+      }
+    }
+
+    /* Without a service key the visitor's own session is no use here
+       — the reporter is not an admin — so there is nothing to fall
+       back to. The report is saved regardless. */
+    if (recipients.length === 0) return;
+
+    /* The place's name, for a subject that says something. Read with
+       the same public client: `places` is readable by RLS. */
+    let name = "a place";
+
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("places")
+      .select("name")
+      .eq("id", placeId)
+      .maybeSingle();
+
+    if (data?.name) name = data.name;
+
+    const opening = reason.length > 60 ? `${reason.slice(0, 57)}…` : reason;
+
+    const body = [
+      reason,
+      "",
+      `Place: ${name}`,
+      `Page: /place/${placeId}`,
+    ].join("\n");
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: recipients,
+        subject: `[coffee'n'laundry] Reported: ${opening}`,
+        text: body,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("[notifyAdmins]", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("[notifyAdmins]", error);
+  }
 }
