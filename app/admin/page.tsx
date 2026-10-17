@@ -106,8 +106,13 @@ export default async function AdminPage({
     }))
     .sort((a, b) => b.reports.length - a.reports.length);
 
+  /* `notify_email` comes along with the rest: the switch on each row
+     renders from it, and without the column every switch would draw
+     as off while the database says on. */
   const { data: adminRows } = master
-    ? await supabase.from("admins").select("email, is_master, created_at")
+    ? await supabase
+        .from("admins")
+        .select("email, is_master, created_at, notify_email")
     : { data: null };
 
   return (
