@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
@@ -16,21 +15,62 @@ import { getSettings } from "@/lib/services/settings";
  * counts both the reports and the distinct reporters.
  */
 
-export async function reportPlace(formData: FormData): Promise<void> {
+/*
+ * WHY THIS RETURNS A CODE INSTEAD OF THROWING ONE
+ *
+ * It used to throw, and to end with `redirect(...)` on the way out.
+ * Both are wrong for a caller that sits across the boundary, and the
+ * combination produced a bug that looked like a total failure where
+ * there was none.
+ *
+ *   - A thrown code is rewritten on its way to the browser. Next.js
+ *     replaces the message with a generic sentence and keeps the real
+ *     one in the logs, so `throw new Error("REPORT_FAILED")` arrives
+ *     as something `describeError` cannot recognise. The person then
+ *     sees "Something went wrong" and a reference that leads nowhere.
+ *
+ *   - A redirect in a Server Action is ALSO an exception, on purpose:
+ *     Next.js throws a special one the client unwraps to navigate.
+ *     So `await reportPlace(...)` inside a try/catch caught the
+ *     SUCCESS as if it were a fault. Sending a report that worked
+ *     perfectly showed the generic error card, every time.
+ *
+ * Returning `{ ok, code }` fixes both: a returned value crosses the
+ * boundary intact, and nothing is thrown on the way out. The caller
+ * decides what to show. This is the same contract `sendContact`
+ * already used, which is why that form never had the problem.
+ *
+ * The final redirect is gone with it. It was there to land the person
+ * back on the place page with `?reported=1`, but the form that calls
+ * this already answers that question itself — and a redirect cannot
+ * coexist with a returned result anyway.
+ */
+
+export interface ReportResult {
+  ok: boolean;
+  code?: string;
+}
+
+export async function reportPlace(formData: FormData): Promise<ReportResult> {
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  /* Signed out is a code, not a redirect: the form shows the popup
+     the catalogue already has copy for, instead of navigating away
+     from what the person was reading. */
   if (!user) {
-    redirect("/login");
+    return { ok: false, code: "REPORT_SIGNED_OUT" };
   }
 
   const placeId = String(formData.get("place_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
 
-  if (!placeId || !reason) throw new Error("REPORT_REASON_REQUIRED");
+  if (!placeId || !reason) {
+    return { ok: false, code: "REPORT_REASON_REQUIRED" };
+  }
 
   /* One report per person. The unique index enforces it, so a second
      press comes back as 23505 rather than adding a row — and that is
@@ -43,13 +83,13 @@ export async function reportPlace(formData: FormData): Promise<void> {
   });
 
   if (error && error.code === "23505") {
-    throw new Error("REPORT_ALREADY_SENT");
+    return { ok: false, code: "REPORT_ALREADY_SENT" };
   }
 
   if (error) {
     console.error("[reportPlace]", error.message);
 
-    throw new Error("REPORT_FAILED");
+    return { ok: false, code: "REPORT_FAILED" };
   }
 
   const settings = await getSettings();
@@ -83,5 +123,5 @@ export async function reportPlace(formData: FormData): Promise<void> {
   revalidatePath(`/place/${placeId}`);
   revalidatePath("/");
 
-  redirect(`/place/${placeId}?reported=1`);
+  return { ok: true };
 }
