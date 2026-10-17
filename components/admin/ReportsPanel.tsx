@@ -8,16 +8,29 @@ import { Card, Badge } from "@/components/ui";
 import { resolveReport, restorePlace } from "@/app/actions/admin";
 
 /*
- * One card per place, with every open report against it inside. A
- * queue of individual reports would ask the same question as many
- * times as there are reports; a place is the unit an admin actually
- * decides about.
+ * Two tables, one tab, chosen by `?view=`.
  *
- * Three outcomes, and they are genuinely different:
+ *   Reporting — the places people have reported, with the decision
+ *               buttons. This is the queue, and it is what existed
+ *               before.
  *
- *   Dismiss — the report was wrong. Nothing about the place changes.
- *   Flag    — doubtful. It stays on the map, wearing a warning.
- *   Close   — gone. It leaves the map.
+ *   Flagged   — the places a moderator marked doubtful, with the
+ *               button that lifts the mark.
+ *
+ * WHY THE SECOND TABLE HAD TO EXIST
+ *
+ * Flagging a place resolves every report against it — that is what
+ * the decision means. And Reporting only lists places that still have
+ * open reports. So the moment a moderator flags a place, it leaves
+ * the queue, and the "Mark it good again" button left with it: the
+ * one screen that could undo the flag was the one screen the flag
+ * removed the place from. A moderator who flagged by mistake had no
+ * way back except SQL.
+ *
+ * The two tables read different things on purpose. Reporting reads
+ * reports; Flagged reads `places.status`. That is the difference
+ * between "somebody complained" and "a decision was taken", and the
+ * second survives the decision that produced it.
  */
 
 export interface ReportGroup {
@@ -31,6 +44,14 @@ export interface ReportGroup {
     country: string | null;
   } | null;
   reports: { id: string; reason: string; created_at: string }[];
+}
+
+export interface FlaggedPlace {
+  id: string;
+  name: string;
+  place_type: string;
+  city: string | null;
+  country: string | null;
 }
 
 function daysSince(iso: string) {
@@ -59,22 +80,6 @@ function GroupCard({ group }: { group: ReportGroup }) {
           err instanceof Error && err.message
             ? err.message
             : "Could not close that report."
-        );
-      }
-    });
-  }
-
-  function restore() {
-    setError("");
-
-    startTransition(async () => {
-      try {
-        await restorePlace(group.placeId);
-      } catch (err) {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Could not restore that place."
         );
       }
     });
@@ -168,43 +173,165 @@ function GroupCard({ group }: { group: ReportGroup }) {
         >
           Close it
         </button>
-
-        {status !== "active" && (
-          <button
-            type="button"
-            onClick={restore}
-            disabled={pending}
-            className="min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-          >
-            Mark it good again
-          </button>
-        )}
       </div>
     </Card>
   );
 }
 
-export function ReportsPanel({ groups }: { groups: ReportGroup[] }) {
-  if (groups.length === 0) {
-    return (
-      <Card>
-        <p className="text-sm text-slate-500">
-          Nothing waiting. The map is holding up.
-        </p>
-      </Card>
-    );
+/*
+ * One row per flagged place, with the one button that applies.
+ *
+ * No Dismiss and no Close here: this table is about places already
+ * carrying a decision. The only move left is to take it back.
+ */
+function FlaggedCard({ place }: { place: FlaggedPlace }) {
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function unflag() {
+    setError("");
+
+    startTransition(async () => {
+      try {
+        await restorePlace(place.id);
+        setDone(true);
+      } catch (err) {
+        setError(
+          err instanceof Error && err.message
+            ? err.message
+            : "Could not lift that flag."
+        );
+      }
+    });
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-slate-600">
-        {groups.length} {groups.length === 1 ? "place" : "places"} reported.
-        Deciding about one closes every report against it.
-      </p>
+    <Card padding="sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link
+            href={`/place/${place.id}`}
+            className="truncate font-semibold text-slate-900 underline"
+          >
+            {place.name}
+          </Link>
 
-      {groups.map((group) => (
-        <GroupCard key={group.placeId} group={group} />
+          <p className="mt-0.5 truncate text-xs text-slate-500">
+            {[place.city, place.country].filter(Boolean).join(" · ") ||
+              "No location recorded"}
+          </p>
+        </div>
+
+        <Badge className="bg-slate-200 text-slate-700">Flagged</Badge>
+      </div>
+
+      {error && (
+        <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={unflag}
+        disabled={pending || done}
+        className="mt-3 min-h-10 w-full rounded-xl border border-emerald-300 bg-emerald-50 px-3 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-50"
+      >
+        {done
+          ? "✓ Flag lifted"
+          : pending
+            ? "Lifting…"
+            : "Mark it good again"}
+      </button>
+    </Card>
+  );
+}
+
+/*
+ * The two views, as a small switch at the top.
+ *
+ * Links rather than client-side state: the view ends up in the URL,
+ * so it can be bookmarked and shared, and the tab keeps working
+ * without JavaScript — the same reasoning as the search term one
+ * level up.
+ */
+function ViewSwitch({ view }: { view: "reporting" | "flagged" }) {
+  const options = [
+    { key: "reporting", label: "Reporting" },
+    { key: "flagged", label: "Flagged" },
+  ] as const;
+
+  return (
+    <div className="flex gap-2">
+      {options.map((option) => (
+        <Link
+          key={option.key}
+          href={`/admin?tab=moderation&view=${option.key}`}
+          className={`inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border text-sm font-semibold transition ${
+            view === option.key
+              ? "border-slate-900 bg-slate-900 text-white"
+              : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          {option.label}
+        </Link>
       ))}
+    </div>
+  );
+}
+
+export function ReportsPanel({
+  groups,
+  flagged,
+  view,
+}: {
+  groups: ReportGroup[];
+  flagged: FlaggedPlace[];
+  view: "reporting" | "flagged";
+}) {
+  return (
+    <div className="space-y-3">
+      <ViewSwitch view={view} />
+
+      {view === "flagged" ? (
+        flagged.length === 0 ? (
+          <Card>
+            <p className="text-sm text-slate-500">
+              No place is marked doubtful. Nothing to put right.
+            </p>
+          </Card>
+        ) : (
+          <>
+            <p className="text-sm text-slate-600">
+              {flagged.length} {flagged.length === 1 ? "place" : "places"}{" "}
+              flagged. Marking one good again puts it back on the map without
+              its warning.
+            </p>
+
+            {flagged.map((place) => (
+              <FlaggedCard key={place.id} place={place} />
+            ))}
+          </>
+        )
+      ) : groups.length === 0 ? (
+        <Card>
+          <p className="text-sm text-slate-500">
+            Nothing waiting. The map is holding up.
+          </p>
+        </Card>
+      ) : (
+        <>
+          <p className="text-sm text-slate-600">
+            {groups.length} {groups.length === 1 ? "place" : "places"} reported.
+            Deciding about one closes every report against it.
+          </p>
+
+          {groups.map((group) => (
+            <GroupCard key={group.placeId} group={group} />
+          ))}
+        </>
+      )}
     </div>
   );
 }
