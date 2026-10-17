@@ -5,8 +5,24 @@ import { useEffect, useRef, useState } from "react";
 
 import { createClient } from "@/lib/supabase/browser";
 
-/* A ring with a cup and a drum inside it. One colour via
-   currentColor, quirky, not corporate. */
+/*
+ * THE MARK — the drawn ring, still here on purpose.
+ *
+ * `public/logo.png` is the real logo, and it is used for the
+ * favicon, the iPhone icon and the share preview. This ring is what
+ * the HEADER uses, and the reason is size: the PNG carries the full
+ * wordmark inside the circle, which is right at 1200 px and unreadable
+ * at the 32 px an app bar gives it. A symbol has to survive being
+ * small, and this one does — it is the same circle, the same coffee
+ * brown, the same laundry blue, drawn as a few shapes rather than a
+ * bitmap.
+ *
+ * It also paints in `currentColor`, so it takes the colour of
+ * whatever it sits in. A PNG cannot do that.
+ *
+ * If the PNG is ever wanted here instead, replace the <svg> below
+ * with an <img src="/logo.png"> — but check it at 32 px first.
+ */
 
 export function Logo({
   size = 36,
