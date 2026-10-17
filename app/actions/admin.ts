@@ -454,3 +454,76 @@ export async function removeAdmin(email: string): Promise<void> {
 
   revalidatePath("/admin");
 }
+
+/*
+ * The notification switch, one per admin.
+ *
+ * Cancelling it is not a downgrade: the admin keeps the panel, keeps
+ * every other right. It only stops the copy of what a visitor wrote
+ * from arriving in their inbox.
+ *
+ * ANY admin may set this — including their own — because it changes
+ * what they receive, not who can act. Only the master decides who the
+ * admins are, and that rule is untouched here.
+ *
+ * THE LAST ONE CANNOT OPT OUT
+ *
+ * The contact form sends to whoever has notify_email set; if the last
+ * one turns it off, recipients is empty, sendContact answers
+ * CONTACT_NO_RECIPIENT, and every message from a visitor is lost
+ * silently from that day on. The form would look like it worked. So
+ * turning the last switch off is refused with a code of its own.
+ */
+export async function setAdminNotify(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const supabase = await createClient();
+
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+
+  const next = String(formData.get("notify_email")) === "true";
+
+  if (!email) throw new Error("ADMIN_EMAIL_INVALID");
+
+  const { data: row, error: readError } = await supabase
+    .from("admins")
+    .select("notify_email")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (readError || !row) {
+    console.error("[setAdminNotify] read", readError?.message ?? "not found");
+
+    throw new Error("ADMIN_NOTIFY_SAVE_FAILED");
+  }
+
+  /* Leaving the last recipient alone. Counting only when a switch is
+     being turned OFF, so the ordinary case costs no extra query. */
+  if (!next && row.notify_email === true) {
+    const { data: others } = await supabase
+      .from("admins")
+      .select("email")
+      .eq("notify_email", true)
+      .neq("email", email)
+      .limit(1);
+
+    if (!others || others.length === 0) {
+      throw new Error("ADMIN_LAST_NOTIFY");
+    }
+  }
+
+  const { error } = await supabase
+    .from("admins")
+    .update({ notify_email: next })
+    .eq("email", email);
+
+  if (error) {
+    console.error("[setAdminNotify]", error.message);
+
+    throw new Error("ADMIN_NOTIFY_SAVE_FAILED");
+  }
+
+  revalidatePath("/admin");
+}
