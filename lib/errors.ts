@@ -366,6 +366,17 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     body: "One report per person. An admin will look at it.",
     severity: "muted",
   },
+  /*
+   * Reporting needs an account, and the action answers with this code
+   * rather than navigating to /login. It blocked the same way before —
+   * the action used to redirect, and a redirect is an exception, which
+   * the form treated as a fault.
+   */
+  REPORT_SIGNED_OUT: {
+    title: "Sign in first",
+    body: "An account is needed to report a place — that is what keeps one person from reporting it eight times.",
+    severity: "blocking",
+  },
 
   /* ---------- credits and subscription ---------- */
   CREDITS_SIGNED_OUT: {
