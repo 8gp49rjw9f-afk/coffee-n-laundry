@@ -55,6 +55,50 @@ export default async function ResetPasswordPage({
             </Link>
           </p>
         </Card>
+
+        {/*
+         * The other reason this page appears without a session.
+         *
+         * "Expired" is the honest headline for the common case — the
+         * link was used, or sat too long. But a link that was ALTERED
+         * on its way through a mail gateway lands here too, and that
+         * person has not done anything wrong and has no idea why the
+         * page is telling them their link is old. It is not old; it
+         * never arrived as it was sent.
+         *
+         * So the possibility is named, with the repair. It is kept
+         * short here rather than repeated in full: the long version
+         * lives on /forgot-password, one tap away, and a page that
+         * shouts a rare case at everybody stops being read.
+         */}
+        <Card>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
+            If the link in the email looked odd
+          </h2>
+
+          <p className="mt-2 text-sm leading-relaxed text-slate-700">
+            Some email providers rewrite the address of a link before
+            you receive it, and the rewritten one can lead nowhere.
+            Copying the address and changing the part before{" "}
+            <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
+              /auth/confirm
+            </code>{" "}
+            to{" "}
+            <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
+              https://coffee-n-laundry.com
+            </code>{" "}
+            is enough to put it right.
+          </p>
+
+          <p className="mt-3 text-center text-sm">
+            <Link
+              href="/forgot-password?error=failed"
+              className="font-semibold underline"
+            >
+              Show me the steps
+            </Link>
+          </p>
+        </Card>
       </main>
     );
   }
