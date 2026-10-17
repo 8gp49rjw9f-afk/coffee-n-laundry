@@ -123,6 +123,15 @@ export async function sendContact(formData: FormData): Promise<ContactResult> {
 /*
  * Who the message goes to.
  *
+ * Not every admin wants this mail. `notify_email` is the switch, set
+ * from the admin page, and an admin who turns it off keeps every other
+ * right — they still see the panel, still approve places. They just
+ * stop receiving a copy of what a visitor wrote.
+ *
+ * The filter is not applied in `currentAdmin` or `isMaster`: those
+ * answer "may this person act?", which has nothing to do with whether
+ * they want the mail.
+ *
  * A service key is the plain way to read a table RLS keeps closed,
  * and it is what runs in production. Without one, the fallback is the
  * visitor's own session — which only works for an admin testing the
@@ -136,7 +145,7 @@ async function adminEmails(): Promise<string[]> {
   if (url && serviceKey) {
     try {
       const response = await fetch(
-        `${url}/rest/v1/admins?select=email&limit=20`,
+        `${url}/rest/v1/admins?select=email&notify_email=is.true&limit=20`,
         {
           headers: {
             apikey: serviceKey,
@@ -162,7 +171,11 @@ async function adminEmails(): Promise<string[]> {
 
   const supabase = await createClient();
 
-  const { data } = await supabase.from("admins").select("email").limit(20);
+  const { data } = await supabase
+    .from("admins")
+    .select("email")
+    .eq("notify_email", true)
+    .limit(20);
 
   return (data ?? [])
     .map((row) => row.email)
