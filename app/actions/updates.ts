@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/services/settings";
+import { currentAdmin } from "@/lib/services/admin";
 
 /* ====================================================== */
 /* REPORT — flag information that looks wrong              */
@@ -46,6 +47,34 @@ import { getSettings } from "@/lib/services/settings";
  * coexist with a returned result anyway.
  */
 
+/*
+ * WHO MAY REPORT, AND HOW OFTEN
+ *
+ * This rule lived in a unique index — `place_reports_user_idx` over
+ * (place_id, reported_by) — and an index can only see columns. So it
+ * said "one report per person per place, for ever", and could say
+ * nothing else. Two consequences, both wrong:
+ *
+ *   - An admin could not report a place twice, ever. The person who
+ *     decides about a reported place is the one most likely to have
+ *     already reported it.
+ *
+ *   - Nobody could report the same place twice, not even a year
+ *     later, after the earlier report was resolved and the price had
+ *     moved again.
+ *
+ * The rule moves here, where two questions can actually be asked:
+ * is this person an admin, and what did they report recently.
+ *
+ *   Admins   — no ceiling at all.
+ *   Everyone — one report per place per 24 hours.
+ *
+ * The index is now plain rather than unique (see 0020) and stays,
+ * because the lookup below still wants it.
+ */
+
+const REPORT_WINDOW_HOURS = 24;
+
 export interface ReportResult {
   ok: boolean;
   code?: string;
@@ -72,16 +101,50 @@ export async function reportPlace(formData: FormData): Promise<ReportResult> {
     return { ok: false, code: "REPORT_REASON_REQUIRED" };
   }
 
-  /* One report per person. The unique index enforces it, so a second
-     press comes back as 23505 rather than adding a row — and that is
-     not a failure worth alarming anyone about, so it is reported as
-     "already sent" rather than as a fault. */
+  /* An admin reports as often as they like. Read once, here, so the
+     window check below can skip its query entirely for them. */
+  const admin = await currentAdmin();
+
+  if (!admin) {
+    /*
+     * A moving 24-hour window, counted backwards from now.
+     *
+     * Deliberately not "has this person reported today": 23:59 and
+     * 00:01 are two minutes apart in reality and on different days by
+     * the calendar, and the calendar answer would let both through.
+     *
+     * One row is enough to answer — `limit(1)` rather than a count,
+     * because the question is whether any report exists, not how many.
+     */
+    const since = new Date(
+      Date.now() - REPORT_WINDOW_HOURS * 60 * 60 * 1000
+    ).toISOString();
+
+    const { data: recent } = await supabase
+      .from("place_reports")
+      .select("id")
+      .eq("place_id", placeId)
+      .eq("reported_by", user.id)
+      .gte("created_at", since)
+      .limit(1);
+
+    if (recent && recent.length > 0) {
+      return { ok: false, code: "REPORT_TOO_SOON" };
+    }
+  }
+
   const { error } = await supabase.from("place_reports").insert({
     place_id: placeId,
     reported_by: user.id,
     reason,
   });
 
+  /*
+   * Kept although it should no longer fire: with the index no longer
+   * unique, nothing returns 23505 on this table. It is left as a net
+   * for the day the uniqueness is put back, and because a duplicate
+   * is still better reported as "already sent" than as a fault.
+   */
   if (error && error.code === "23505") {
     return { ok: false, code: "REPORT_ALREADY_SENT" };
   }
