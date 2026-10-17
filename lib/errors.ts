@@ -512,6 +512,28 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     severity: "blocking",
     retry: true,
   },
+  /*
+   * The notification switch on the admin list. Not a downgrade: the
+   * admin keeps every other right and only stops receiving a copy of
+   * what a visitor wrote.
+   */
+  ADMIN_NOTIFY_SAVE_FAILED: {
+    title: "Could not change that notification",
+    body: "The switch is unchanged. Try again.",
+    severity: "blocking",
+    retry: true,
+  },
+  /*
+   * Refused on purpose. The contact form sends to whoever has the
+   * switch on; with the last one off, recipients is empty and every
+   * message from a visitor is lost without a word. So the last switch
+   * stays on — see setAdminNotify in app/actions/admin.ts.
+   */
+  ADMIN_LAST_NOTIFY: {
+    title: "One admin must keep these",
+    body: "Somebody has to receive the messages visitors send. Turn another admin's notifications on first.",
+    severity: "blocking",
+  },
 
   /* ---------- pages that failed to load ---------- */
   PAGE_MAP_FAILED: {
