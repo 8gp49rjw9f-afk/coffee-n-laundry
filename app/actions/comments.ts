@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { displayNameFor } from "@/lib/database/places";
+import { canCommentOrReport } from "@/lib/services/accountAge";
 
 /* ====================================================== */
 /* COMMENTS — one person, one short thing, once a day      */
@@ -26,6 +27,16 @@ import { displayNameFor } from "@/lib/database/places";
  * A report is a signal a moderator has to weigh; a comment is public
  * text, and a moderator filling their own places with comments is
  * exactly what the ceiling is for. Everyone follows the same rule.
+ *
+ * AND AN AGE GATE BEFORE ANY OF IT — seven days, from
+ * lib/services/accountAge.ts, the same delay as editing a place. A
+ * comment is public text sitting under somebody else's place for
+ * everyone to read, which puts it in the same class as rewriting the
+ * place itself. Decided, not defaulted.
+ *
+ * The two rules are different questions and both are asked:
+ *   - canCommentOrReport — may this ACCOUNT write about a place at all
+ *   - the window below   — has it already written today
  *
  * A moving 24-hour window, counted backwards from now, for the same
  * reason as reports: 23:59 and 00:01 are two minutes apart in
@@ -77,6 +88,12 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
 
   if (body.length > MAX_LENGTH) {
     return { ok: false, code: "COMMENT_TOO_LONG" };
+  }
+
+  /* The age gate, first. Nothing else is worth asking if the account
+     has been open for two hours. */
+  if (!(await canCommentOrReport(user.id))) {
+    return { ok: false, code: "ACCOUNT_TOO_NEW_TO_EDIT" };
   }
 
   /*
