@@ -75,40 +75,50 @@ export const DEFAULT_SETTINGS: SiteSettings = {
 };
 
 /*
- * TWO CACHES, NOT ONE.
+ * TWO CACHES, NOT ONE — AND WHY THE FIRST WAS TOO SLOW TO TRUST
  *
- * Everything in `site_settings` is read on nearly every request —
- * the proxy alone runs on each one that is not a static asset — and
- * almost none of it changes during a day. A minute of staleness on
- * a label, a length limit or a map zoom costs nothing, and caching
- * it keeps a database read off the hot path.
+ * Everything in `site_settings` is read on nearly every request, and
+ * almost none of it changes during a day. A minute of staleness on a
+ * label, a length limit or a map zoom costs nothing.
  *
- * The maintenance switch is the exception, and it is the reason
- * these are two caches rather than one. It is an emergency lever:
- * the moment it is flipped, the site should be resting. Under the
- * single minute-long cache it took up to sixty seconds to bite,
- * repeated per warm instance on Vercel.
+ * The maintenance switch is the exception, and it is the whole reason
+ * there are two caches. It is an emergency lever: the moment it is
+ * flipped, the site should be resting.
  *
- * So the switch gets its own short window. Five seconds is fast
- * enough that a person who flips it, reloads and finds the site
- * still up knows something else is wrong, and slow enough that a
- * burst of traffic does not turn into a burst of queries.
+ * THAT WAS THE BUG, OR HALF OF IT. The switch had a five-second
+ * window of its own, and getSettings refreshed it on every call — so
+ * in principle it turned over quickly. But the value it refreshed
+ * FROM was the one-minute row cache, and the sequence below is what
+ * made the switch feel dead:
+ *
+ *   1. An admin flips the switch and the row is written. Correct.
+ *   2. `clearSettingsCache()` runs, so the cache is emptied. Correct.
+ *   3. But every warm serverless instance keeps ITS OWN copy of these
+ *      module-level variables. Clearing them in the instance that
+ *      handled the save does nothing for the dozen others still
+ *      serving requests, each holding the pre-flip row.
+ *   4. Those instances go on answering `maintenance_mode: false`
+ *      until their own minute is up — and on a busy site that
+dereferencing   *      minute keeps being extended by traffic, so the switch can
+ *      appear never to take at all.
+ *
+ * The fix is not a cleverer cache. It is to stop caching the one
+ * field that must not be stale: `readMaintenanceMode` now always asks
+ * the database, and the row cache is allowed to hold everything else.
+ * One indexed lookup on a single-column primary key, on requests that
+ * a proxy already touches the database for — a cost worth paying for
+ * a lever that has to work the first time.
  */
 
 let cached: SiteSettings | null = null;
 let cachedAt = 0;
-const CACHE_TTL = 1000 * 60; // 1 minute — everything but the switch
-
-let cachedMaintenance: boolean | null = null;
-let cachedMaintenanceAt = 0;
-const MAINTENANCE_TTL = 1000 * 5; // 5 seconds
+const CACHE_TTL = 1000 * 60; // 1 minute — everything except the switch
 
 export async function getSettings(): Promise<SiteSettings> {
   if (cached && Date.now() - cachedAt < CACHE_TTL) {
     /*
      * The cached copy is a minute old, which is fine for the rest of
-     * it and not fine for this one field. Ask about the switch on its
-     * own, far more cheaply than re-reading the whole row.
+     * it and not fine for this one field. Asked fresh, every time.
      */
     return { ...cached, maintenance_mode: await readMaintenanceMode() };
   }
@@ -123,36 +133,44 @@ export async function getSettings(): Promise<SiteSettings> {
       .single();
 
     if (error || !data) {
+      console.error(
+        "[getSettings]",
+        error?.message ?? "no site_settings row with id = 1"
+      );
+
       return DEFAULT_SETTINGS;
     }
 
     cached = { ...DEFAULT_SETTINGS, ...(data as SiteSettings) };
     cachedAt = Date.now();
 
-    /* The row just told us the switch's value, so start its own
-       window from now rather than making a second query. */
-    cachedMaintenance = cached.maintenance_mode;
-    cachedMaintenanceAt = Date.now();
-
     return cached;
-  } catch {
+  } catch (error) {
+    console.error("[getSettings] threw:", error);
+
     return DEFAULT_SETTINGS;
   }
 }
 
 /**
- * The maintenance flag, on a five-second window of its own.
+ * The maintenance flag, asked fresh every single time.
  *
- * One column, not the whole row. A failure returns the last known
- * value rather than `false`: an unreachable database must not be
- * what lifts a maintenance mode, since that is the one moment the
- * site most needs to stay closed.
+ * One column, not the whole row — and no cache at all. The five-second
+ * window that used to live here was the last place a stale `false`
+ * could hide, in a warm instance that had not yet noticed the switch
+ * had been thrown. Five seconds is short, but "the site stays up for
+ * another five seconds" is not a property an emergency lever should
+ * have.
+ *
+ * A failure returns the last known value rather than `false`: an
+ * unreachable database must not be what lifts a maintenance mode,
+ * since that is the one moment the site most needs to stay closed.
+ * It returns THAT and not the default, so a blip does not silently
+ * un-rest a site that was resting.
  */
-export async function readMaintenanceMode(): Promise<boolean> {
-  if (cachedMaintenance !== null && Date.now() - cachedMaintenanceAt < MAINTENANCE_TTL) {
-    return cachedMaintenance;
-  }
+let lastKnownMaintenance: boolean | null = null;
 
+export async function readMaintenanceMode(): Promise<boolean> {
   try {
     const supabase = await createClient();
 
@@ -165,23 +183,22 @@ export async function readMaintenanceMode(): Promise<boolean> {
     if (error) {
       console.error("[readMaintenanceMode]", error.message);
 
-      return cachedMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
+      return lastKnownMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
     }
 
     if (!data) {
       console.error("[readMaintenanceMode] no site_settings row with id = 1");
 
-      return cachedMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
+      return lastKnownMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
     }
 
-    cachedMaintenance = Boolean(data.maintenance_mode);
-    cachedMaintenanceAt = Date.now();
+    lastKnownMaintenance = Boolean(data.maintenance_mode);
 
-    return cachedMaintenance;
+    return lastKnownMaintenance;
   } catch (error) {
     console.error("[readMaintenanceMode] threw:", error);
 
-    return cachedMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
+    return lastKnownMaintenance ?? DEFAULT_SETTINGS.maintenance_mode;
   }
 }
 
@@ -207,9 +224,16 @@ export async function isAdmin(): Promise<boolean> {
   }
 }
 
+/*
+ * Emptied after a settings save, so the instance that handled the
+ * write does not go on serving its own stale copy.
+ *
+ * It does NOT reach the other warm instances — nothing can, from
+ * here. That is why the switch above is not cached: clearing a cache
+ * you cannot clear everywhere is not a strategy, and the field that
+ * matters most is the one that must not depend on it.
+ */
 export function clearSettingsCache() {
   cached = null;
   cachedAt = 0;
-  cachedMaintenance = null;
-  cachedMaintenanceAt = 0;
 }
