@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { getSettings, readMaintenanceMode } from "@/lib/services/settings";
+import { getSettings } from "@/lib/services/settings";
 
 /*
  * Next 16 renamed the "middleware" convention to "proxy". Same file,
@@ -18,6 +18,19 @@ import { getSettings, readMaintenanceMode } from "@/lib/services/settings";
  *
  *   2. Session refresh. Without rewriting the cookies here, a stale
  *      session survives signOut.
+ *
+ * THE TRACE IS GONE, AND SO IS THE SECOND READ
+ *
+ * Three temporary lines lived here: a dedicated readMaintenanceMode()
+ * call just to log what it returned, then a console.log on every
+ * non-static request. The note above them said to delete the block
+ * once the switch was confirmed working, and the cost of leaving it
+ * was not only noise: it read the database TWICE per request — once
+ * for the trace, once through getSettings() below — on a file that
+ * runs for nearly every request the site serves.
+ *
+ * The switch is read ONCE now, here, by the call below. That is also
+ * the value trusted below; there is no second opinion to reconcile.
  */
 
 /* Everything a visitor may still reach while the site is resting.
@@ -40,46 +53,21 @@ function isAllowed(pathname: string) {
   /* Static assets and the icon, or the page would render unstyled. */
   if (/\.[a-z0-9]+$/i.test(pathname)) return true;
 
+  /*
+   * The sitemap and the robots file, which moved out of Next's
+   * metadata convention and are served by plain routes now — see
+   * app/sitemap/route.ts. They are not in the matcher's exclusion
+   * list any more, so they are named here instead: a crawler that
+   * arrives while the site is resting should still be told how to
+   * come back, and a 404 on either one costs the site its indexing.
+   */
+  if (pathname === "/sitemap" || pathname === "/robots.txt") return true;
+
   return false;
 }
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-
-  /*
-   * ======================================================
-   * TEMPORARY TRACE — remove once the switch is confirmed working
-   * ======================================================
-   *
-   * Three lines, so the Vercel logs answer a question the source
-   * cannot: is this function running at all, and what does it think
-   * the switch says?
-   *
-   *   no line at all      → the runtime never calls this file, and
-   *                         the problem is the convention or the
-   *                         matcher, not the logic.
-   *   RUNNING … mode=false → it runs and reads the switch as off.
-   *                         The database says true, so the read is
-   *                         what fails — the Supabase client in a
-   *                         serverless runtime, or the settings row
-   *                         read from this context.
-   *   RUNNING … mode=true  → it runs and sees the switch on, and the
-   *                         redirect below is being skipped for the
-   *                         wrong reason: the admin lookup, or
-   *                         isAllowed, or the response.
-   *
-   * DELETE THIS BLOCK, including the dedicated read below, once the
-   * answer is known. It logs on every non-static request.
-   */
-  let traced: boolean | null = null;
-
-  try {
-    traced = await readMaintenanceMode();
-  } catch (error) {
-    console.error("[proxy] maintenance read threw:", error);
-  }
-
-  console.log(`[proxy] RUNNING ${pathname} · mode=${traced}`);
 
   let response = NextResponse.next({ request });
 
@@ -170,6 +158,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|sitemap.xml).*)$",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|sitemap).*)$",
   ],
 };
