@@ -361,6 +361,7 @@ export async function deletePlace(formData: FormData): Promise<void> {
     "place_updates",
     "place_field_checks",
     "place_prices",
+    "place_comments",
   ];
 
   for (const table of children) {
@@ -390,6 +391,17 @@ export async function deletePlace(formData: FormData): Promise<void> {
 
 /* ---------- admins: master only ---------- */
 
+/*
+ * WHO MAY CHANGE THE LIST, AND WHY THAT IS NOT NEGOTIABLE
+ *
+ * Every function below opens with requireMaster(). Adding an admin,
+ * promoting one, removing one — none of it is an admin's business.
+ * An admin runs the site; a master decides who runs the site. The
+ * menu hides this panel from a plain admin, but the menu is only the
+ * shape of the screen: these functions are reachable by anyone who
+ * can forge a request, so the gate is here.
+ */
+
 export async function addAdmin(formData: FormData): Promise<void> {
   await requireMaster();
 
@@ -417,28 +429,78 @@ export async function addAdmin(formData: FormData): Promise<void> {
 }
 
 /*
- * A master cannot be removed here, and cannot remove themselves: a
- * panel that can lock its own last key holder out is a trap.
+ * WHO A MASTER IS, AND HOW ONE LEAVES
+ *
+ * The rule, as it was finally stated: A MASTER CAN ONLY REMOVE
+ * THEMSELVES. Nobody else can remove a master — not another master,
+ * not an ordinary admin.
+ *
+ * So there is no "master removal" here at all, and no request-and-vote
+ * flow either: a master who wants out does it from their own row, and
+ * the only thing standing between them and the door is the count.
+ *
+ * That is what the checks below are, in order:
+ *
+ *   1. not yourself, unless you ARE a master and you are the target
+ *   2. never another master
+ *   3. never the last master, which the database refuses too
+ *
+ * (3) is belt and braces on purpose. 0023 puts a trigger under this
+ * table that refuses to delete the last master row whoever runs the
+ * statement — including a hand-typed DELETE in the Supabase editor.
+ * The check here exists so the failure arrives as a readable code
+ * instead of a Postgres exception, not because the database needs
+ * the help.
  */
 export async function removeAdmin(email: string): Promise<void> {
   const master = await requireMaster();
 
-  const target = email.trim().toLowerCase();
-
-  if (target === master.email.toLowerCase()) {
-    throw new Error("ADMIN_SELF_REMOVE");
-  }
-
   const supabase = await createClient();
 
-  const { data: row } = await supabase
+  const target = email.trim().toLowerCase();
+  const self = master.email.toLowerCase();
+
+  const { data: row, error: readError } = await supabase
     .from("admins")
     .select("is_master")
     .eq("email", target)
     .maybeSingle();
 
-  if (row?.is_master) {
-    throw new Error("ADMIN_MASTER_REMOVE");
+  if (readError || !row) {
+    console.error("[removeAdmin] read", readError?.message ?? "not found");
+
+    throw new Error("ADMIN_REMOVE_FAILED");
+  }
+
+  /*
+   * The two refusals, and the order between them matters for the
+   * message the person reads.
+   *
+   * Removing ANOTHER master is refused first: it is the rule that is
+   * absolute, and it does not depend on how many masters there are.
+   * "A master steps down on their own" is the sentence that teaches
+   * the rule; "the last master stays" would answer a different
+   * question than the one being asked.
+   */
+  if (row.is_master && target !== self) {
+    throw new Error("ADMIN_OTHER_MASTER_REMOVE");
+  }
+
+  /* Stepping down, or removing an ordinary admin — both are allowed,
+     but the last master cannot leave. Counted across the table, not
+     against the caller: what matters is how many are left, not who
+     is asking. */
+  if (row.is_master) {
+    const { data: others } = await supabase
+      .from("admins")
+      .select("email")
+      .eq("is_master", true)
+      .neq("email", target)
+      .limit(1);
+
+    if (!others || others.length === 0) {
+      throw new Error("ADMIN_LAST_MASTER");
+    }
   }
 
   const { error } = await supabase
@@ -450,6 +512,56 @@ export async function removeAdmin(email: string): Promise<void> {
     console.error("[removeAdmin]", error.message);
 
     throw new Error("ADMIN_REMOVE_FAILED");
+  }
+
+  revalidatePath("/admin");
+}
+
+/*
+ * MAKING AN ADMIN A MASTER
+ *
+ * A master can hand the level to another admin. That is the only way
+ * a second master comes into being — there is no self-service path
+ * to it, which is the point of the level.
+ *
+ * ANY ADMIN, including the master who promoted them, can later be
+ * removed from the panel — an ordinary admin by any master, a master
+ * only by themselves. Promotion is not permanent, and it is not
+alse meant to be: the whole reason the removal rule exists is that
+ * a list of masters can go wrong.
+ */
+export async function promoteAdmin(email: string): Promise<void> {
+  await requireMaster();
+
+  const supabase = await createClient();
+
+  const target = email.trim().toLowerCase();
+
+  const { data: row, error: readError } = await supabase
+    .from("admins")
+    .select("is_master")
+    .eq("email", target)
+    .maybeSingle();
+
+  if (readError || !row) {
+    console.error("[promoteAdmin] read", readError?.message ?? "not found");
+
+    throw new Error("ADMIN_PROMOTE_FAILED");
+  }
+
+  if (row.is_master) {
+    throw new Error("ADMIN_ALREADY_MASTER");
+  }
+
+  const { error } = await supabase
+    .from("admins")
+    .update({ is_master: true })
+    .eq("email", target);
+
+  if (error) {
+    console.error("[promoteAdmin]", error.message);
+
+    throw new Error("ADMIN_PROMOTE_FAILED");
   }
 
   revalidatePath("/admin");
@@ -468,11 +580,12 @@ export async function removeAdmin(email: string): Promise<void> {
  *
  * THE LAST ONE CANNOT OPT OUT
  *
- * The contact form sends to whoever has notify_email set; if the last
- * one turns it off, recipients is empty, sendContact answers
- * CONTACT_NO_RECIPIENT, and every message from a visitor is lost
- * silently from that day on. The form would look like it worked. So
- * turning the last switch off is refused with a code of its own.
+ * Three things land in these inboxes, all three through the same
+ * switch: a bug report, a message from the contact form, and a
+ * "something is wrong with this place" report. With every switch off,
+ * the three senders find no recipients and the messages are lost
+ * silently — the forms would look like they worked. So turning the
+ * last one off is refused with a code of its own.
  */
 export async function setAdminNotify(formData: FormData): Promise<void> {
   await requireAdmin();
