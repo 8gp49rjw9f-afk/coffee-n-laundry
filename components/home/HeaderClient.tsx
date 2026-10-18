@@ -1,35 +1,44 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { createClient } from "@/lib/supabase/browser";
 
 /*
- * THE MARK — the real logo, from `public/logo.png`.
+ * THE MARK — drawn here as SVG, not the PNG from `public/logo.png`.
+ *
+ * WHY WE STOPPED USING THE PNG
+ *
+ * The PNG carries the wordmark inside the ring. That is legible at
+ * 1200 px and a smudge at 40 — so every attempt to read it up here
+ * ended in either a bigger bar or an unreadable one. A raster mark
+ * also softens on the retina scales a header gets rendered at.
+ *
+ * The SVG below is the same motif with the text left out: the ring,
+ * the two dots (coffee brown, the blue), and the vertical stroke. It
+ * is sharp at 12 px and at 512, holds at any device pixel ratio, and
+ * costs a few hundred bytes instead of 324 KB.
+ *
+ * The wordmark BESIDE it is what spells the name out; the drawing is
+ * the mark. That division is deliberate: a logo that has to be
+ * enlarged to be readable stops being an icon.
  *
  * NO BACKING PLATE. There was a dark disc behind this for one
  * commit, on the assumption that white artwork needs a dark ground.
- * That assumption was wrong twice over: the PNG is not white but
+ * That assumption was wrong twice over: the artwork is not white but
  * silver-grey with highlights, which reads fine on white — and the
- * disc was the same 32 px as the image while the artwork inside it
- * is inset with its own margin, so the visible result was a black
- * circle with a small mark somewhere in the middle. It looked like a
- * hole in the header.
+ * disc was the same size as the image while the artwork inside it is
+ * inset with its own margin, so the visible result was a black circle
+ * with a small mark somewhere in the middle. It looked like a hole in
+ * the header. The mark sits straight on the bar.
  *
- * So the image sits straight on the bar.
+ * SIZE. 48 px in the header, set at the call site below. Nothing
+ * else depends on the number: the SVG scales cleanly, so raising it
+ * is a one-line change.
  *
- * SIZE, AND WHAT THE PICTURE IS FOR
- *
- * The artwork carries the wordmark inside the ring, which is
- * legible at 1200 px and a smudge at 32. The wordmark BESIDE it is
- * what spells the name out; the picture is the mark. That division
- * is deliberate, not a compromise — a logo that has to be enlarged
- * to be readable stops being an icon.
- *
- * If the mark ever needs to be bigger, raise `size` on the Logo in
- * the header below. Nothing else depends on this number.
+ * Kept in step with `app/icon.svg`, which is the favicon of the same
+ * motif. If the design changes, change both.
  */
 
 export function Logo({
@@ -47,14 +56,24 @@ export function Logo({
       aria-label="coffee'n'laundry"
       role="img"
     >
-      <Image
-        src="/logo.png"
-        alt=""
+      <svg
+        viewBox="0 0 200 200"
         width={size}
         height={size}
-        priority
-        className="shrink-0 object-contain"
-      />
+        fill="none"
+        aria-hidden="true"
+        className="shrink-0"
+      >
+        <circle cx="100" cy="100" r="86" stroke="#171717" strokeWidth="8" />
+        <circle cx="66" cy="104" r="17" fill="#6f4e37" />
+        <circle cx="134" cy="104" r="17" fill="#0284c7" />
+        <path
+          d="M100 30 v38"
+          stroke="#171717"
+          strokeWidth="8"
+          strokeLinecap="round"
+        />
+      </svg>
 
       {showWordmark && (
         <span className="text-base font-bold leading-none sm:text-lg">
@@ -178,7 +197,7 @@ export default function HeaderClient({
     <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-8">
         <Link href="/" className="flex items-center gap-2">
-          <Logo size={40} />
+          <Logo size={48} />
         </Link>
 
         <div className="flex items-center gap-3">
