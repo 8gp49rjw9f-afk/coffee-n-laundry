@@ -1,27 +1,36 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { createClient } from "@/lib/supabase/browser";
 
 /*
- * THE MARK — the drawn ring, still here on purpose.
+ * THE MARK — the real logo, from `public/logo.png`.
  *
- * `public/logo.png` is the real logo, and it is used for the
- * favicon, the iPhone icon and the share preview. This ring is what
- * the HEADER uses, and the reason is size: the PNG carries the full
- * wordmark inside the circle, which is right at 1200 px and unreadable
- * at the 32 px an app bar gives it. A symbol has to survive being
- * small, and this one does — it is the same circle, the same coffee
- * brown, the same laundry blue, drawn as a few shapes rather than a
- * bitmap.
+ * WHY AN <img> INSIDE A FIXED SQUARE, RATHER THAN next/image
  *
- * It also paints in `currentColor`, so it takes the colour of
- * whatever it sits in. A PNG cannot do that.
+ * The file is 1024×1024 with a transparent background, and it holds
+ * the full wordmark inside the ring. At 32 px — the size an app bar
+ * gives it — that lettering is roughly four pixels tall and reads as
+ * a smudge, not as a name. The wordmark beside it is what actually
+ * spells the name out, so the picture does not need to.
  *
- * If the PNG is ever wanted here instead, replace the <svg> below
- * with an <img src="/logo.png"> — but check it at 32 px first.
+ * So the image is drawn in a fixed square and the browser scales it
+ * to fit. `object-contain` keeps the disc round. The alternative was
+ * to enlarge the picture until its text became legible, which would
+ * mean a 60 px header; this keeps the bar compact and the name
+ * readable, which is what the bar is for.
+ *
+ * The colours: the PNG is white artwork on transparency, so it only
+ * shows on a dark ground. The header is white, so the square behind
+ * it is dark — slate-900, the same near-black the buttons use. Without
+ * it the logo would be invisible here.
+ *
+ * If a future logo is a solid dark mark rather than white line art,
+ * drop the dark square below and the picture will sit straight on the
+ * white header.
  */
 
 export function Logo({
@@ -39,24 +48,19 @@ export function Logo({
       aria-label="coffee'n'laundry"
       role="img"
     >
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 200 200"
-        fill="none"
-        aria-hidden="true"
-        className="shrink-0"
+      <span
+        className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900"
+        style={{ width: size, height: size }}
       >
-        <circle cx="100" cy="100" r="86" stroke="currentColor" strokeWidth="9" />
-        <circle cx="66" cy="104" r="17" fill="#6f4e37" />
-        <circle cx="134" cy="104" r="17" fill="#0284c7" />
-        <path
-          d="M100 30 v38"
-          stroke="currentColor"
-          strokeWidth="9"
-          strokeLinecap="round"
+        <Image
+          src="/logo.png"
+          alt=""
+          width={size}
+          height={size}
+          priority
+          className="h-full w-full object-contain"
         />
-      </svg>
+      </span>
 
       {showWordmark && (
         <span className="text-base font-bold leading-none sm:text-lg">
