@@ -31,19 +31,9 @@ export function PlaceHeader({
     [place.address, place.city, place.country].filter(Boolean).join(" · ") ||
     `${place.latitude.toFixed(4)}, ${place.longitude.toFixed(4)}`;
 
-  /* “last verified” is the same instant the freshness badge counts
-     from — place.last_verified_at. Spelled out as a date here because
-     the reader wants to know WHICH DAY, not how many days ago. Read
-     in UTC to match the freshness computation: a date read in one
-     zone and counted in another disagrees by a day at the edges. */
-  const lastVerified = place.last_verified_at
-    ? new Date(place.last_verified_at).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      })
-    : null;
+  const freshnessLabel = "text-sm font-semibold text-slate-700";
+  const freshnessValue = "mt-1 text-sm text-slate-500";
+  const lastCheck = place.confirmations_count > 0 ? "this week" : "never";
 
   return (
     <Card>
@@ -70,31 +60,6 @@ export function PlaceHeader({
 
           <p className="mt-1 text-sm text-slate-600">📍 {where}</p>
 
-          {/* VERIFY — moved here from the right-hand column, between
-              the city and “Added by”, because it is something you do
-              to the place rather than a badge earned by it: it reads
-              with the facts above it and leaves the right-hand column
-              for what only an admin sees.
-
-              The label is “Verify”, not “Still open”: the button and
-              the per-field ticks write the same thing, the same date.
-
-              The date in brackets is a parenthetical detail of the
-              button, so it sits beside it and wraps with it. */}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <StillOpenButton
-              placeId={place.id}
-              signedIn={signedIn}
-              alreadyThisWeek={confirmedThisWeek}
-            />
-
-            {lastVerified && (
-              <span className="text-[11px] leading-tight text-slate-400">
-                ( last verified: {lastVerified} )
-              </span>
-            )}
-          </div>
-
           {/* Who put this on the map. Shown as a username, never as an
               email — the address is personal data and this line is
               public. */}
@@ -103,6 +68,46 @@ export function PlaceHeader({
               Added by @{creatorName}
             </p>
           )}
+
+          {/* VERIFY — its own row under “Added by”, and a step larger
+              than the rest of the identity lines.
+
+              It was moved up between the city and “Added by” first,
+              and that was too tight for the most-used control on the
+              page: it sat inside the block of things you READ, when
+              what it is is the one thing you DO here. On its own
+              line, at text-base, it reads as a button.
+
+              It stays on the left, with Delete alone on the right,
+              because deleting belongs to an admin and this belongs
+              to whoever is standing outside the place.
+
+              The old “Still open” label lives in StillOpenButton.tsx
+              and has not been renamed yet. */}
+          <StillOpenButton
+            placeId={place.id}
+            signedIn={signedIn}
+            alreadyThisWeek={confirmedThisWeek}
+            size="lg"
+            className="mt-3"
+          />
+
+          {/* FRESHNESS — the badge that used to sit at the top of the
+              right-hand column, as two plain lines under the button.
+              Same data, same computation (getFreshness), same colour
+              coding as the badge had, so nothing was lost when the
+              badge went: only the shape changed, from a pill to text.
+              The tier is spelled out for anyone who cannot see the
+              colour. */}
+          <div className="mt-3">
+            <p className={freshnessLabel}>Freshness</p>
+
+            <p className={freshnessValue}>
+              {freshness.emoji} {freshness.label} · {freshness.tier}
+            </p>
+
+            <p className={freshnessValue}>Last check : {lastCheck}</p>
+          </div>
         </div>
 
         {/* The right-hand column is down to the one thing that belongs
