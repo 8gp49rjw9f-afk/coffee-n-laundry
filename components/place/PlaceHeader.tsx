@@ -58,17 +58,24 @@ export function PlaceHeader({
 
           <p className="mt-1 text-sm text-slate-600">📍 {where}</p>
 
-          {/* Who put this on the map. Shown as a username, never as an
-              email — the address is personal data and this line is
-              public. */}
+          {/* Who put this on the map, in the same type as the city
+              above it: text-sm, the same slate-600 as the 📍 line.
+              It used to be text-slate-500 and half a step down the
+              scale, which made the person look like a footnote to
+              their own place.
+
+              The label is a person glyph, not the words “Added by”:
+              the emoji carries “who”, and @name carries the name.
+              Shown as a username, never as an email — the address is
+              personal data and this line is public. */}
           {creatorName && (
-            <p className="mt-0.5 text-sm text-slate-500">
-              Added by @{creatorName}
+            <p className="mt-1 text-sm text-slate-600">
+              👤 @{creatorName}
             </p>
           )}
 
-          {/* VERIFY — its own row under “Added by”, and a step larger
-              than the rest of the identity lines.
+          {/* VERIFY — its own row under the person line, and a step
+              larger than the rest of the identity lines.
 
               It was moved up between the city and “Added by” first,
               and that was too tight for the most-used control on the
