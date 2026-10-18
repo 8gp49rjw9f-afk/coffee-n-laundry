@@ -555,10 +555,35 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     body: "A panel that can lock out its last key holder is a trap, so this is refused.",
     severity: "blocking",
   },
-  ADMIN_MASTER_REMOVE: {
-    title: "A master cannot be removed",
-    body: "Only the master account can change the admin list.",
+  /*
+   * Renamed from ADMIN_MASTER_REMOVE. The old sentence said only the
+   * master could change the list, which is true but does not answer
+   * what the person just tried: remove a master who is not them.
+   * Several masters are legitimate, so "a master cannot be removed"
+   * was also no longer accurate — a master CAN be removed, by
+   * themselves.
+   */
+  ADMIN_OTHER_MASTER_REMOVE: {
+    title: "A master steps down on their own",
+    body: "Nobody else can remove a master — not another master, not an admin.",
     severity: "blocking",
+  },
+  /*
+   * The floor, and 0023 enforces it in the database as well: a
+   * trigger refuses to delete the last master row whatever runs the
+   * statement. This code exists so the refusal arrives as a sentence
+   * rather than a Postgres exception.
+   */
+  ADMIN_LAST_MASTER: {
+    title: "The last master",
+    body: "Somebody has to be able to change this list, so the last master stays. Make another admin a master first.",
+    severity: "blocking",
+  },
+  ADMIN_PROMOTE_FAILED: {
+    title: "Could not make that admin a master",
+    body: "Nothing was changed. Try again.",
+    severity: "blocking",
+    retry: true,
   },
   ADMIN_REMOVE_FAILED: {
     title: "Could not remove that admin",
@@ -609,9 +634,11 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     retry: true,
   },
   /*
-   * Refused on purpose. The contact form sends to whoever has the
-   * switch on; with the last one off, recipients is empty and every
-   * message from a visitor is lost without a word. So the last switch
+   * Refused on purpose. Three senders pick their recipients from this
+   * switch — a bug report, a message from the contact form, and a
+   * "something is wrong" report on a place. With the last one off,
+   * every one of those finds no recipient and is lost without a word,
+   * while the forms still look like they worked. So the last switch
    * stays on — see setAdminNotify in app/actions/admin.ts.
    */
   ADMIN_LAST_NOTIFY: {
