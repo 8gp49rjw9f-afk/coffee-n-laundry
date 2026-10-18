@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { awardCredits, awardPlaceCreditsOnce } from "@/lib/services/credits";
 import { displayNameFor } from "@/lib/database/places";
+import { canVerify } from "@/lib/services/accountAge";
 
 /*
  * A Postgres code, turned into one of ours.
@@ -19,6 +20,21 @@ function explain(error: { code?: string }): string {
   return error.code === "23505" ? "VERIFY_ALREADY_THIS_WEEK" : "VERIFY_FAILED";
 }
 
+/*
+ * THE ONE-HOUR GATE.
+ *
+ * Every write in this file opens with it. Ticking a field and saying
+ * "still open" are the lightest gestures on the site, so the delay is
+ * the shortest of the three — but it is not nothing: an hour still
+ * shuts out an account opened in the same sitting as the vandalism,
+ * which is the shape almost all of it takes.
+ *
+ * Seven days for editing, one hour for this. The two numbers are in
+ * lib/services/accountAge.ts, with the reasoning for each. A master
+ * or an admin is not exempt here — ADMINS are, in reportPlace, but
+ * these are not moderation actions and there is nothing to exempt.
+ */
+
 export async function verifyField(
   placeId: string,
   fieldKey: string
@@ -31,6 +47,10 @@ export async function verifyField(
 
   if (!user) {
     throw new Error("VERIFY_SIGNED_OUT");
+  }
+
+  if (!(await canVerify(user.id))) {
+    throw new Error("ACCOUNT_TOO_NEW_TO_VERIFY");
   }
 
   /*
@@ -80,6 +100,10 @@ export async function confirmStillOpen(placeId: string): Promise<void> {
 
   if (!user) {
     throw new Error("VERIFY_SIGNED_OUT");
+  }
+
+  if (!(await canVerify(user.id))) {
+    throw new Error("ACCOUNT_TOO_NEW_TO_VERIFY");
   }
 
   const { error } = await supabase.from("place_confirmations").insert({
