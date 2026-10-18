@@ -75,39 +75,46 @@ export const DEFAULT_SETTINGS: SiteSettings = {
 };
 
 /*
- * TWO CACHES, NOT ONE — AND WHY THE FIRST WAS TOO SLOW TO TRUST
+ * TWO CACHES, NOT ONE — AND WHY THE FIVE-SECOND ONE STILL FAILED
  *
  * Everything in `site_settings` is read on nearly every request, and
  * almost none of it changes during a day. A minute of staleness on a
  * label, a length limit or a map zoom costs nothing.
  *
  * The maintenance switch is the exception, and it is the whole reason
- * there are two caches. It is an emergency lever: the moment it is
+ * there were two caches. It is an emergency lever: the moment it is
  * flipped, the site should be resting.
  *
- * THAT WAS THE BUG, OR HALF OF IT. The switch had a five-second
- * window of its own, and getSettings refreshed it on every call — so
- * in principle it turned over quickly. But the value it refreshed
- * FROM was the one-minute row cache, and the sequence below is what
- * made the switch feel dead:
+ * THAT WAS THE BUG. The switch had a five-second window of its own,
+ * and getSettings refreshed it on every call — so in principle it
+ * turned over quickly. But each warm serverless instance keeps ITS
+ * OWN copy of these module-level variables, and the sequence below is
+ * what made the switch feel dead:
  *
  *   1. An admin flips the switch and the row is written. Correct.
  *   2. `clearSettingsCache()` runs, so the cache is emptied. Correct.
- *   3. But every warm serverless instance keeps ITS OWN copy of these
- *      module-level variables. Clearing them in the instance that
- *      handled the save does nothing for the dozen others still
- *      serving requests, each holding the pre-flip row.
+ *   3. But clearing it in the instance that handled the save does
+ *      nothing for the dozen others still serving requests, each
+ *      holding the pre-flip row. Nothing here can reach them: there
+ *      is no shared cache, so there is no shared invalidation.
  *   4. Those instances go on answering `maintenance_mode: false`
- *      until their own minute is up — and on a busy site that
-dereferencing   *      minute keeps being extended by traffic, so the switch can
- *      appear never to take at all.
+ *      until their own window expires — and on a busy site, every
+ *      request through them can push that window forward again.
  *
  * The fix is not a cleverer cache. It is to stop caching the one
  * field that must not be stale: `readMaintenanceMode` now always asks
  * the database, and the row cache is allowed to hold everything else.
- * One indexed lookup on a single-column primary key, on requests that
- * a proxy already touches the database for — a cost worth paying for
- * a lever that has to work the first time.
+ * One indexed lookup on a single-column primary key, on requests where
+ * the proxy already touches the database for the session — a cost
+ * worth paying for a lever that has to work the first time.
+ *
+ * WHAT IS STILL NOT PROVEN
+ *
+ * Nobody has watched this in the Vercel logs. The reasoning above is
+ * sound and the double read in proxy.ts was certainly wrong, but the
+ * only way to know is to flip the switch and watch. If it still does
+ * not take, the next suspect is the save itself — whether the row is
+ * actually written — and that is read from the database, not guessed.
  */
 
 let cached: SiteSettings | null = null;
@@ -158,8 +165,8 @@ export async function getSettings(): Promise<SiteSettings> {
  * One column, not the whole row — and no cache at all. The five-second
  * window that used to live here was the last place a stale `false`
  * could hide, in a warm instance that had not yet noticed the switch
- * had been thrown. Five seconds is short, but "the site stays up for
- * another five seconds" is not a property an emergency lever should
+ * had been thrown. Five seconds is short, but “the site stays up for
+ * another five seconds” is not a property an emergency lever should
  * have.
  *
  * A failure returns the last known value rather than `false`: an
