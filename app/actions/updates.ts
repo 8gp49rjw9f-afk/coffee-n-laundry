@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/services/settings";
 import { currentAdmin } from "@/lib/services/admin";
+import { canCommentOrReport } from "@/lib/services/accountAge";
 
 /* ====================================================== */
 /* REPORT — flag information that looks wrong              */
@@ -66,8 +67,19 @@ import { currentAdmin } from "@/lib/services/admin";
  * The rule moves here, where two questions can actually be asked:
  * is this person an admin, and what did they report recently.
  *
- *   Admins   — no ceiling at all.
- *   Everyone — one report per place per 24 hours.
+ *   Admins   — no ceiling at all, and no age gate either. A report is
+ *              a signal a moderator has to weigh, and an admin IS the
+ *              moderator: a clock on the person who is supposed to
+ *              act on reports would be a lock on the wrong door. A
+ *              master appointed them precisely so they could act.
+ *
+ *   Everyone — one report per place per 24 hours, and the account
+ *              must be a week old before the first one.
+ *
+ * SEVEN DAYS, the same delay as editing and commenting, from
+ * lib/services/accountAge.ts. A false report can take a real
+ * business off the map, which is at least as much damage as editing
+ * its price — decided rather than defaulted.
  *
  * The index is now plain rather than unique (see 0020) and stays,
  * because the lookup below still wants it.
@@ -102,10 +114,15 @@ export async function reportPlace(formData: FormData): Promise<ReportResult> {
   }
 
   /* An admin reports as often as they like. Read once, here, so the
-     window check below can skip its query entirely for them. */
+     age gate and the window check below can both skip entirely for
+     them. */
   const admin = await currentAdmin();
 
   if (!admin) {
+    if (!(await canCommentOrReport(user.id))) {
+      return { ok: false, code: "ACCOUNT_TOO_NEW_TO_EDIT" };
+    }
+
     /*
      * A moving 24-hour window, counted backwards from now.
      *
