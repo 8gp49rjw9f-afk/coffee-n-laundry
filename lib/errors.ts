@@ -647,6 +647,36 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     severity: "blocking",
   },
 
+  /* ---------- a new account ---------- */
+  /*
+   * Seven days. The account exists and may read anything, add its
+   * own places, and correct what it added — what it may not do is
+   * rewrite somebody else's work, or leave a public comment under
+   * it. The rule is about touching other people's places, not about
+   * being new: see canEdit in lib/services/accountAge.ts, which
+   * exempts the creator outright.
+   *
+   * The sentence names the wait rather than the rule, the same way
+   * REPORT_TOO_SOON does, because the wait is the only part the
+   * person can act on.
+   */
+  ACCOUNT_TOO_NEW_TO_EDIT: {
+    title: "Not yet",
+    body: "Your account is too new to change a place. You can edit once it has been open a week.",
+    severity: "blocking",
+  },
+  /*
+   * One hour. Ticking a field, or saying a place is still open, is
+   * the lightest gesture on the site — but an hour is enough to shut
+   * out the account opened in the same sitting as the vandalism,
+   * which is the shape almost all of it takes.
+   */
+  ACCOUNT_TOO_NEW_TO_VERIFY: {
+    title: "Not yet",
+    body: "Your account is too new to confirm anything. Give it an hour.",
+    severity: "blocking",
+  },
+
   /* ---------- pages that failed to load ---------- */
   PAGE_MAP_FAILED: {
     title: "The map could not load",
