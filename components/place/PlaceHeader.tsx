@@ -31,6 +31,20 @@ export function PlaceHeader({
     [place.address, place.city, place.country].filter(Boolean).join(" · ") ||
     `${place.latitude.toFixed(4)}, ${place.longitude.toFixed(4)}`;
 
+  /* “last verified” is the same instant the freshness badge counts
+     from — place.last_verified_at. Spelled out as a date here because
+     the reader wants to know WHICH DAY, not how many days ago. Read
+     in UTC to match the freshness computation: a date read in one
+     zone and counted in another disagrees by a day at the edges. */
+  const lastVerified = place.last_verified_at
+    ? new Date(place.last_verified_at).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      })
+    : null;
+
   return (
     <Card>
       <Link
@@ -56,6 +70,31 @@ export function PlaceHeader({
 
           <p className="mt-1 text-sm text-slate-600">📍 {where}</p>
 
+          {/* VERIFY — moved here from the right-hand column, between
+              the city and “Added by”, because it is something you do
+              to the place rather than a badge earned by it: it reads
+              with the facts above it and leaves the right-hand column
+              for what only an admin sees.
+
+              The label is “Verify”, not “Still open”: the button and
+              the per-field ticks write the same thing, the same date.
+
+              The date in brackets is a parenthetical detail of the
+              button, so it sits beside it and wraps with it. */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <StillOpenButton
+              placeId={place.id}
+              signedIn={signedIn}
+              alreadyThisWeek={confirmedThisWeek}
+            />
+
+            {lastVerified && (
+              <span className="text-[11px] leading-tight text-slate-400">
+                ( last verified: {lastVerified} )
+              </span>
+            )}
+          </div>
+
           {/* Who put this on the map. Shown as a username, never as an
               email — the address is personal data and this line is
               public. */}
@@ -66,23 +105,9 @@ export function PlaceHeader({
           )}
         </div>
 
+        {/* The right-hand column is down to the one thing that belongs
+            to nobody but an admin. */}
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Badge className={freshness.className}>
-            {freshness.emoji} {freshness.label}
-          </Badge>
-
-          <StillOpenButton
-            placeId={place.id}
-            signedIn={signedIn}
-            alreadyThisWeek={confirmedThisWeek}
-          />
-
-          {place.confirmations_count > 0 && (
-            <span className="text-[10px] leading-tight text-slate-400">
-              👍 {place.confirmations_count} confirmed
-            </span>
-          )}
-
           {canDelete && (
             <DeletePlaceButton placeId={place.id} placeName={place.name} />
           )}
