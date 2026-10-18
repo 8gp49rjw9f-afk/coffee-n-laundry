@@ -9,28 +9,27 @@ import { createClient } from "@/lib/supabase/browser";
 /*
  * THE MARK — the real logo, from `public/logo.png`.
  *
- * WHY AN <img> INSIDE A FIXED SQUARE, RATHER THAN next/image
+ * NO BACKING PLATE. There was a dark disc behind this for one
+ * commit, on the assumption that white artwork needs a dark ground.
+ * That assumption was wrong twice over: the PNG is not white but
+ * silver-grey with highlights, which reads fine on white — and the
+ * disc was the same 32 px as the image while the artwork inside it
+ * is inset with its own margin, so the visible result was a black
+ * circle with a small mark somewhere in the middle. It looked like a
+ * hole in the header.
  *
- * The file is 1024×1024 with a transparent background, and it holds
- * the full wordmark inside the ring. At 32 px — the size an app bar
- * gives it — that lettering is roughly four pixels tall and reads as
- * a smudge, not as a name. The wordmark beside it is what actually
- * spells the name out, so the picture does not need to.
+ * So the image sits straight on the bar.
  *
- * So the image is drawn in a fixed square and the browser scales it
- * to fit. `object-contain` keeps the disc round. The alternative was
- * to enlarge the picture until its text became legible, which would
- * mean a 60 px header; this keeps the bar compact and the name
- * readable, which is what the bar is for.
+ * SIZE, AND WHAT THE PICTURE IS FOR
  *
- * The colours: the PNG is white artwork on transparency, so it only
- * shows on a dark ground. The header is white, so the square behind
- * it is dark — slate-900, the same near-black the buttons use. Without
- * it the logo would be invisible here.
+ * The artwork carries the wordmark inside the ring, which is
+ * legible at 1200 px and a smudge at 32. The wordmark BESIDE it is
+ * what spells the name out; the picture is the mark. That division
+ * is deliberate, not a compromise — a logo that has to be enlarged
+ * to be readable stops being an icon.
  *
- * If a future logo is a solid dark mark rather than white line art,
- * drop the dark square below and the picture will sit straight on the
- * white header.
+ * If the mark ever needs to be bigger, raise `size` on the Logo in
+ * the header below. Nothing else depends on this number.
  */
 
 export function Logo({
@@ -48,19 +47,14 @@ export function Logo({
       aria-label="coffee'n'laundry"
       role="img"
     >
-      <span
-        className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900"
-        style={{ width: size, height: size }}
-      >
-        <Image
-          src="/logo.png"
-          alt=""
-          width={size}
-          height={size}
-          priority
-          className="h-full w-full object-contain"
-        />
-      </span>
+      <Image
+        src="/logo.png"
+        alt=""
+        width={size}
+        height={size}
+        priority
+        className="shrink-0 object-contain"
+      />
 
       {showWordmark && (
         <span className="text-base font-bold leading-none sm:text-lg">
@@ -184,7 +178,7 @@ export default function HeaderClient({
     <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-8">
         <Link href="/" className="flex items-center gap-2">
-          <Logo size={32} />
+          <Logo size={40} />
         </Link>
 
         <div className="flex items-center gap-3">
