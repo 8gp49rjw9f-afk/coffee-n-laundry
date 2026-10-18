@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import { Card } from "@/components/ui";
 
@@ -16,13 +16,14 @@ import { showError } from "@/components/ui/ErrorPopup";
  * The old panel listed what CHANGED: a price that moved, a field
  * somebody confirmed, a place reported closed. All of that already
  * appears where it belongs — the “was 6$” line sits under the price
- * it refers to, and the count of confirmations is right here. A
- * separate five-row history said the same things a second time, in
- * a place someone had to scroll to, and it grew stale between
- * visits. What was missing was not a record but a voice.
+ * it refers to — so a separate five-row history was saying the same
+ * things a second time, in a place someone had to scroll to. What
+ * was missing was not a record but a voice.
  *
- * THE DATE UNDER THE BUTTON is the one fact from that panel worth
- * keeping, and the place header renders it.
+ * THE COUNT OF CONFIRMATIONS came down from that panel, because it
+ * had nowhere else to live, and it sits in this header. The date
+ * under the verify button is the other fact worth keeping, and the
+ * place header renders it.
  *
  * THE RULE: once per person, per place, per 24 hours.
  *
@@ -149,6 +150,9 @@ export function CommentSection({
             : `${comments.length} comment${comments.length === 1 ? "" : "s"}`}
         </h2>
 
+        {/* The count of confirmations, kept from the panel that
+            went: it had nowhere else to live, and “how many people
+            back this up” is worth knowing next to what they said. */}
         {confirmations > 0 && (
           <span className="text-right text-xs font-semibold text-slate-500">
             👍 {confirmations} confirmed
@@ -212,8 +216,8 @@ export function CommentSection({
             />
 
             <div className="flex items-center justify-between gap-3">
-              /* The count appears only near the limit. Nobody should
-                 be counting characters while writing one sentence. */
+              {/* The count appears only near the limit. Nobody should
+                  be counting characters while writing one sentence. */}
               <span className="text-xs text-slate-400">
                 {remaining <= 40 ? `${remaining} left` : ""}
               </span>
