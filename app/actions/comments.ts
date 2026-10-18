@@ -24,7 +24,7 @@ import { displayNameFor } from "@/lib/database/places";
  *
  * AND AGAIN — A RETURNED RESULT, NOT A THROWN ERROR.
  *
- * godThe boundary rewrites a thrown message, so `throw new
+ * The boundary rewrites a thrown message, so `throw new
  * Error("COMMENT_TOO_SOON")` would reach the browser as a generic
  * sentence the catalogue cannot recognise, and the person would see
  * "Something went wrong" with a reference to nothing. This is the
@@ -123,9 +123,9 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
     console.error("[writeComment] insert", error.message, error.code);
 
     /* The window check above can be raced by two taps a second
-       apart. Nothing in the schema is unique on purpose, so this
-       is not 23505 — but a failure here is still "try again",
-       not a crash. */
+       apart, so the insert can still be attempted twice. Nothing
+       in the schema is unique on purpose, so this is not 23505 —
+       but a failure here is still "try again", not a crash. */
     return {
       ok: false,
       code: error.code === "23514" ? "COMMENT_TOO_LONG" : "COMMENT_FAILED",
@@ -135,4 +135,34 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
   revalidatePath(`/place/${placeId}`);
 
   return { ok: true };
+}
+
+/*
+ * Has this person commented on this place in the last 24 hours?
+ *
+ * Read by the place page, so the field gives way to a line saying
+ * "thanks" instead of offering a form that will be refused. Same
+ * window, same index — the component and the action must not
+ * disagree about the rule, which is why the constant is shared
+ * rather than repeated.
+ */
+export async function hasCommentedToday(
+  placeId: string,
+  userId: string
+): Promise<boolean> {
+  const supabase = await createClient();
+
+  const since = new Date(
+    Date.now() - COMMENT_WINDOW_HOURS * 60 * 60 * 1000
+  ).toISOString();
+
+  const { data } = await supabase
+    .from("place_comments")
+    .select("id")
+    .eq("place_id", placeId)
+    .eq("user_id", userId)
+    .gte("created_at", since)
+    .limit(1);
+
+  return Boolean(data && data.length > 0);
 }
