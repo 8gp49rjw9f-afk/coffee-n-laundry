@@ -11,12 +11,16 @@ import { PlaceHeader } from "@/components/place/PlaceHeader";
 import { PhotoStrip } from "@/components/place/PhotoStrip";
 import { CoffeeTable } from "@/components/place/CoffeeTable";
 import { LaundryTable } from "@/components/place/LaundryTable";
-import { UpdateTimeline } from "@/components/place/UpdateTimeline";
+import { CommentSection } from "@/components/place/CommentSection";
 import { ReportForm } from "@/components/place/ReportForm";
 
 import { Card, Button, DirectionsButton } from "@/components/ui";
 
-import { verifyField, hasConfirmedThisWeek } from "@/app/actions/verify";
+import {
+  verifyField,
+  hasConfirmedThisWeek,
+} from "@/app/actions/verify";
+import { hasCommentedToday } from "@/app/actions/comments";
 
 import { getFreshness } from "@/lib/services/freshness";
 import { currentAdmin } from "@/lib/services/admin";
@@ -60,35 +64,46 @@ export default async function PlacePage({
     );
   }
 
-  const [lastConfirmation, myWeekChecks, confirmedThisWeek, priceHistory] =
-    await Promise.all([
-      supabase
-        .from("place_confirmations")
-        .select("created_at")
-        .eq("place_id", id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-        .then((r) => r.data),
+  /*
+   * Five reads, in parallel, and all five feed the page:
+   *
+   *   lastConfirmation  — the “last on …” line beside the count
+   *   myWeekChecks      — which per-field buttons say “This week”
+   *   confirmedThisWeek — what the verify button in the header says
+   *   priceHistory      — the “was 6$” line under a price
+   *   writtenToday      — whether to offer the comment field
+   *
+   * The last one is new with the comments panel. It asks the same
+   * question writeComment will ask, so the form is not offered and
+   * then refused — and it is read here, on the server, because a
+   * client component cannot answer it before rendering.
+   */
+  const [
+    lastConfirmation,
+    myWeekChecks,
+    confirmedThisWeek,
+    priceHistory,
+    writtenToday,
+  ] = await Promise.all([
+    supabase
+      .from("place_confirmations")
+      .select("created_at")
+      .eq("place_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then((r) => r.data),
 
-      user ? getMyWeekChecks(id, user.id) : Promise.resolve([] as string[]),
+    user ? getMyWeekChecks(id, user.id) : Promise.resolve([] as string[]),
 
-      user ? hasConfirmedThisWeek(id, user.id) : Promise.resolve(false),
+    user ? hasConfirmedThisWeek(id, user.id) : Promise.resolve(false),
 
-      getPriceHistory(id),
-    ]);
+    getPriceHistory(id),
+
+    user ? hasCommentedToday(id, user.id) : Promise.resolve(false),
+  ]);
 
   const freshness = getFreshness(place.last_verified_at);
-
-  const updates = place.recent_updates as {
-    id: string;
-    update_type: string;
-    field_changed: string | null;
-    old_value: string | null;
-    new_value: string | null;
-    comment: string | null;
-    created_at: string;
-  }[];
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 px-4 py-5 sm:px-8">
@@ -244,11 +259,22 @@ export default async function PlacePage({
         )}
       </div>
 
-      <UpdateTimeline
-        updates={updates}
+      {/* THE COMMENTS PANEL, where the “Last 5 updates” card used to be.
+
+          That card is gone. What CHANGED about a place still shows — the
+          price table says “was 6$” under the price itself, and the count
+          of confirmations sits in this header. What was missing was a
+          voice, and this is it.
+
+          The confirmations and their date come down with it, and the
+          place they left is written in CommentSection. */}
+      <CommentSection
+        placeId={place.id}
+        comments={place.comments}
+        signedIn={Boolean(user)}
+        writtenToday={writtenToday}
         confirmations={place.confirmations_count}
         lastConfirmedAt={lastConfirmation?.created_at ?? null}
-        total={place.updates_count}
       />
 
       <Card padding="sm">
