@@ -10,17 +10,28 @@ import { displayNameFor } from "@/lib/database/places";
 /* ====================================================== */
 
 /*
- * One comment per person per place per 24 hours.
+ * One comment per PERSON per 24 hours — not per place.
  *
- * Admins are NOT exempt here, unlike reports (see 0020 and
- * reportPlace). A report is a signal that goes to a moderator and
- * has to be weighed; a comment is public text, and a moderator
- * posting six of them on their own place is exactly the thing the
- * ceiling exists to prevent. Everyone follows the same rule.
+ * This started as “one per person per place”, which does not do the
+ * job it was written for. What it is there to stop is a wave: one
+ * person opening twenty places and leaving a word on each in ten
+ * minutes. A per-place ceiling lets all twenty through, because each
+ * one is a different place. The ceiling has to be per person.
  *
- * The same moving 24-hour window as reports, for the same reason:
- * 23:59 and 00:01 are two minutes apart in reality and on different
- * days by the calendar. Counted backwards from now.
+ * So the question below never mentions the place. Same place twice,
+ * or twenty different ones — what matters is whether this person has
+ * written anything in the last day.
+ *
+ * Admins are NOT exempt, unlike reports (see 0020 and reportPlace).
+ * A report is a signal a moderator has to weigh; a comment is public
+ * text, and a moderator filling their own places with comments is
+ * exactly what the ceiling is for. Everyone follows the same rule.
+ *
+ * A moving 24-hour window, counted backwards from now, for the same
+ * reason as reports: 23:59 and 00:01 are two minutes apart in
+ * reality and on different days by the calendar. The index this
+ * reads is place_comments_user_recent_idx — see 0022, which replaced
+ * the per-place index that no longer matched this query.
  *
  * AND AGAIN — A RETURNED RESULT, NOT A THROWN ERROR.
  *
@@ -70,11 +81,10 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
 
   /*
    * The window. `limit(1)` rather than a count: the question is
-   * whether a comment exists in the last 24 hours, not how many.
+   * whether ANY comment exists in the last 24 hours, not how many.
    *
-   * The index this reads is place_comments_recent_idx, added in
-   * 0021 for exactly this query — one person, one place, newest
-   * first — so the check does not scan the table.
+   * NO place_id FILTER, and that is the whole point of this file's
+   * second revision — see the note at the top.
    */
   const since = new Date(
     Date.now() - COMMENT_WINDOW_HOURS * 60 * 60 * 1000
@@ -83,7 +93,6 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
   const { data: recent, error: readError } = await supabase
     .from("place_comments")
     .select("id")
-    .eq("place_id", placeId)
     .eq("user_id", user.id)
     .gte("created_at", since)
     .limit(1);
@@ -123,9 +132,9 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
     console.error("[writeComment] insert", error.message, error.code);
 
     /* The window check above can be raced by two taps a second
-       apart, so the insert can still be attempted twice. Nothing
-       in the schema is unique on purpose, so this is not 23505 —
-       but a failure here is still "try again", not a crash. */
+       apart, so the insert can still be attempted twice. Nothing in
+       the schema is unique on purpose, so this is not 23505 — a
+       failure here is still "try again", not a crash. */
     return {
       ok: false,
       code: error.code === "23514" ? "COMMENT_TOO_LONG" : "COMMENT_FAILED",
@@ -138,16 +147,19 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
 }
 
 /*
- * Has this person commented on this place in the last 24 hours?
+ * Has this person commented anywhere in the last 24 hours?
  *
  * Read by the place page, so the field gives way to a line saying
  * "thanks" instead of offering a form that will be refused. Same
- * window, same index — the component and the action must not
- * disagree about the rule, which is why the constant is shared
- * rather than repeated.
+ * window, same index, and NO place filter — the component must not
+ * disagree with the action about the rule, which is why both read
+ * this one constant rather than each keeping its own.
+ *
+ * The name is honest about the scope: it is not "today on this
+ * place", it is "recently, anywhere". The previous name said the
+ * wrong thing, which is how the wrong rule survived this long.
  */
-export async function hasCommentedToday(
-  placeId: string,
+export async function hasCommentedRecently(
   userId: string
 ): Promise<boolean> {
   const supabase = await createClient();
@@ -159,7 +171,6 @@ export async function hasCommentedToday(
   const { data } = await supabase
     .from("place_comments")
     .select("id")
-    .eq("place_id", placeId)
     .eq("user_id", userId)
     .gte("created_at", since)
     .limit(1);
