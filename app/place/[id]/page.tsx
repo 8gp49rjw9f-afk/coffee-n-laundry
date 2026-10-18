@@ -213,6 +213,22 @@ export default async function PlacePage({
         />
       )}
 
+      {/* WHAT TO DO WITH THE PLACE, before how to get to it.
+
+          The update link used to sit BELOW the directions row, which put
+          “how do I drive there” ahead of “the price is wrong, let me fix
+          it” — the second of which is the whole point of the site. It
+          now opens the block of actions.
+
+          The Directions row and the Website link stay together under it:
+          both are “leave the page and go somewhere”. */}
+      <Link
+        href={`/update/${place.id}`}
+        className="flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50"
+      >
+        📷 Submit an update or a photo
+      </Link>
+
       <div className="flex flex-wrap justify-center gap-2">
         <DirectionsButton latitude={place.latitude} longitude={place.longitude} />
 
@@ -227,13 +243,6 @@ export default async function PlacePage({
           </a>
         )}
       </div>
-
-      <Link
-        href={`/update/${place.id}`}
-        className="flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50"
-      >
-        📷 Submit an update or a photo
-      </Link>
 
       <UpdateTimeline
         updates={updates}
