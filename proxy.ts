@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { getSettings } from "@/lib/services/settings";
-
 /*
  * Next 16 renamed the "middleware" convention to "proxy". Same file,
  * same shape, only the filename and the exported name changed.
@@ -19,18 +17,33 @@ import { getSettings } from "@/lib/services/settings";
  *   2. Session refresh. Without rewriting the cookies here, a stale
  *      session survives signOut.
  *
- * THE TRACE IS GONE, AND SO IS THE SECOND READ
+ * WHY THE MAINTENANCE READ IS DONE HERE, BY HAND
  *
- * Three temporary lines lived here: a dedicated readMaintenanceMode()
- * call just to log what it returned, then a console.log on every
- * non-static request. The note above them said to delete the block
- * once the switch was confirmed working, and the cost of leaving it
- * was not only noise: it read the database TWICE per request — once
- * for the trace, once through getSettings() below — on a file that
- * runs for nearly every request the site serves.
+ * The first version of this function asked `getSettings()` for the
+ * switch, and `getSettings()` builds its client on `cookies()` from
+ * `next/headers`. That works in a page and NOT here: in a middleware
+ * there is no cookie store to read, the call throws, and
+ * `getSettings()` catches its own failure and answers
+ * `DEFAULT_SETTINGS` — where `maintenance_mode` is `false`.
  *
- * The switch is read ONCE now, here, by the call below. That is also
- * the value trusted below; there is no second opinion to reconcile.
+ * So the switch was read as OFF on every request, whatever the
+ * database said, and the site stayed open. The build log showed the
+ * same failure four times, at static generation:
+ *
+ *   [getSettings] threw: Dynamic server usage: Route /maintenance
+ *   couldn't be rendered statically because it used `cookies`
+ *
+ * The fix is to read the one column over PostgREST, with the anon
+ * key, and no session at all: `site_settings` is readable by anybody,
+ * and this needs no cookie store it cannot reach.
+ *
+ * AND THE FALLBACK IS BACKWARDS-SAFE NOW
+ *
+ * If that read fails, the answer is "the site is resting", not "the
+ * site is open". A site closed by mistake is reopened in thirty
+ * seconds by flipping the switch; a site left open through a
+ * maintenance nobody notices is the failure that costs something.
+ * The switch is an emergency lever and it fails closed.
  */
 
 /* Everything a visitor may still reach while the site is resting.
@@ -56,10 +69,8 @@ function isAllowed(pathname: string) {
   /*
    * The sitemap and the robots file, which moved out of Next's
    * metadata convention and are served by plain routes now — see
-   * app/sitemap/route.ts. They are not in the matcher's exclusion
-   * list any more, so they are named here instead: a crawler that
-   * arrives while the site is resting should still be told how to
-   * come back, and a 404 on either one costs the site its indexing.
+   * app/sitemap/route.ts. A crawler that arrives while the site is
+   * resting should still be told how to come back.
    */
   if (pathname === "/sitemap" || pathname === "/robots.txt") return true;
 
@@ -96,15 +107,15 @@ export async function proxy(request: NextRequest) {
   );
 
   /*
-   * Refresh the session first, because the maintenance check below
-   * needs to know whether this person is an admin — and that question
-   * cannot be answered from a cookie that has not been refreshed.
+   * Refresh the session FIRST, because the admin check below needs to
+   * know who this is — and that cannot be answered from a cookie that
+   * has not been refreshed.
    *
    * A cookie whose refresh token no longer exists server-side throws
    * on EVERY request that passes the matcher — eight times for one
-   * page load, filling the terminal with noise that hides real errors.
-   * It is not a failure: it just means the session is gone. Clearing
-   * the sb-* cookies lets the next request start clean.
+   * page load, filling the terminal with noise that hides real
+   * errors. It is not a failure: it just means the session is gone.
+   * Clearing the sb-* cookies lets the next request start clean.
    */
   let user = null;
 
@@ -126,9 +137,9 @@ export async function proxy(request: NextRequest) {
 
   /* ---------- maintenance ---------- */
 
-  const settings = await getSettings();
+  const resting = await readMaintenanceSwitch();
 
-  if (settings.maintenance_mode) {
+  if (resting) {
     /* An admin is never redirected: they are the only one who can end
        the maintenance, and locking them out would make it permanent. */
     let admin = false;
@@ -154,6 +165,66 @@ export async function proxy(request: NextRequest) {
   }
 
   return response;
+}
+
+/*
+ * The one column, over PostgREST, with the anon key.
+ *
+ * Deliberately NOT `getSettings()`: see the note at the top. This
+ * asks the REST API directly for `maintenance_mode`, which RLS allows
+ * anybody to read, and it needs no session and no cookie store.
+ *
+ * FAILS CLOSED. Any failure — a network blip, a missing row, a
+ * missing environment variable, a malformed response — answers
+ * `true`. The switch exists to take the site down on purpose; if the
+ * answer is unknown, the safe reading is that it is down.
+ */
+async function readMaintenanceSwitch(): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    console.error("[proxy] maintenance: Supabase env vars are missing");
+
+    return true;
+  }
+
+  try {
+    const response = await fetch(
+      `${url}/rest/v1/site_settings?select=maintenance_mode&id=eq.1`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      console.error(
+        "[proxy] maintenance:",
+        response.status,
+        await response.text()
+      );
+
+      return true;
+    }
+
+    const rows = (await response.json()) as { maintenance_mode?: boolean }[];
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.error("[proxy] maintenance: no site_settings row with id = 1");
+
+      return true;
+    }
+
+    return Boolean(rows[0].maintenance_mode);
+  } catch (error) {
+    console.error("[proxy] maintenance read threw:", error);
+
+    return true;
+  }
 }
 
 export const config = {
