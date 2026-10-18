@@ -9,14 +9,15 @@ import type { Freshness } from "@/lib/services/freshness";
 
 export function PlaceHeader({
   place,
+  freshness,
   signedIn,
   confirmedThisWeek,
   creatorName,
   canDelete = false,
 }: {
   place: PlaceWithFreshness;
-  /* Still taken, still required by the page — the header no longer
-     renders a tier of its own. See the note under the button. */
+  /* Required, and rendered as one line under the button — see the note
+     there. The tier is deliberately not shown. */
   freshness: Freshness;
   signedIn: boolean;
   confirmedThisWeek: boolean;
@@ -101,12 +102,7 @@ export function PlaceHeader({
               The wording comes from getFreshness — “verified 13 days
               ago”, “verified yesterday”, “verified a month ago” —
               which is already a sentence. No adjective is added on
-              top, in the label or anywhere else.
-
-              The `freshness` prop still arrives from the page and is
-              still typed, so this stays the one place to reason about
-              it: put the tier back here, and nowhere else, if it is
-              ever wanted again. */}
+              top, in the label or anywhere else. */}
           <p className="mt-2 text-sm text-slate-500">{freshness.label}</p>
         </div>
 
