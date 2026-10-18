@@ -20,7 +20,7 @@ import {
   verifyField,
   hasConfirmedThisWeek,
 } from "@/app/actions/verify";
-import { hasCommentedToday } from "@/app/actions/comments";
+import { hasCommentedRecently } from "@/app/actions/comments";
 
 import { getFreshness } from "@/lib/services/freshness";
 import { currentAdmin } from "@/lib/services/admin";
@@ -73,17 +73,20 @@ export default async function PlacePage({
    *   priceHistory      — the “was 6$” line under a price
    *   writtenToday      — whether to offer the comment field
    *
-   * The last one is new with the comments panel. It asks the same
-   * question writeComment will ask, so the form is not offered and
-   * then refused — and it is read here, on the server, because a
-   * client component cannot answer it before rendering.
+   * The last one asks the same question writeComment asks — have you
+   * written in the last 24 hours, ANYWHERE — so the field is not
+   * offered and then refused. It is read here, on the server, because
+   * a client component cannot answer it before it renders.
+   *
+   * It takes only the user id: the ceiling is per person, not per
+   * place, so there is nothing to pass but who is asking.
    */
   const [
     lastConfirmation,
     myWeekChecks,
     confirmedThisWeek,
     priceHistory,
-    writtenToday,
+    writtenRecently,
   ] = await Promise.all([
     supabase
       .from("place_confirmations")
@@ -100,7 +103,7 @@ export default async function PlacePage({
 
     getPriceHistory(id),
 
-    user ? hasCommentedToday(id, user.id) : Promise.resolve(false),
+    user ? hasCommentedRecently(user.id) : Promise.resolve(false),
   ]);
 
   const freshness = getFreshness(place.last_verified_at);
@@ -266,13 +269,15 @@ export default async function PlacePage({
           of confirmations sits in this header. What was missing was a
           voice, and this is it.
 
-          The confirmations and their date come down with it, and the
-          place they left is written in CommentSection. */}
+          The ceiling is one comment per person per 24 hours, wherever
+          it is posted — so `writtenRecently` is per person, and the
+          same person sees the “thanks” line on every place until the
+          day is out. That is the point: it is what stops a wave. */}
       <CommentSection
         placeId={place.id}
         comments={place.comments}
         signedIn={Boolean(user)}
-        writtenToday={writtenToday}
+        writtenToday={writtenRecently}
         confirmations={place.confirmations_count}
         lastConfirmedAt={lastConfirmation?.created_at ?? null}
       />
