@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Card, Badge } from "@/components/ui";
+import { Card } from "@/components/ui";
 import { StillOpenButton } from "@/components/place/StillOpenButton";
 import { DeletePlaceButton } from "@/components/place/DeletePlaceButton";
 
@@ -9,13 +9,14 @@ import type { Freshness } from "@/lib/services/freshness";
 
 export function PlaceHeader({
   place,
-  freshness,
   signedIn,
   confirmedThisWeek,
   creatorName,
   canDelete = false,
 }: {
   place: PlaceWithFreshness;
+  /* Still taken, still required by the page — the header no longer
+     renders a tier of its own. See the note under the button. */
   freshness: Freshness;
   signedIn: boolean;
   confirmedThisWeek: boolean;
@@ -30,10 +31,6 @@ export function PlaceHeader({
   const where =
     [place.address, place.city, place.country].filter(Boolean).join(" · ") ||
     `${place.latitude.toFixed(4)}, ${place.longitude.toFixed(4)}`;
-
-  const freshnessLabel = "text-sm font-semibold text-slate-700";
-  const freshnessValue = "mt-1 text-sm text-slate-500";
-  const lastCheck = place.confirmations_count > 0 ? "this week" : "never";
 
   return (
     <Card>
@@ -76,7 +73,7 @@ export function PlaceHeader({
               and that was too tight for the most-used control on the
               page: it sat inside the block of things you READ, when
               what it is is the one thing you DO here. On its own
-              line, at text-base, it reads as a button.
+              line, at text-sm, it reads as a button.
 
               It stays on the left, with Delete alone on the right,
               because deleting belongs to an admin and this belongs
@@ -92,22 +89,25 @@ export function PlaceHeader({
             className="mt-3"
           />
 
-          {/* FRESHNESS — the badge that used to sit at the top of the
-              right-hand column, as two plain lines under the button.
-              Same data, same computation (getFreshness), same colour
-              coding as the badge had, so nothing was lost when the
-              badge went: only the shape changed, from a pill to text.
-              The tier is spelled out for anyone who cannot see the
-              colour. */}
-          <div className="mt-3">
-            <p className={freshnessLabel}>Freshness</p>
+          {/* THE DATE, AND NOTHING ELSE.
 
-            <p className={freshnessValue}>
-              {freshness.emoji} {freshness.label} · {freshness.tier}
-            </p>
+              This used to be a block: a “Freshness” heading, the tier
+              spelled out (“fresh”, “aging”), and a “Last check”
+              line — and before that, a coloured badge at the top of
+              the right-hand column. All of it said the same thing
+              twice. What is left is the one fact a reader wants:
+              how long since somebody looked.
 
-            <p className={freshnessValue}>Last check : {lastCheck}</p>
-          </div>
+              The wording comes from getFreshness — “verified 13 days
+              ago”, “verified yesterday”, “verified a month ago” —
+              which is already a sentence. No adjective is added on
+              top, in the label or anywhere else.
+
+              The `freshness` prop still arrives from the page and is
+              still typed, so this stays the one place to reason about
+              it: put the tier back here, and nowhere else, if it is
+              ever wanted again. */}
+          <p className="mt-2 text-sm text-slate-500">{freshness.label}</p>
         </div>
 
         {/* The right-hand column is down to the one thing that belongs
