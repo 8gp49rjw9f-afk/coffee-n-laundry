@@ -4,44 +4,30 @@ import { useState, useTransition } from "react";
 
 import { Button, Card, ErrorBanner, Badge } from "@/components/ui";
 
-import { addAdmin, removeAdmin, setAdminNotify } from "@/app/actions/admin";
+import {
+  addAdmin,
+  removeAdmin,
+  promoteAdmin,
+  setAdminNotify,
+} from "@/app/actions/admin";
 
 /*
- * Master only. An admin edits the site; the master decides who the
+ * MASTER ONLY. An admin edits the site; a master decides who the
  * admins are — that separation is the whole point of the level, and
  * it is why this is the one panel a plain admin never sees.
  *
- * The master cannot remove themselves, and cannot remove another
- * master: a panel that can lock out its own last key holder is a trap.
- * The server enforces both; this is only the shape of the screen.
- */
-
-/*
- * The notification switch, on every row — including the master's.
+ * WHO LEAVES, AND HOW — the rule, as it was finally stated:
  *
- * It is NOT a master-only control, and it sits outside the master's
- * panel on purpose: it changes what one person receives, not who may
- * act. Gating it behind the master would mean only the master could
- * unsubscribe themselves, which is the wrong lock on the wrong door.
- * The server allows any admin to set it, their own included.
+ *   An ordinary admin  ← any master can remove them.
+ *   A master           ← ONLY THEMSELVES. Nobody else, not even
+ *                        another master. "Step down" is the button
+ *                        on your own row, and it is the only way out.
+ *   The last master    ← nobody, not even themselves. Somebody has to
+ *                        be able to change this list.
  *
- * The last one cannot be turned off. That is refused in
- * setAdminNotify, and it has to be: with every switch off, the
- * contact form finds no recipients, answers CONTACT_NO_RECIPIENT,
- * and every message a visitor writes is thrown away in silence.
- *
- * `switchable` is computed here rather than sent from the server: it
- * is arithmetic on what this screen already has, and the count can
- * only be right for the moment the page was rendered. If it is
- * stale, the server refuses anyway — this only stops the person
- * before the round-trip, it does not replace the check.
- */
-
-/*
- * A place for these switches, separate from the panel the master
- * sees. Every admin, master or not, has to be able to reach their
- * own. Until the parent page renders this, the server function has
- * no caller — see the note in the hand-off.
+ * The server enforces all three, and 0023 puts a trigger under the
+ * table for the third one. What is on this screen is the shape of
+ * the rule, not the rule itself: every button here can be forged.
  */
 
 export interface AdminRow {
@@ -53,6 +39,9 @@ export interface AdminRow {
 
 const FIELD =
   "w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-slate-500";
+
+const SMALL =
+  "rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50";
 
 export function AdminsPanel({
   admins,
@@ -71,70 +60,81 @@ export function AdminsPanel({
   });
 
   const receiving = admins.filter((admin) => admin.notify_email).length;
+  const masters = admins.filter((admin) => admin.is_master).length;
 
-  function submit() {
+  function run(work: () => Promise<void>, fallback: string) {
     setError("");
-
-    const formData = new FormData();
-    formData.set("email", email.trim());
 
     startTransition(async () => {
       try {
-        await addAdmin(formData);
-        setEmail("");
+        await work();
       } catch (err) {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Could not add that admin."
-        );
+        setError(err instanceof Error && err.message ? err.message : fallback);
       }
     });
+  }
+
+  function submit() {
+    const formData = new FormData();
+    formData.set("email", email.trim());
+
+    run(async () => {
+      await addAdmin(formData);
+      setEmail("");
+    }, "Could not add that admin.");
   }
 
   function remove(target: string) {
     if (!confirm(`Remove ${target} as an admin?`)) return;
 
-    setError("");
+    run(() => removeAdmin(target), "Could not remove that admin.");
+  }
 
-    startTransition(async () => {
-      try {
-        await removeAdmin(target);
-      } catch (err) {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Could not remove that admin."
-        );
-      }
-    });
+  /* Stepping down is your own decision and only yours — so it asks
+     first, and it says what it means. Leaving the panel is not the
+     same thing as losing an account: the account stays, the admin
+     rights go. */
+  function stepDown(target: string) {
+    if (
+      !confirm(
+        `Step down as master?\n\nYou keep your account and stop being an admin. Nobody can do this for you, so it takes another master to invite you back.`
+      )
+    ) {
+      return;
+    }
+
+    run(() => removeAdmin(target), "Could not step down.");
+  }
+
+  function promote(target: string) {
+    if (!confirm(`Make ${target} a master?\n\nThey will be able to add and remove admins.`)) {
+      return;
+    }
+
+    run(() => promoteAdmin(target), "Could not make that admin a master.");
   }
 
   function toggleNotify(target: string, next: boolean) {
-    setError("");
-
     const formData = new FormData();
     formData.set("email", target);
     formData.set("notify_email", String(next));
 
-    startTransition(async () => {
-      try {
-        await setAdminNotify(formData);
-      } catch (err) {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Could not change that notification."
-        );
-      }
-    });
+    run(
+      () => setAdminNotify(formData),
+      "Could not change that notification."
+    );
   }
+
+  /* The last master cannot leave, so the button says so rather than
+     sending the person on a round-trip to be refused. The server and
+     the database both refuse it too — this is only the shape. */
+  const lastMaster = masters <= 1;
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">
         Admins can edit the site settings and moderate reports. They cannot
-        change this list — that is the master's job, and yours is the master
+        change this list — that is a master's job, and yours is a master
         account.
       </p>
 
@@ -203,29 +203,67 @@ export function AdminsPanel({
                     <Badge className="bg-[#6f4e37] text-white">Master</Badge>
                   )}
 
-                  {!admin.is_master && !isSelf && (
+                  {/* An ordinary admin: any master may remove them. */}
+                  {!admin.is_master && (
                     <button
                       type="button"
                       onClick={() => remove(admin.email)}
                       disabled={pending}
-                      className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                      className={`${SMALL} border-rose-200 bg-white text-rose-700 hover:bg-rose-50`}
                     >
                       Remove
+                    </button>
+                  )}
+
+                  {/* A master who is not you: offered nothing. No
+                     Remove, because nobody else can remove a master;
+                     no Step down, because it is not yours to take. */}
+
+                  {/* Your own master row: the only door out, and only
+                     for you. */}
+                  {admin.is_master && isSelf && (
+                    <button
+                      type="button"
+                      onClick={() => stepDown(admin.email)}
+                      disabled={pending || lastMaster}
+                      title={
+                        lastMaster
+                          ? "Somebody has to be able to change this list."
+                          : undefined
+                      }
+                      className={`${SMALL} border-slate-300 bg-white text-slate-600 hover:bg-slate-50`}
+                    >
+                      Step down
+                    </button>
+                  )}
+
+                  {!admin.is_master && (
+                    <button
+                      type="button"
+                      onClick={() => promote(admin.email)}
+                      disabled={pending}
+                      className={`${SMALL} border-slate-300 bg-white text-slate-600 hover:bg-slate-50`}
+                    >
+                      Make master
                     </button>
                   )}
                 </div>
               </div>
 
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold text-slate-700">
-                    Bug reports and messages
+                    Receive emails from users
                   </p>
 
-                  <p className="mt-0.5 text-[11px] text-slate-400">
+                  {/* The three things this switch governs, named. A
+                     single word like "notifications" would leave an
+                     admin guessing which of them they had just
+                     stopped receiving. */}
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
                     {admin.notify_email
-                      ? "Get a copy of what visitors write."
-                      : "Not being sent these."}
+                      ? "Bug reports, contact messages, and “something is wrong” reports on a place."
+                      : "Not being sent any of them."}
                   </p>
                 </div>
 
@@ -233,7 +271,7 @@ export function AdminsPanel({
                   type="button"
                   role="switch"
                   aria-checked={admin.notify_email}
-                  aria-label={`Send bug reports and messages to ${admin.email}`}
+                  aria-label={`Send emails from users to ${admin.email}`}
                   onClick={() => toggleNotify(admin.email, !admin.notify_email)}
                   disabled={pending || !switchable}
                   title={
