@@ -8,6 +8,17 @@ export interface SiteSettings {
   site_name: string;
   tagline: string;
 
+  /* The donation button — 0024 and 0025. Optional here, and nothing
+     else in this interface is, on purpose: a deployment where the
+     migrations have not been pasted into Supabase yet still reads the
+     row, the column is simply absent, the value is undefined, and the
+     button hides itself. Marking them optional is what lets the rest
+     of the site build and run against a database that is a step
+     behind the code. */
+  donation_enabled?: boolean;
+  donation_url?: string | null;
+  donation_amount?: number;
+
   maintenance_mode: boolean;
   maintenance_message: string | null;
   maintenance_allow_listed: boolean;
@@ -42,6 +53,12 @@ export interface SiteSettings {
 export const DEFAULT_SETTINGS: SiteSettings = {
   site_name: "coffee'n'laundry",
   tagline: "Good coffee. Clean clothes. Keep moving.",
+
+  /* Off, and at the price of a coffee. An admin turns it on by
+     filling the address in — see Admin → Site. */
+  donation_enabled: false,
+  donation_url: null,
+  donation_amount: 2,
 
   maintenance_mode: false,
   maintenance_message: null,
