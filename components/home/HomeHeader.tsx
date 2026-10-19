@@ -26,11 +26,10 @@ import HeaderClient from "./HeaderClient";
  *   - the switch is off in Admin → Site;
  *   - the address was never filled in;
  *   - `donation_url` does not exist yet, because 0024 has not been
- *     pasted into the Supabase SQL editor. `getSettings()` merges the
- *     row over DEFAULT_SETTINGS, where the column is absent, so the
- *     value is simply undefined and the button stays hidden. The
- *     site works either way, which is why this is safe to deploy
- *     before the migration is applied.
+ *     pasted into the Supabase SQL editor. The column is optional in
+ *     SiteSettings for exactly that case, so the value is undefined
+ *     and the button stays hidden. The site works either way, which
+ *     is why this is safe to deploy before the migration is applied.
  */
 
 export default async function HomeHeader() {
@@ -45,9 +44,16 @@ export default async function HomeHeader() {
     getSettings(),
   ]);
 
-  /* The switch AND the address — see the note above. */
+  /*
+   * The switch AND the address — both optional in SiteSettings, both
+   * absent from a database where 0024 has not been applied yet.
+   * Either being missing means the same thing: no button.
+   *
+   * No cast, now that the two columns are part of the interface —
+   * see the note on them in lib/services/settings.ts.
+   */
   const donationUrl = settings.donation_enabled
-    ? (settings as { donation_url?: string | null }).donation_url ?? null
+    ? settings.donation_url ?? null
     : null;
 
   return (
