@@ -34,9 +34,7 @@ import { DonationButton } from "@/components/home/DonationButton";
  * with a small mark somewhere in the middle. It looked like a hole in
  * the header. The mark sits straight on the bar.
  *
- * SIZE. 48 px in the header, set at the call site below. Nothing
- * else depends on the number: the SVG scales cleanly, so raising it
- * is a one-line change.
+ * SIZE. 48 px in the header, set at the call site below.
  *
  * Kept in step with `app/icon.svg`, which is the favicon of the same
  * motif. If the design changes, change both.
@@ -86,14 +84,49 @@ export function Logo({
 }
 
 /*
- * Three groups, divided by rules: where you go, what you can tell us,
- * and who you are. The order matters — the map and adding a place come
- * first because they are what the site is for.
+ * THE MENU, IN THE ORDER IT WAS ASKED FOR
+ *
+ *   Menu                      ← a title, centred, with no links of its own
+ *   ─────
+ *   Me [username]             ← signed in
+ *   Admin                     ← master only
+ *   ☕ 2 $ — buy us a coffee!  ← only when the address is set
+ *   ─────
+ *   Add a place
+ *   Map
+ *   ─────
+ *   The goal
+ *   Pricing
+ *   ─────
+ *   Report a bug
+ *   Reach us
+ *   ─────
+ *   Log out / Log in · Sign up
+ *
+ * WHY THE GROUPS ARE SEPARATE AND NOT ONE LIST
+ *
+ * The rules are not decoration: they are what makes the menu readable
+ * in one glance. The top block is YOU (who you are, what you may do,
+ * and the coffee); the next is the site itself; then what it promises;
+ * then how to reach us; then the session. A single undivided column of
+ * thirteen rows is a list, not a menu.
+ *
+ * THREE RULES THAT CANNOT ALL SHOW AT ONCE
+ *
+ *   signed in  → Me, Admin (if master), Log out
+ *   signed out → Log in, Sign up
+ *
+ * Nothing is drawn for a state that is not current, so the menu is
+ * never longer than it needs to be and never offers a door that is
+ * already open.
  */
 
-const GO_PLACES = [
+const SITE = [
   { href: "/new", label: "Add a place", emoji: "➕" },
   { href: "/", label: "Map", emoji: "🗺️" },
+];
+
+const ABOUT = [
   { href: "/goal", label: "The goal", emoji: "🎯" },
   { href: "/pricing", label: "Pricing", emoji: "💵" },
 ];
@@ -132,18 +165,24 @@ function LogOutButton({ className }: { className: string }) {
 export default function HeaderClient({
   signedIn,
   admin,
+  username = null,
   donationUrl = null,
 }: {
   signedIn: boolean;
   admin: boolean;
   /*
-   * The donation address, from Admin → Site. Null — or empty, or a
-   * missing column before 0024 is applied — means no button at all.
+   * The username, for the line beside the person glyph. Read on the
+   * server from the same `profiles` row the rest of the site uses —
+   * never the email, which is personal data and this menu is public.
    *
-   * It arrives as a prop rather than being read here because this is
-   * a client component and the setting lives in the database: the
-   * server reads it once per request, in app/layout.tsx, and passes
-   * it down. Nothing about the button is fetched in the browser.
+   * Null is normal: an account that has not chosen a name yet reads
+   * as "someone" everywhere else on the site, and the line falls back
+   * to the bare word rather than showing brackets around nothing.
+   */
+  username?: string | null;
+  /*
+   * The donation address, from Admin → Site. Null — or empty, or a
+   * missing column — means no line for it at all.
    */
   donationUrl?: string | null;
 }) {
@@ -188,12 +227,8 @@ export default function HeaderClient({
 
   const divider = "my-2 border-t border-slate-300";
 
-  const group = (label: string, links: { href: string; label: string; emoji: string }[]) => (
+  const group = (links: { href: string; label: string; emoji: string }[]) => (
     <>
-      <p className="px-4 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-
       {links.map((link) => (
         <Link
           key={link.href}
@@ -252,46 +287,70 @@ export default function HeaderClient({
 
             {open && (
               <div className="absolute right-0 top-full mt-1 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-2 shadow-lg">
-                {group("Menu", GO_PLACES)}
+                {/* The title, centred, with no links under it — the
+                    rows it used to hold now live in their own groups
+                    further down. */}
+                <p className="px-4 pb-2 pt-1 text-center text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Menu
+                </p>
 
                 <div className={divider} />
 
-                {group("Tell us", TALK_TO_US)}
+                {/* WHO YOU ARE — and what you may do. */}
+                {signedIn && (
+                  <Link
+                    href="/profile"
+                    onClick={() => setOpen(false)}
+                    className={item}
+                  >
+                    <span>👤 Me</span>
+
+                    {/* The username, in brackets beside it. Falls
+                        back to the bare word when the account has not
+                        chosen a name — brackets around nothing would
+                        read as a bug. */}
+                    <span className="truncate text-slate-400">
+                      [{username ?? "someone"}]
+                    </span>
+                  </Link>
+                )}
+
+                {admin && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className={item}
+                  >
+                    ⚙️ Admin
+                  </Link>
+                )}
+
+                {donating && (
+                  <DonationButton url={donationUrl} variant="row" />
+                )}
+
+                {(signedIn || admin || donating) && <div className={divider} />}
+
+                {/* THE SITE ITSELF. */}
+                {group(SITE)}
 
                 <div className={divider} />
 
+                {/* WHAT IT PROMISES. */}
+                {group(ABOUT)}
+
+                <div className={divider} />
+
+                {/* HOW TO REACH US. */}
+                {group(TALK_TO_US)}
+
+                <div className={divider} />
+
+                {/* THE SESSION — one side or the other, never both. */}
                 {signedIn ? (
-                  <>
-                    <Link
-                      href="/profile"
-                      onClick={() => setOpen(false)}
-                      className={item}
-                    >
-                      👤 Me
-                    </Link>
-
-                    {admin && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setOpen(false)}
-                        className={item}
-                      >
-                        ⚙️ Admin
-                      </Link>
-                    )}
-
-                    <LogOutButton className={item} />
-                  </>
+                  <LogOutButton className={item} />
                 ) : (
                   <>
-                    <Link
-                      href="/signup"
-                      onClick={() => setOpen(false)}
-                      className={item}
-                    >
-                      Sign up
-                    </Link>
-
                     <Link
                       href="/login"
                       onClick={() => setOpen(false)}
@@ -299,25 +358,14 @@ export default function HeaderClient({
                     >
                       Log in
                     </Link>
-                  </>
-                )}
 
-                {/*
-                 * The coffee again, on a phone only — see the note
-                 * above the wide-screen copy.
-                 *
-                 * THE SAME COMPONENT, not a second copy of the link.
-                 * The first version wrote the href out by hand here,
-                 * and with an empty address it produced "/2" — a
-                 * relative path — so a tap landed on this site's own
-                 * 404. One component means one guard, and the two
-                 * layouts cannot drift apart again.
-                 */}
-                {donating && (
-                  <>
-                    <div className={divider} />
-
-                    <DonationButton url={donationUrl} variant="row" />
+                    <Link
+                      href="/signup"
+                      onClick={() => setOpen(false)}
+                      className={item}
+                    >
+                      Sign up
+                    </Link>
                   </>
                 )}
               </div>
