@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { currentAdmin } from "@/lib/services/admin";
 import { getSettings } from "@/lib/services/settings";
+import { displayNameFor } from "@/lib/database/places";
 
 import HeaderClient from "./HeaderClient";
 
@@ -12,6 +13,11 @@ import HeaderClient from "./HeaderClient";
  * admin" — the admin actions call it too. Two functions answering the
  * same question would eventually disagree.
  *
+ * `displayNameFor` is the same helper the place pages use to print
+ * "Added by @name". It answers "someone" when the account has no
+ * username yet, which is what the menu shows beside the person glyph
+ * — never the email, which is personal data and this menu is public.
+ *
  * WHY THE DONATION ADDRESS IS READ HERE
  *
  * The button lives in a client component and the address lives in
@@ -21,15 +27,15 @@ import HeaderClient from "./HeaderClient";
  * fetch from the browser.
  *
  * THREE WAYS IT COMES BACK EMPTY, and all three mean the same thing
- * — no button:
+ * — no line for it:
  *
  *   - the switch is off in Admin → Site;
  *   - the address was never filled in;
  *   - `donation_url` does not exist yet, because 0024 has not been
  *     pasted into the Supabase SQL editor. The column is optional in
  *     SiteSettings for exactly that case, so the value is undefined
- *     and the button stays hidden. The site works either way, which
- *     is why this is safe to deploy before the migration is applied.
+ *     and no row is drawn. The site works either way, which is why
+ *     this is safe to deploy before the migration is applied.
  */
 
 export default async function HomeHeader() {
@@ -39,18 +45,16 @@ export default async function HomeHeader() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [admin, settings] = await Promise.all([
+  const [admin, settings, username] = await Promise.all([
     user ? currentAdmin() : Promise.resolve(null),
     getSettings(),
+    user ? displayNameFor(user.id) : Promise.resolve(null),
   ]);
 
   /*
    * The switch AND the address — both optional in SiteSettings, both
    * absent from a database where 0024 has not been applied yet.
-   * Either being missing means the same thing: no button.
-   *
-   * No cast, now that the two columns are part of the interface —
-   * see the note on them in lib/services/settings.ts.
+   * Either being missing means the same thing: no row.
    */
   const donationUrl = settings.donation_enabled
     ? settings.donation_url ?? null
@@ -60,6 +64,7 @@ export default async function HomeHeader() {
     <HeaderClient
       signedIn={Boolean(user)}
       admin={Boolean(admin)}
+      username={username}
       donationUrl={donationUrl}
     />
   );
