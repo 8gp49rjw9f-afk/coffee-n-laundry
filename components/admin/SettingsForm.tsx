@@ -9,6 +9,23 @@ import { saveSettings } from "@/app/actions/admin";
 import type { SiteSettings } from "@/lib/services/settings";
 
 /*
+ * The three donation fields, declared here as well as in the service.
+ *
+ * `SiteSettings` comes from lib/services/settings.ts, and the
+ * interface there lists every column of `site_settings`. The donation
+ * columns arrive with 0024 and 0025, and this form must not stop
+ * compiling on a deployment where the service has not caught up — an
+ * admin panel that will not build is worse than a missing switch. So
+ * the keys the form needs are added here, and this local type is what
+ * `useState` holds.
+ */
+type FormSettings = SiteSettings & {
+  donation_enabled: boolean;
+  donation_url: string | null;
+  donation_amount: number;
+};
+
+/*
  * Grouped, not alphabetical. The groups match how the settings are
  * actually thought about.
  *
@@ -118,13 +135,13 @@ function Switch({
   );
 }
 
-export function SettingsForm({ settings }: { settings: SiteSettings }) {
-  const [draft, setDraft] = useState(settings);
+export function SettingsForm({ settings }: { settings: FormSettings }) {
+  const [draft, setDraft] = useState<FormSettings>(settings);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  function set<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
+  function set<K extends keyof FormSettings>(key: K, value: FormSettings[K]) {
     setSaved(false);
     setDraft((current) => ({ ...current, [key]: value }));
   }
@@ -293,6 +310,33 @@ export function SettingsForm({ settings }: { settings: SiteSettings }) {
           type="number"
           value={draft.reporters_to_hide}
           onChange={(v) => set("reporters_to_hide", Number(v))}
+        />
+      </Group>
+
+      <Group
+        title="The coffee"
+        note="A donation button in the header. Off by default; the address is what turns it on."
+      >
+        <Switch
+          label="Show the donation button"
+          hint="A coffee cup beside the menu, opening a payment page."
+          value={draft.donation_enabled}
+          onChange={(v) => set("donation_enabled", v)}
+        />
+
+        <Text
+          label="Payment address"
+          hint="Where the money goes. PayPal: https://paypal.me/CoffeeNLaundry"
+          value={draft.donation_url ?? ""}
+          onChange={(v) => set("donation_url", v)}
+        />
+
+        <Text
+          label="Amount (USD)"
+          type="number"
+          hint="Added to the address, so the payment page opens with it filled in. Between 1 and 1000."
+          value={draft.donation_amount}
+          onChange={(v) => set("donation_amount", Number(v))}
         />
       </Group>
 
