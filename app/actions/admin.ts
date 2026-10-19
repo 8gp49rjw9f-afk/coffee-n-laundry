@@ -97,6 +97,34 @@ export async function saveSettings(formData: FormData): Promise<void> {
       maintenance_message:
         str("maintenance_message", current.maintenance_message ?? "") || null,
 
+      /* The donation button. A setting, not code, because the plan
+         has a date on it — see 0024 and 0025. All three values come
+         from the form; a form that does not show them sends nothing,
+         and the fallbacks above keep what the row already holds.
+
+         `donation_url` is stored as trimmed text, or null when it is
+         blank — the button hides itself on an empty address, so
+         clearing the field is a second way to switch it off that
+         does not touch the switch.
+
+         `donation_amount` is clamped by the form and by the check
+         constraint in 0025. The `num` fallback covers the third
+         case: a form that somehow sends nothing leaves the stored
+         number alone instead of resetting it to the default. */
+      donation_enabled: bool(
+        "donation_enabled",
+        (current as { donation_enabled?: boolean }).donation_enabled ?? false
+      ),
+      donation_url:
+        str(
+          "donation_url",
+          (current as { donation_url?: string | null }).donation_url ?? ""
+        ) || null,
+      donation_amount: num(
+        "donation_amount",
+        (current as { donation_amount?: number }).donation_amount ?? 2
+      ),
+
       registrations_enabled: bool(
         "registrations_enabled",
         current.registrations_enabled
@@ -353,7 +381,12 @@ export async function deletePlace(formData: FormData): Promise<void> {
      The list is wider than this schema on purpose: a table that is not
      there is skipped rather than fatal, so a place is never left
      half-deleted over a name that did not exist. 42P01 is Postgres
-     for "undefined table". */
+     for "undefined table".
+
+     `place_comments` is in the list because it holds a foreign key of
+     its own: without it here, Postgres would still cascade — but the
+     explicit order is what the note above promises, and a list that
+     quietly relies on a cascade is a list that stops being true. */
   const children = [
     "place_photos",
     "place_reports",
@@ -441,11 +474,10 @@ export async function addAdmin(formData: FormData): Promise<void> {
  *
  * That is what the checks below are, in order:
  *
- *   1. not yourself, unless you ARE a master and you are the target
- *   2. never another master
- *   3. never the last master, which the database refuses too
+ *   1. never another master
+ *   2. never the last master, which the database refuses too
  *
- * (3) is belt and braces on purpose. 0023 puts a trigger under this
+ * (2) is belt and braces on purpose. 0023 puts a trigger under this
  * table that refuses to delete the last master row whoever runs the
  * statement — including a hand-typed DELETE in the Supabase editor.
  * The check here exists so the failure arrives as a readable code
@@ -527,8 +559,8 @@ export async function removeAdmin(email: string): Promise<void> {
  * ANY ADMIN, including the master who promoted them, can later be
  * removed from the panel — an ordinary admin by any master, a master
  * only by themselves. Promotion is not permanent, and it is not
-alse meant to be: the whole reason the removal rule exists is that
- * a list of masters can go wrong.
+ * meant to be: the whole reason the removal rule exists is that a
+ * list of masters can go wrong.
  */
 export async function promoteAdmin(email: string): Promise<void> {
   await requireMaster();
