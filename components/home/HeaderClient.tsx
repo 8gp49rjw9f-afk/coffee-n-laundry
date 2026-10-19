@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { createClient } from "@/lib/supabase/browser";
+import { DonationButton } from "@/components/home/DonationButton";
 
 /*
  * THE MARK — drawn here as SVG, not the PNG from `public/logo.png`.
@@ -131,12 +132,25 @@ function LogOutButton({ className }: { className: string }) {
 export default function HeaderClient({
   signedIn,
   admin,
+  donationUrl = null,
 }: {
   signedIn: boolean;
   admin: boolean;
+  /*
+   * The donation address, from Admin → Site. Null — or empty, or a
+   * missing column before 0024 is applied — means no button at all.
+   *
+   * It arrives as a prop rather than being read here because this is
+   * a client component and the setting lives in the database: the
+   * server reads it once per request, in app/layout.tsx, and passes
+   * it down. Nothing about the button is fetched in the browser.
+   */
+  donationUrl?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const donating = Boolean((donationUrl ?? "").trim());
 
   /* Click outside closes it. */
   useEffect(() => {
@@ -204,10 +218,23 @@ export default function HeaderClient({
           {!signedIn && (
             <Link
               href="/login"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              className="hidden items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:inline-flex"
             >
               Log in
             </Link>
+          )}
+
+          {/*
+           * THE COFFEE, on a wide screen only.
+           *
+           * A phone header already carries the mark, the wordmark and
+           * the hamburger, and a fourth control would start squeezing
+           * the wordmark rather than fitting beside it. So on a narrow
+           * screen the button moves into the menu instead — same
+           * action, one tap further, and nothing overlapping.
+           */}
+          {donating && (
+            <DonationButton url={donationUrl} className="hidden sm:inline-flex" />
           )}
 
           {/* HAMBURGER */}
@@ -272,6 +299,24 @@ export default function HeaderClient({
                     >
                       Log in
                     </Link>
+                  </>
+                )}
+
+                {/* The coffee again, on a phone only — see the note
+                    above the wide-screen copy. */}
+                {donating && (
+                  <>
+                    <div className={divider} />
+
+                    <a
+                      href={`${(donationUrl ?? "").trim().replace(/\/$/, "")}/2`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setOpen(false)}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-amber-900 transition hover:bg-amber-50"
+                    >
+                      ☕ 2 $ — buy us a coffee
+                    </a>
                   </>
                 )}
               </div>
