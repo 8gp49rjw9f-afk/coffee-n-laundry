@@ -9,23 +9,6 @@ import { saveSettings } from "@/app/actions/admin";
 import type { SiteSettings } from "@/lib/services/settings";
 
 /*
- * The three donation fields, declared here as well as in the service.
- *
- * `SiteSettings` comes from lib/services/settings.ts, and the
- * interface there lists every column of `site_settings`. The donation
- * columns arrive with 0024 and 0025, and this form must not stop
- * compiling on a deployment where the service has not caught up — an
- * admin panel that will not build is worse than a missing switch. So
- * the keys the form needs are added here, and this local type is what
- * `useState` holds.
- */
-type FormSettings = SiteSettings & {
-  donation_enabled: boolean;
-  donation_url: string | null;
-  donation_amount: number;
-};
-
-/*
  * Grouped, not alphabetical. The groups match how the settings are
  * actually thought about.
  *
@@ -34,6 +17,15 @@ type FormSettings = SiteSettings & {
  * silently dropped, and a field read there but not shown here would be
  * overwritten with its fallback the first time anybody saves. Keep the
  * two lists in step.
+ *
+ * THE DONATION FIELDS ARE NOT SPECIAL-CASED HERE. An earlier pass
+ * declared a local `FormSettings` widening SiteSettings with the three
+ * columns, and that is what broke the build: SettingsPanel hands this
+ * component a SiteSettings, and a type that had been widened behind
+ * its back no longer accepted it. The three columns belong to the
+ * interface in lib/services/settings.ts, marked optional there so a
+ * database without the migrations still reads cleanly. Nothing extra
+ * is needed on this side.
  */
 
 const FIELD =
@@ -135,13 +127,13 @@ function Switch({
   );
 }
 
-export function SettingsForm({ settings }: { settings: FormSettings }) {
-  const [draft, setDraft] = useState<FormSettings>(settings);
+export function SettingsForm({ settings }: { settings: SiteSettings }) {
+  const [draft, setDraft] = useState<SiteSettings>(settings);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  function set<K extends keyof FormSettings>(key: K, value: FormSettings[K]) {
+  function set<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
     setSaved(false);
     setDraft((current) => ({ ...current, [key]: value }));
   }
@@ -320,7 +312,7 @@ export function SettingsForm({ settings }: { settings: FormSettings }) {
         <Switch
           label="Show the donation button"
           hint="A coffee cup beside the menu, opening a payment page."
-          value={draft.donation_enabled}
+          value={draft.donation_enabled ?? false}
           onChange={(v) => set("donation_enabled", v)}
         />
 
@@ -335,7 +327,7 @@ export function SettingsForm({ settings }: { settings: FormSettings }) {
           label="Amount (USD)"
           type="number"
           hint="Added to the address, so the payment page opens with it filled in. Between 1 and 1000."
-          value={draft.donation_amount}
+          value={draft.donation_amount ?? 2}
           onChange={(v) => set("donation_amount", Number(v))}
         />
       </Group>
