@@ -1,64 +1,81 @@
 /*
  * THE DONATION BUTTON — one cup, two dollars, next to the menu.
  *
- * WHAT IT IS NOT
- *
- * Not a campaign, not a counter, not a “support us” banner. There is
- * no progress bar and no goal, because a goal that is not met is a
- * public failure and this is meant to be the opposite: a coffee that
- * somebody may buy if the map was useful, and nothing at all if it
- * was not.
- *
- * WHY IT SITS IN THE HEADER
- *
- * Because the header is where a person already looks for things to
- * do, and the alternative — a strip across the top of the page —
- * greets every visitor with a request before it has given them
- * anything. This is a door in the wall, not a hand held out.
- *
  * IT LEAVES THE SITE
  *
  * PayPal, in a new tab, with the amount already in the link. The
  * person is not navigated away from the page they were reading, and
  * nothing of theirs comes back here: no account, no email, no
- * payment detail. That is the whole reason to use a payment page
- * somebody else operates.
+ * payment detail.
  *
- * THE AMOUNT IS IN THE URL
+ * TWO LAYOUTS, ONE GUARD
  *
- * `paypal.me/CoffeeNLaundry/2`. One number, in one place — see the
- * note in 0024_donations.sql for why there is no setting for it.
- *
- * WHY IT TAKES AN `enabled` FLAG AS WELL AS A URL
- *
- * An empty URL would already hide it, so the flag looks redundant.
- * It is not, for the case the whole feature is built around: the
- * first year ends, the button goes quiet, and the address stays in
- * the settings for the day it is wanted again. A switch that erases
- * what it switches is not a switch.
+ * "chip" for the bar, "row" for the hamburger menu on a phone. An
+ * earlier version wrote the menu's link out by hand at the call site,
+ * and with an empty address it produced "/2" — a RELATIVE path — so a
+ * tap landed on this site's own 404. Both layouts live here now, and
+ * both go through the same check below.
  */
 
 export function DonationButton({
   url,
   amount = 2,
+  variant = "chip",
   className = "",
 }: {
   /* The base address, from Admin → Site. The amount is appended.
-     Empty or missing — no button at all. */
+     Empty, or not an absolute http(s) address — no button at all. */
   url?: string | null;
   amount?: number;
+  /*
+   * "chip" — the small amber button, for the bar.
+   * "row"  — a line in the hamburger menu, for a phone.
+   */
+  variant?: "chip" | "row";
   className?: string;
 }) {
   const base = (url ?? "").trim().replace(/\/$/, "");
 
-  if (!base) return null;
+  /*
+   * TWO WAYS THIS COMES BACK EMPTY, and both must hide the button:
+   *
+   *   - no address at all, with the switch on and the field blank;
+   *   - an address that is not absolute. This is the one that shipped
+   *     broken: a partial value turned the menu's link into "/2", a
+   *     relative path, so the browser asked OUR OWN site for a page
+   *     called /2 and showed the 404. A setting half filled in must
+   *     never produce a link that points back at us.
+   *
+   * Only http and https are accepted. No javascript:, no mailto:, no
+   * relative path, no bare domain without a scheme.
+   */
+  const usable = /^https?:\/\/[^\s]+$/i.test(base);
+
+  if (!base || !usable) return null;
+
+  const href = `${base}/${amount}`;
+  const title = `Buy coffee'n'laundry a coffee — $${amount}`;
+
+  if (variant === "row") {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        title={title}
+        className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-amber-900 transition hover:bg-amber-50 ${className}`}
+      >
+        ☕ {amount} $ — buy us a coffee
+      </a>
+    );
+  }
 
   return (
     <a
-      href={`${base}/${amount}`}
+      href={href}
       target="_blank"
       rel="noreferrer"
-      title={`Buy coffee'n'laundry a coffee — $${amount}`}
+      title={title}
       className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 ${className}`}
     >
       <span className="text-base leading-none">☕</span>
