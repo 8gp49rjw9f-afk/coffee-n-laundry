@@ -302,21 +302,22 @@ export default function HeaderClient({
                   </>
                 )}
 
-                {/* The coffee again, on a phone only — see the note
-                    above the wide-screen copy. */}
+                {/*
+                 * The coffee again, on a phone only — see the note
+                 * above the wide-screen copy.
+                 *
+                 * THE SAME COMPONENT, not a second copy of the link.
+                 * The first version wrote the href out by hand here,
+                 * and with an empty address it produced "/2" — a
+                 * relative path — so a tap landed on this site's own
+                 * 404. One component means one guard, and the two
+                 * layouts cannot drift apart again.
+                 */}
                 {donating && (
                   <>
                     <div className={divider} />
 
-                    <a
-                      href={`${(donationUrl ?? "").trim().replace(/\/$/, "")}/2`}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={() => setOpen(false)}
-                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-amber-900 transition hover:bg-amber-50"
-                    >
-                      ☕ 2 $ — buy us a coffee
-                    </a>
+                    <DonationButton url={donationUrl} variant="row" />
                   </>
                 )}
               </div>
