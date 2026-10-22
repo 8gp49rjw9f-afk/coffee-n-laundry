@@ -27,14 +27,6 @@ export interface LaundryFacts {
   has_parking: boolean | null;
   has_toilets: boolean | null;
   has_seating: boolean | null;
-
-  /*
-   * How you pay. Was missing from this interface while the form
-   * collected it and the row below asked for it — the row could not
-   * read a column that was not in the shape it was handed, so the
-   * Payment line never drew. Optional because a place that predates
-   * the field simply has nothing there, which is not an error.
-   */
   accepted_payments?: string[] | null;
 }
 
@@ -66,9 +58,8 @@ function priceAndTime(
  *
  * `accepted_payments` holds the keys the form wrote — `cash`, `card`,
  * `online`, `laundry_card` — plus possibly one free-text note the
- * person typed themselves ("exact change only", capped at 25
- * characters). The note is not in this map and is not an error: it is
- * printed as it was written, after the known ones.
+ * person typed themselves. The note is not in this map and is not an
+ * error: it is printed as it was written, after the known ones.
  */
 const PAYMENT_LABEL: Record<string, string> = {
   cash: "💵 Cash",
@@ -86,13 +77,10 @@ function paymentsLine(p: LaundryFacts): string | null {
 
   if (held.length === 0) return null;
 
-  /* Known keys first, in a fixed order, so the same laundromat always
-     reads the same way whichever order the form happened to send. */
   const known = PAYMENT_ORDER.filter((key) => held.includes(key)).map(
     (key) => PAYMENT_LABEL[key]
   );
 
-  /* Then anything else — the person's own note. */
   const notes = held.filter((value) => !PAYMENT_ORDER.includes(value));
 
   const parts = [...known, ...notes];
@@ -111,8 +99,6 @@ function formatDate(iso: string) {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
-/* Minutes from midnight → "22:00". Built by hand: toLocaleTimeString
-   differs between server and browser. */
 function clockTime(minutes: number | null) {
   if (minutes == null) return null;
 
@@ -123,25 +109,39 @@ function clockTime(minutes: number | null) {
 }
 
 /*
- * Six rows, not eleven. The wash price and its duration are one
- * question, and so are the dryer's — four rows became two. Detergent
- * is one row now instead of two, because "included" and "what it
- * costs" are the same fact told two ways.
+ * NO `truncate` ON ANYTHING A PERSON TYPED.
  *
- * PAYMENT IS FIRST AND REAL NOW. It used to return `null` in hard —
- * the row existed, was mapped, and was filtered out on every render,
- * so the payment methods a person entered never appeared on the page.
- * A row that cannot produce a value is not a placeholder; it is dead
- * code wearing a label.
+ * This table used to cut its values with ellipses — the wash price
+ * list, the payment methods, the "was …" line. On a phone the value
+ * column is about a third of the screen, so "💵 Cash · 💳 Cards · 📱
+ * App" arrived as "💵 Cash · 💳 Ca…" and the rest was simply gone.
+ *
+ * For a map whose whole point is telling somebody whether a
+ * laundromat takes cards, hiding the answer behind three dots defeats
+ * the page. A tall row is a cost; a missing fact is a failure.
+ *
+ * So the value wraps. `whitespace-normal` puts the line breaks back,
+ * `break-words` stops a long unbroken string from overflowing the
+ * column instead of wrapping.
+ *
+ * The one `truncate` left is on the verifier's username, in the
+ * checked column — a pseudonym that overflows there loses nothing a
+ * reader needs, and that column is three twelfths wide on purpose.
+ *
+ * THE COLUMNS ARE STILL FIXED, and that is worth knowing: 5 for the
+ * item, 4 for the value, 3 for the button. A long value now wraps
+ * inside those four twelfths, which makes the row taller rather than
+ * wider. If that reads badly on a phone, the next step is to give the
+ * value more room and move the button under it — a different layout,
+ * not a different string.
  */
+
 const ROWS: {
   key: string;
   label: string;
   emoji: string;
   produces: (place: LaundryFacts) => {
     value: string | null;
-    /* A row may cover more than one verifiable field — the wash price
-       and the wash duration are stamped together. */
     alsoKeys?: string[];
   };
 }[] = [
@@ -206,7 +206,6 @@ const ROWS: {
     label: "Others",
     emoji: "•",
     produces: (p) => {
-      /* Icons only, and only the ones that are there. */
       const icons: string[] = [];
 
       if (p.has_wifi) icons.push("📶");
@@ -279,20 +278,24 @@ export function LaundryTable({
           return (
             <li
               key={row.key}
-              className="grid grid-cols-12 items-center gap-3 px-4 py-2.5"
+              className="grid grid-cols-12 items-start gap-3 px-4 py-2.5"
             >
               <span className="col-span-5 flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-900">
                 <span className="text-base">{row.emoji}</span>
-                <span className="truncate">{row.label}</span>
+
+                {/* Wraps rather than clipping: "Laptop-friendly" is one
+                    word too long for five twelfths on a phone. */}
+                <span className="break-words">{row.label}</span>
               </span>
 
               <span className="col-span-4 min-w-0">
-                <span className="block truncate text-sm font-bold text-slate-900">
+                {/* WRAPS, on purpose — see the note above ROWS. */}
+                <span className="block whitespace-normal break-words text-sm font-bold text-slate-900">
                   {value}
                 </span>
 
                 {history?.old_value && history.old_value !== value && (
-                  <span className="block truncate text-[10px] leading-tight text-amber-700">
+                  <span className="mt-0.5 block whitespace-normal break-words text-[10px] leading-tight text-amber-700">
                     was {history.old_value}
                   </span>
                 )}
