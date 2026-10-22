@@ -9,8 +9,6 @@ import { DonationButton } from "@/components/home/DonationButton";
 /*
  * THE MARK — drawn here as SVG, not the PNG from `public/logo.png`.
  *
- * WHY WE STOPPED USING THE PNG
- *
  * The PNG carries the wordmark inside the ring. That is legible at
  * 1200 px and a smudge at 40 — so every attempt to read it up here
  * ended in either a bigger bar or an unreadable one. A raster mark
@@ -24,15 +22,6 @@ import { DonationButton } from "@/components/home/DonationButton";
  * The wordmark BESIDE it is what spells the name out; the drawing is
  * the mark. That division is deliberate: a logo that has to be
  * enlarged to be readable stops being an icon.
- *
- * NO BACKING PLATE. There was a dark disc behind this for one
- * commit, on the assumption that white artwork needs a dark ground.
- * That assumption was wrong twice over: the artwork is not white but
- * silver-grey with highlights, which reads fine on white — and the
- * disc was the same size as the image while the artwork inside it is
- * inset with its own margin, so the visible result was a black circle
- * with a small mark somewhere in the middle. It looked like a hole in
- * the header. The mark sits straight on the bar.
  *
  * SIZE. 48 px in the header, set at the call site below.
  *
@@ -96,7 +85,6 @@ export function Logo({
  *   Map
  *   ─────
  *   The goal
- *   Pricing
  *   ─────
  *   Report a bug
  *   Reach us
@@ -110,6 +98,18 @@ export function Logo({
  * and the coffee); the next is the site itself; then what it promises;
  * then how to reach us; then the session. A single undivided column of
  * thirteen rows is a list, not a menu.
+ *
+ * PRICING IS NOT IN THIS MENU, on purpose.
+ *
+ * `/pricing` still exists and still renders — the page and the credit
+ * system behind it are untouched. What went away is the row in the
+ * hamburger. The credits do not behave well enough to be advertised
+ * from the main navigation yet, and a link called "Pricing" in a menu
+ * that also says the map is free invites the one question the site is
+ * not ready to answer.
+ *
+ * Put the row back here — one line in ABOUT below — when the system
+ * settles, and nothing else has to change.
  *
  * THREE RULES THAT CANNOT ALL SHOW AT ONCE
  *
@@ -126,9 +126,14 @@ const SITE = [
   { href: "/", label: "Map", emoji: "🗺️" },
 ];
 
+/*
+ * `Pricing` used to be the second row here. It is commented out rather
+ * than deleted so the intent is legible to whoever opens this file
+ * next: the page is alive, the menu simply does not point at it.
+ */
 const ABOUT = [
   { href: "/goal", label: "The goal", emoji: "🎯" },
-  { href: "/pricing", label: "Pricing", emoji: "💵" },
+  /* { href: "/pricing", label: "Pricing", emoji: "💵" }, */
 ];
 
 const TALK_TO_US = [
@@ -170,20 +175,7 @@ export default function HeaderClient({
 }: {
   signedIn: boolean;
   admin: boolean;
-  /*
-   * The username, for the line beside the person glyph. Read on the
-   * server from the same `profiles` row the rest of the site uses —
-   * never the email, which is personal data and this menu is public.
-   *
-   * Null is normal: an account that has not chosen a name yet reads
-   * as "someone" everywhere else on the site, and the line falls back
-   * to the bare word rather than showing brackets around nothing.
-   */
   username?: string | null;
-  /*
-   * The donation address, from Admin → Site. Null — or empty, or a
-   * missing column — means no line for it at all.
-   */
   donationUrl?: string | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -259,15 +251,7 @@ export default function HeaderClient({
             </Link>
           )}
 
-          {/*
-           * THE COFFEE, on a wide screen only.
-           *
-           * A phone header already carries the mark, the wordmark and
-           * the hamburger, and a fourth control would start squeezing
-           * the wordmark rather than fitting beside it. So on a narrow
-           * screen the button moves into the menu instead — same
-           * action, one tap further, and nothing overlapping.
-           */}
+          {/* THE COFFEE, on a wide screen only. */}
           {donating && (
             <DonationButton url={donationUrl} className="hidden sm:inline-flex" />
           )}
@@ -287,9 +271,6 @@ export default function HeaderClient({
 
             {open && (
               <div className="absolute right-0 top-full mt-1 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-2 shadow-lg">
-                {/* The title, centred, with no links under it — the
-                    rows it used to hold now live in their own groups
-                    further down. */}
                 <p className="px-4 pb-2 pt-1 text-center text-xs font-bold uppercase tracking-wide text-slate-400">
                   Menu
                 </p>
@@ -305,10 +286,6 @@ export default function HeaderClient({
                   >
                     <span>👤 Me</span>
 
-                    {/* The username, in brackets beside it. Falls
-                        back to the bare word when the account has not
-                        chosen a name — brackets around nothing would
-                        read as a bug. */}
                     <span className="truncate text-slate-400">
                       [{username ?? "someone"}]
                     </span>
