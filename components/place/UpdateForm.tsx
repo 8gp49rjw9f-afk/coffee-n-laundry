@@ -482,89 +482,42 @@ export function UpdateForm({
               </select>
             </label>
           </div>
-
-          <p className="mt-2 text-xs text-slate-500">
-            The server refuses a price with no currency, which is why the
-            two travel together.
-          </p>
         </Card>
       ) : (
         <Card>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            Price and time
+            Laundry Prices
           </h2>
 
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-slate-500">
-                🧺 Wash
+                Wash
               </span>
 
               <input
                 value={washAmount}
                 onChange={(e) => setWashAmount(e.target.value)}
                 inputMode="decimal"
-                placeholder="6.00"
+                placeholder="8.00"
                 className={field}
               />
             </label>
 
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-slate-500">
-                ⏱️ Wash takes
-              </span>
-
-              <select
-                value={washMinutes}
-                onChange={(e) => setWashMinutes(e.target.value)}
-                className={field}
-              >
-                <option value="">—</option>
-
-                {DURATIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {d} min
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-slate-500">
-                🔥 Dryer
+                Dryer
               </span>
 
               <input
                 value={dryerAmount}
                 onChange={(e) => setDryerAmount(e.target.value)}
                 inputMode="decimal"
-                placeholder="4.00"
+                placeholder="6.00"
                 className={field}
               />
             </label>
 
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-slate-500">
-                ⏱️ Dryer takes
-              </span>
-
-              <select
-                value={dryerMinutes}
-                onChange={(e) => setDryerMinutes(e.target.value)}
-                className={field}
-              >
-                <option value="">—</option>
-
-                {DURATIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {d} min
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="mt-2">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-slate-500">
                 Currency
@@ -577,7 +530,7 @@ export function UpdateForm({
               >
                 {CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>
-                    {c.country} — {c.code}
+                    {c.code}
                   </option>
                 ))}
               </select>
@@ -586,332 +539,59 @@ export function UpdateForm({
         </Card>
       )}
 
-      {isCoffee && (
-        <Card>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            Coffee type
-          </h2>
-
-          <div className="grid grid-cols-3 gap-2">
-            {COFFEE_KINDS.map((option) => (
-              <Toggle
-                key={option.key}
-                label={option.label}
-                value={coffeeKind === option.key}
-                onChange={() => setCoffeeKind(option.key)}
-              />
-            ))}
-          </div>
-        </Card>
-      )}
+      {/* ---------- payment ---------- */}
 
       <Card>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-          How do you pay?
+        <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">
+          Payment
         </h2>
 
-        <div className="flex flex-wrap gap-2">
-          {paymentKeysFor(isCoffee).map((option) => {
-            const on = payments.includes(option.value);
+        <p className="mb-3 text-xs text-slate-400">
+          Pick everything this place takes.
+        </p>
 
-            return (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => {
-                  /* Leaving Cards takes the card detail with it: a row
-                     saying "Visa" under a place that does not take
-                     cards is worse than no row at all. */
-                  if (option.value === "card" && on) {
-                    setPayments(
-                      payments.filter(
-                        (p) =>
-                          p !== "card" &&
-                          !CARD_KINDS.some((c) => c.value === p)
-                      )
-                    );
-                    return;
-                  }
-
-                  toggleIn(payments, setPayments, option.value);
-                }}
-                className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
-              >
-                {option.label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap gap-1.5">
+          {paymentKeysFor(isCoffee).map((option) => (
+            <Toggle
+              key={option.value}
+              label={option.label}
+              value={payments.includes(option.value)}
+              onChange={() =>
+                toggleIn(payments, setPayments, option.value)
+              }
+            />
+          ))}
         </div>
 
         {payments.includes("card") && (
-          <div className="mt-3 flex flex-wrap gap-2 border-l-2 border-slate-200 pl-3">
-            {CARD_KINDS.map((option) => {
-              const on = payments.includes(option.value);
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(payments, setPayments, option.value)}
-                  className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+          <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
+            {CARD_KINDS.map((option) => (
+              <Toggle
+                key={option.value}
+                label={option.label}
+                value={payments.includes(option.value)}
+                onChange={() =>
+                  toggleIn(payments, setPayments, option.value)
+                }
+              />
+            ))}
           </div>
         )}
 
         <label className="mt-3 block">
           <span className="mb-1 block text-xs font-medium text-slate-500">
-            Or add your own — {PAYMENT_NOTE_MAX} characters at most
+            Anything else? (optional)
           </span>
 
           <input
             value={paymentNote}
-            onChange={(e) =>
-              setPaymentNote(e.target.value.slice(0, PAYMENT_NOTE_MAX))
-            }
+            onChange={(e) => setPaymentNote(e.target.value)}
             maxLength={PAYMENT_NOTE_MAX}
-            placeholder="Exact change only, tokens at the counter…"
+            placeholder="Exact change only"
             className={field}
           />
         </label>
       </Card>
-
-      {isCoffee && (
-        <Card>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            What is in the cup
-          </h2>
-
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">
-            Milk / PBM
-          </h3>
-
-          <div className="flex flex-wrap gap-2">
-            {MILKS.map((option) => {
-              const on = milks.includes(option.key);
-
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(milks, setMilks, option.key)}
-                  className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-            Decaf
-          </h3>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Toggle
-              label="🌙 Decaf"
-              value={hasDecaf}
-              onChange={setHasDecaf}
-            />
-
-            <Toggle
-              label="💻 Laptop-friendly"
-              value={laptop}
-              onChange={setLaptop}
-            />
-          </div>
-
-          <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-            Beans
-          </h3>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Toggle
-              label="🫘 Beans for sale"
-              value={sellsBeans}
-              onChange={setSellsBeans}
-            />
-
-            <Toggle
-              label="🔥 Has a roaster"
-              value={hasRoaster}
-              onChange={setHasRoaster}
-            />
-          </div>
-
-          {hasRoaster && (
-            <label className="mt-2 block">
-              <span className="mb-1 block text-xs font-medium text-slate-500">
-                Roaster name
-              </span>
-
-              <input
-                value={roaster}
-                onChange={(e) => setRoaster(e.target.value)}
-                className={field}
-              />
-            </label>
-          )}
-
-          <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-            Food
-          </h3>
-
-          <div className="flex flex-wrap gap-2">
-            {FOOD.map((option) => {
-              const on = food.includes(option.key);
-
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(food, setFood, option.key)}
-                  className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
-                >
-                  {option.emoji} {option.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <h3 className="mt-4 mb-2 text-sm font-semibold text-slate-700">
-            Ambiance
-          </h3>
-
-          <div className="flex flex-wrap gap-2">
-            {AMBIENCE.map((option) => {
-              const on = ambience.includes(option.key);
-
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(ambience, setAmbience, option.key)}
-                  className={`${BUTTON_SHAPE} ${on ? BUTTON_ON : BUTTON_OFF}`}
-                >
-                  {option.emoji} {option.label}
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* ---------- machines ---------- */}
-
-      {!isCoffee && (
-        <Card>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            Machine size
-          </h2>
-
-          <p className="mb-2 text-xs text-slate-400">
-            Tick every size this laundromat has.
-          </p>
-
-          <div className="grid grid-cols-3 gap-2">
-            {MACHINE_SIZES.map((option) => (
-              <Toggle
-                key={option.key}
-                label={option.label}
-                value={machineSizes.includes(option.key)}
-                onChange={() =>
-                  toggleIn(machineSizes, setMachineSizes, option.key)
-                }
-              />
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* ---------- detergent ---------- */}
-
-      {!isCoffee && (
-        <Card>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            Detergent
-          </h2>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Toggle
-              label="🧼 Detergent included"
-              value={detergentIncluded}
-              onChange={setDetergentIncluded}
-            />
-
-            <Toggle
-              label="🛒 Can buy it there"
-              value={detergentPurchasable}
-              onChange={setDetergentPurchasable}
-            />
-          </div>
-
-          {detergentPurchasable && !detergentIncluded && (
-            <label className="mt-2 block">
-              <span className="mb-1 block text-xs font-medium text-slate-500">
-                Detergent price
-              </span>
-
-              <input
-                value={detergentPrice}
-                onChange={(e) => setDetergentPrice(e.target.value)}
-                inputMode="decimal"
-                placeholder="1.00"
-                className={field}
-              />
-            </label>
-          )}
-        </Card>
-      )}
-
-      {/* ---------- opening hours ---------- */}
-
-      {!isCoffee && (
-        <Card>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-            Opening hours
-          </h2>
-
-          <div className="flex flex-wrap gap-2">
-            <Toggle
-              label="🕛 Open 24 hours"
-              value={open24h}
-              onChange={setOpen24h}
-            />
-          </div>
-
-          {/* 24h means there is no last entry to record. */}
-          {!open24h && (
-            <label className="mt-2 block">
-              <span className="mb-1 block text-xs font-medium text-slate-500">
-                Last entry
-              </span>
-
-              <select
-                value={lastEntry}
-                onChange={(e) => setLastEntry(e.target.value)}
-                className={field}
-              >
-                <option value="">—</option>
-
-                {ENTRY_TIMES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </Card>
-      )}
 
       {/* ---------- amenities ---------- */}
 
@@ -920,13 +600,27 @@ export function UpdateForm({
           Amenities
         </h2>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Toggle label="📶 Wi-Fi" value={wifi} onChange={setWifi} />
-          <Toggle label="🔌 Power" value={power} onChange={setPower} />
-          <Toggle label="🅿️ Parking" value={parking} onChange={setParking} />
+        <div className="flex flex-wrap gap-1.5">
+          <Toggle
+            label="📶 Wifi"
+            value={wifi}
+            onChange={setWifi}
+          />
 
           <Toggle
-            label={isCoffee ? "🪑 Seating" : "🚻 Toilets"}
+            label="🔌 Power"
+            value={power}
+            onChange={setPower}
+          />
+
+          <Toggle
+            label="🅿️ Parking"
+            value={parking}
+            onChange={setParking}
+          />
+
+          <Toggle
+            label={isCoffee ? "🪑 Seating" : "🧺 Folding table"}
             value={isCoffee ? seating : toilets}
             onChange={isCoffee ? setSeating : setToilets}
           />
@@ -936,7 +630,7 @@ export function UpdateForm({
       <Card>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-slate-500">
-            Anything useful to know?
+            Add some comments
           </span>
 
           <textarea
@@ -946,8 +640,10 @@ export function UpdateForm({
             className={field}
           />
         </label>
+      </Card>
 
-        <label className="mt-3 block">
+      <Card>
+        <label className="block">
           <span className="mb-1 block text-xs font-medium text-slate-500">
             Website
           </span>
@@ -955,6 +651,7 @@ export function UpdateForm({
           <input
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://"
             className={field}
           />
         </label>
@@ -968,5 +665,3 @@ export function UpdateForm({
     </form>
   );
 }
-
-export default UpdateForm;
