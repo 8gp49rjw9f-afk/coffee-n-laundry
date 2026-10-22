@@ -266,7 +266,6 @@ export function UpdateForm({
   const [washAmount, setWashAmount] = useState(amountOf("wash"));
   const [dryerAmount, setDryerAmount] = useState(amountOf("dryer"));
 
-  const [description, setDescription] = useState(place.description ?? "");
   const [website, setWebsite] = useState(place.website ?? "");
 
   const [error, setError] = useState("");
@@ -289,7 +288,27 @@ export function UpdateForm({
 
     formData.set("place_id", place.id);
     formData.set("website", website.trim());
-    formData.set("description", description.trim());
+
+    /*
+     * NO DESCRIPTION FIELD HERE ANY MORE.
+     *
+     * This form used to carry one — "Anything useful to know?" — and
+     * the note went into `places.description`, where nothing has ever
+     * read it. On the creation form the same field now becomes the
+     * first COMMENT on the place; here there is nothing to become
+     * one, because a comment already exists by then.
+     *
+     * So the field is gone rather than renamed. A box labelled
+     * "Add some comments" that saves text nobody can see would be a
+     * worse lie than the old label was, and leaving the description
+     * untouched is the only honest behaviour: this form changes
+     * prices and facts, and comments are written on the place page.
+     *
+     * The server still accepts `description` on this path and updates
+     * the column if it is sent — see updatePlace.ts. It simply is not
+     * sent any more, so the existing text is preserved rather than
+     * cleared.
+     */
 
     /* The identity fields travel with the form either way; the server
        honours them only for the creator. */
@@ -625,21 +644,6 @@ export function UpdateForm({
             onChange={isCoffee ? setSeating : setToilets}
           />
         </div>
-      </Card>
-
-      <Card>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-500">
-            Add some comments
-          </span>
-
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            className={field}
-          />
-        </label>
       </Card>
 
       <Card>
