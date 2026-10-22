@@ -71,15 +71,12 @@ export default async function PlacePage({
    *   myWeekChecks      — which per-field buttons say “This week”
    *   confirmedThisWeek — what the verify button in the header says
    *   priceHistory      — the “was 6$” line under a price
-   *   writtenToday      — whether to offer the comment field
+   *   writtenRecently   — whether to offer the comment field
    *
    * The last one asks the same question writeComment asks — have you
    * written in the last 24 hours, ANYWHERE — so the field is not
    * offered and then refused. It is read here, on the server, because
    * a client component cannot answer it before it renders.
-   *
-   * It takes only the user id: the ceiling is per person, not per
-   * place, so there is nothing to pass but who is asking.
    */
   const [
     lastConfirmation,
@@ -223,6 +220,19 @@ export default async function PlacePage({
             has_parking: place.has_parking,
             has_seating: place.has_seating,
             has_toilets: place.has_toilets,
+
+            /*
+             * HOW YOU PAY — the column the form has always written and
+             * this page never passed on.
+             *
+             * The table has a Payment row that asks for this array. It
+             * was not among the twelve values below, so the row found
+             * nothing, drew nothing, and the payment methods a person
+             * entered on the add-a-place form never appeared on the
+             * page. The coffee table had the same gap until its own row
+             * was written; this one is the laundromat's.
+             */
+            accepted_payments: place.accepted_payments ?? [],
           }}
           checks={place.field_checks}
           priceHistory={priceHistory}
@@ -263,11 +273,6 @@ export default async function PlacePage({
       </div>
 
       {/* THE COMMENTS PANEL, where the “Last 5 updates” card used to be.
-
-          That card is gone. What CHANGED about a place still shows — the
-          price table says “was 6$” under the price itself, and the count
-          of confirmations sits in this header. What was missing was a
-          voice, and this is it.
 
           The ceiling is one comment per person per 24 hours, wherever
           it is posted — so `writtenRecently` is per person, and the
