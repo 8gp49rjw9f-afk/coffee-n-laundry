@@ -27,6 +27,15 @@ export interface LaundryFacts {
   has_parking: boolean | null;
   has_toilets: boolean | null;
   has_seating: boolean | null;
+
+  /*
+   * How you pay. Was missing from this interface while the form
+   * collected it and the row below asked for it — the row could not
+   * read a column that was not in the shape it was handed, so the
+   * Payment line never drew. Optional because a place that predates
+   * the field simply has nothing there, which is not an error.
+   */
+  accepted_payments?: string[] | null;
 }
 
 function price(p: LaundryFacts, kind: string) {
@@ -50,6 +59,45 @@ function priceAndTime(
   if (minutes != null) parts.push(`${minutes} min`);
 
   return parts.length > 0 ? parts.join(" / ") : null;
+}
+
+/*
+ * The four payment keys, in the words the form uses.
+ *
+ * `accepted_payments` holds the keys the form wrote — `cash`, `card`,
+ * `online`, `laundry_card` — plus possibly one free-text note the
+ * person typed themselves ("exact change only", capped at 25
+ * characters). The note is not in this map and is not an error: it is
+ * printed as it was written, after the known ones.
+ */
+const PAYMENT_LABEL: Record<string, string> = {
+  cash: "💵 Cash",
+  card: "💳 Cards",
+  online: "📱 App",
+  laundry_card: "🎟️ Card",
+};
+
+const PAYMENT_ORDER = ["cash", "card", "online", "laundry_card"];
+
+function paymentsLine(p: LaundryFacts): string | null {
+  const held = (p.accepted_payments ?? []).filter(
+    (value): value is string => typeof value === "string" && value.length > 0
+  );
+
+  if (held.length === 0) return null;
+
+  /* Known keys first, in a fixed order, so the same laundromat always
+     reads the same way whichever order the form happened to send. */
+  const known = PAYMENT_ORDER.filter((key) => held.includes(key)).map(
+    (key) => PAYMENT_LABEL[key]
+  );
+
+  /* Then anything else — the person's own note. */
+  const notes = held.filter((value) => !PAYMENT_ORDER.includes(value));
+
+  const parts = [...known, ...notes];
+
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 const MONTHS = [
@@ -79,6 +127,12 @@ function clockTime(minutes: number | null) {
  * question, and so are the dryer's — four rows became two. Detergent
  * is one row now instead of two, because "included" and "what it
  * costs" are the same fact told two ways.
+ *
+ * PAYMENT IS FIRST AND REAL NOW. It used to return `null` in hard —
+ * the row existed, was mapped, and was filtered out on every render,
+ * so the payment methods a person entered never appeared on the page.
+ * A row that cannot produce a value is not a placeholder; it is dead
+ * code wearing a label.
  */
 const ROWS: {
   key: string;
@@ -95,7 +149,7 @@ const ROWS: {
     key: "payment",
     label: "Payment",
     emoji: "💳",
-    produces: () => ({ value: null }),
+    produces: (p) => ({ value: paymentsLine(p) }),
   },
   {
     key: "wash_price",
@@ -214,7 +268,7 @@ export function LaundryTable({
 
       <ul className="divide-y divide-slate-100">
         {ROWS.map((row) => {
-          const { value, alsoKeys = [] } = row.produces(facts);
+          const { value } = row.produces(facts);
 
           if (!value) return null;
 
