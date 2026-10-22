@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import { formatDistance } from "@/lib/services/distance";
-import { AMBIENCE_EMOJI, AMBIENCE_LABEL } from "@/lib/coffee";
 
 import type { PlaceWithFreshness } from "@/lib/types";
 
@@ -16,34 +15,52 @@ function daysAgo(iso: string, today: number) {
   return Math.max(0, Math.floor((today - then) / (1000 * 60 * 60 * 24)));
 }
 
-function clockTime(minutes: number | null) {
-  if (minutes == null) return null;
-
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
 /*
- * THE CLOSE BUTTON IS STICKY, ON EVERY SCREEN.
+ * WHAT THIS PANEL SHOWS, AND WHAT IT NO LONGER SHOWS
  *
- * Two earlier versions of this put it in the flow — beside the name,
- * then floating over the photo. Both failed the same way on a phone:
- * the card is a scrolling box whose first child is a square photo as
- * wide as the screen, so the button travelled up out of sight the
- * moment anyone scrolled, and the way out disappeared.
+ * The panel is what a tap on a pin opens — a card on a phone, a
+ * column beside the map on a wide screen. It answers one question:
+ * is this place worth walking to? So it carries, in this order:
  *
- * It is a `sticky` bar now, the first thing in the scrolling column,
- * so it stays pinned to the top of the card whatever the content is
- * doing. `bg-white/95` and a backdrop blur keep it legible where it
- * overlaps the photo, and `-mb-9` cancels the height of the bar so the
- * photo still starts at the very top of the card as it did before.
+ *   the cover photo, the type, the name, the address,
+ *   how you pay, whether anyone has checked it lately,
+ *   Directions, Full details, the counts, and Share.
  *
- * It shows on desktop too, where the panel is a full-height column:
- * there was never a reason to hide it there, and one control that is
- * always in the same place is easier to learn than two.
+ * IT WAS CARRYING TOO MUCH. Removed from this file, on request:
+ *
+ *   - the "facts" chips — ambience, beans for sale, wash and dryer
+ *     durations, last entry, detergent. Five tags of equal weight sat
+ *     between the address and the payment line, and a reader had to
+ *     scan them all before reaching the two things that decide a
+ *     visit. They are all still on the place page, which is where
+ *     somebody goes to compare rather than to decide.
+ *
+ *   - the amenity icons — wifi, power, parking. Three glyphs with no
+ *     words, on a card whose whole job is to be read in five seconds.
+ *
+ *   - the wash and dryer prices. They were the laundromat's own
+ *     version of the same problem: two coloured pills sitting above
+ *     everything else, when the price is already the first thing the
+ *     place page shows.
+ *
+ *   - the newest note, `latest_note`, shown between quotation marks.
+ *     It was capped at two lines, so a long note was cut mid-sentence
+ *     — and a note nobody can finish does not help anyone decide.
+ *
+ * WHAT CHANGED ABOUT PAYMENT
+ *
+ * It used to be five icons and a hard cut: `.slice(0, 5)`, with a
+ * lookup table that drew 💵 for cash, 💳 for card, and a bare ➖ for
+ * anything it did not recognise. Two problems at once — a laundromat
+ * that accepts four methods showed three, and ➖ told the reader
+ * nothing about the fourth.
+ *
+ * Now every method is printed, in words, and nothing is cut. The keys
+ * the add-a-place form writes are the four below; the rest of the map
+ * is kept for places entered before the form was simplified, where
+ * those keys really do exist in the column.
  */
+
 export function PlacePanel({
   place,
   bucketUrl,
@@ -78,29 +95,11 @@ export function PlacePanel({
             ? `verified ${fresh} days ago`
             : `verified ${Math.round(fresh / 30)} months ago`;
 
-  /* ---------- type-specific facts ---------- */
+  /* ---------- how you pay, in words ---------- */
 
-  const facts: string[] = [];
-
-  if (isCoffee) {
-    if (place.coffee_kind === "barista") facts.push("☕ Specialty / Barista");
-    else if (place.coffee_kind === "both") facts.push("☕ Both");
-    else if (place.coffee_kind === "regular") facts.push("☕ Regular");
-
-    for (const key of (place.ambience ?? []).slice(0, 3)) {
-      facts.push(`${AMBIENCE_EMOJI[key] ?? ""} ${AMBIENCE_LABEL[key] ?? key}`);
-    }
-
-    if (place.sells_beans) facts.push("🫘 Beans for sale");
-  } else {
-    if (place.wash_minutes) facts.push(`Wash ~${place.wash_minutes} min`);
-    if (place.dryer_minutes) facts.push(`Dry ~${place.dryer_minutes} min`);
-
-    const lastEntry = clockTime(place.last_entry_minutes);
-    if (lastEntry) facts.push(`Last entry ${lastEntry}`);
-
-    if (place.detergent_included) facts.push("Detergent included");
-  }
+  const payments = (place.accepted_payments ?? []).filter(
+    (value): value is string => typeof value === "string" && value.length > 0
+  );
 
   return (
     <div className="relative">
@@ -138,76 +137,39 @@ export function PlacePanel({
 
       <div className="p-5">
         <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-          {isCoffee ? "☕ Coffee" : "🧺 Laundromat"}
+          {isCoffee ? "☕ Barista" : "🧺 Laundromat"}
         </p>
 
-        <h2 className="mt-1 truncate text-xl font-bold text-slate-900">
+        <h2 className="mt-1 break-words text-xl font-bold text-slate-900">
           {place.name}
         </h2>
 
-        <p className="mt-1 truncate text-sm text-slate-500">
+        <p className="mt-1 break-words text-sm text-slate-500">
           {[place.address, place.city, place.country]
             .filter(Boolean)
             .join(" · ") || "No address yet"}
         </p>
 
-        {/* Prices — the first thing anyone looks for */}
+        {/* How you pay — every method, in words. */}
 
-        {!isCoffee && (place.wash_amount || place.dryer_amount) && (
-          <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
-            {place.wash_amount && (
-              <span className="rounded-lg bg-sky-50 px-2.5 py-1 text-sky-900">
-                🧺 {place.wash_amount} {place.wash_currency}
-              </span>
-            )}
+        {payments.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Payment
+            </p>
 
-            {place.dryer_amount && (
-              <span className="rounded-lg bg-orange-50 px-2.5 py-1 text-orange-900">
-                🔥 {place.dryer_amount} {place.dryer_currency}
-              </span>
-            )}
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {payments.map((key) => (
+                <span
+                  key={key}
+                  className="rounded-lg bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-700"
+                >
+                  {paymentLabel(key)}
+                </span>
+              ))}
+            </div>
           </div>
         )}
-
-        {/* Facts, one per chip */}
-
-        {facts.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5 text-sm">
-            {facts.map((fact) => (
-              <span
-                key={fact}
-                className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700"
-              >
-                {fact}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Payment and amenities */}
-
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {(place.accepted_payments ?? []).slice(0, 5).map((key) => (
-            <span
-              key={key}
-              className="rounded-lg bg-slate-100 px-2 py-1 text-sm text-slate-700"
-            >
-              {paymentIcon(key)}
-            </span>
-          ))}
-
-          {place.has_wifi && (
-            <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">📶</span>
-          )}
-
-          {place.has_power && (
-            <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">🔌</span>
-          )}
-
-          {place.has_parking && (
-            <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm">🅿️</span>
-          )}
-        </div>
 
         {/* Freshness — the whole point of the site */}
 
@@ -219,14 +181,6 @@ export function PlacePanel({
 
         {distanceLabel && (
           <p className="mt-0.5 text-xs text-slate-500">📍 {distanceLabel} away</p>
-        )}
-
-        {/* The newest note, truncated */}
-
-        {place.latest_note && (
-          <p className="mt-3 line-clamp-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-            “{place.latest_note}”
-          </p>
         )}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -271,20 +225,37 @@ export function PlacePanel({
   );
 }
 
-function paymentIcon(key: string) {
-  return (
-    {
-      cash: "💵",
-      card: "💳",
-      debit: "🏧",
-      contactless: "📱",
-      apple_pay: "🍎",
-      google_pay: "🟢",
-      laundry_card: "🎟️",
-      coins: "🪙",
-      other: "➖",
-    }[key] ?? "➖"
-  );
+/*
+ * The payment keys, in words.
+ *
+ * The four at the top are what the add-a-place form writes. The rest
+ * are kept because they are real values in `accepted_payments` for
+ * places added before that form was simplified — dropping them would
+ * turn an old laundromat's payment line into a row of question marks.
+ *
+ * An unknown key prints as it was stored, minus the underscores: a
+ * person typing "exact change only" into the payment note field gets
+ * their own words back rather than a dash.
+ */
+const PAYMENT_WORDS: Record<string, string> = {
+  cash: "Cash",
+  card: "Cards",
+  online: "Online app",
+  laundry_card: "Laundry card",
+  debit: "Debit",
+  contactless: "Contactless",
+  apple_pay: "Apple Pay",
+  google_pay: "Google Pay",
+  coins: "Coins",
+  other: "Other",
+};
+
+function paymentLabel(key: string): string {
+  const known = PAYMENT_WORDS[key];
+
+  if (known) return known;
+
+  return key.replace(/_/g, " ");
 }
 
 export { formatDistance };
