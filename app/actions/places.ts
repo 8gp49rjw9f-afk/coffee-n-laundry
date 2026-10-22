@@ -14,9 +14,7 @@ import type { PlaceType } from "@/lib/types";
 
 /*
  * The field keys come from lib/fieldKeys.ts — one list, shared with
- * the database enum's writer expectations. The type used to be
- * declared here, in a second copy that could not be checked against
- * the first. Migration 0014 exists because those two copies drifted.
+ * the database enum's writer expectations.
  *
  * Every failure below throws a CODE. The database message still goes
  * to the logs beside it, where it belongs; it no longer reaches a
@@ -32,9 +30,24 @@ const AMBIENCE_VALUES = [
   "outdoor-seating",
 ];
 
-/* The same four the form offers. A stray string must not reach the
-   column, which is why this list is checked rather than trusted. */
 const FOOD_VALUES = ["full_meals", "vegan", "sandwich", "pastries"];
+
+function readBool(value: FormDataEntryValue | null): boolean {
+  return String(value) === "true";
+}
+
+function numberOrNull(value: FormDataEntryValue | null): number | null {
+  const n = Number(value);
+
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function clockTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
 
 export async function createPlace(formData: FormData): Promise<void> {
   const supabase = await createClient();
@@ -78,11 +91,6 @@ export async function createPlace(formData: FormData): Promise<void> {
     throw new Error("PLACE_POSITION_INVALID");
   }
 
-  /*
-   * At least one photo. The form disables its button without one, but
-   * the form is a suggestion — this is the rule, and it holds for a
-   * request built by hand as well.
-   */
   const photoCount = formData
     .getAll("photo")
     .filter((value) => value instanceof File && value.size > 0).length;
@@ -103,11 +111,6 @@ export async function createPlace(formData: FormData): Promise<void> {
     throw new Error("PLACE_DAILY_LIMIT");
   }
 
-  /*
-   * The lookup may not answer — and when it does not, the place still
-   * goes on the map with no city and no country. The flag is logged so
-   * a run of failures is visible; nothing is said to the visitor.
-   */
   const geo = await reverseGeocode(latitude, longitude);
 
   if (geo.failed) console.error("[createPlace] reverse geocode failed");
@@ -164,8 +167,6 @@ export async function createPlace(formData: FormData): Promise<void> {
     .select("id")
     .single();
 
-  /* This one is fatal, and says so. A place that was not saved has
-     nothing to redirect to, and the person needs to know why. */
   if (error || !place) {
     if (error) console.error("[createPlace] place", error.message);
 
@@ -187,7 +188,6 @@ export async function createPlace(formData: FormData): Promise<void> {
     created_by: string;
   }[] = [];
 
-  /* A number without a currency is refused: it tells nobody anything. */
   if (currency.length === 3) {
     const add = (kind: string, raw: FormDataEntryValue | null) => {
       const amount = Number(raw);
@@ -207,8 +207,6 @@ export async function createPlace(formData: FormData): Promise<void> {
       add("wash", formData.get("wash_amount"));
       add("dryer", formData.get("dryer_amount"));
 
-      /* Detergent is only priced when it is bought there and not
-         already part of the wash price. */
       if (
         readBool(formData.get("detergent_purchasable")) &&
         !readBool(formData.get("detergent_included"))
@@ -216,9 +214,6 @@ export async function createPlace(formData: FormData): Promise<void> {
         add("detergent", formData.get("detergent_price"));
       }
     } else {
-      /* Espresso and flat white only. Filter coffee was a third price
-         row that almost every café left empty, and nothing offers it
-         any more — so nothing reads the field either. */
       add("espresso", formData.get("espresso_price"));
       add("flat_white", formData.get("flat_white_price"));
     }
@@ -228,9 +223,6 @@ export async function createPlace(formData: FormData): Promise<void> {
         .from("place_prices")
         .insert(priceRows);
 
-      /* The place is real and saved; losing its prices would leave it
-         silently useless to the person who drives there. This is the
-         one failure here that WARNS rather than blocks. */
       if (priceError) {
         console.error("[createPlace] prices", priceError.message);
 
@@ -317,22 +309,12 @@ export async function createPlace(formData: FormData): Promise<void> {
         photo_type: "detail",
       });
     } catch (photoError) {
-      /* A failed photo must never lose the place itself. It is worth a
-         line in the logs, and worth a quiet word — but not a block. */
       console.error("[createPlace] photo", photoError);
     }
   }
 
   /* ---------- who verified what ---------- */
 
-  /*
-   * The username, not the part of the email before the @.
-   *
-   * `simon@gmail.com` and `simon@hotmail.fr` both read as "simon" on
-   * the page — two people wearing one name, and no way to tell which
-   * of them filled in a wrong price. The username is unique, so it
-   * names exactly one person.
-   */
   const displayName = await displayNameFor(user.id);
 
   const checks: {
@@ -376,23 +358,6 @@ export async function createPlace(formData: FormData): Promise<void> {
     if (food.length > 0) push("food", food.join(", "));
     if (readBool(formData.get("has_decaf"))) push("decaf", "yes");
 
-    /*
-     * NO SNAPSHOT FOR THE MILK LINE, AND THAT IS THE POINT.
-     *
-     * `milk` is the one coffee key that is NOT a yes/no on the page.
-     * CoffeeTable renders it as the list of milks the café actually
-     * pours — Oat, Soy, Coconut, Almond — read from the four columns.
-     *
-     * But a snapshot wins over that list (`check?.value_snapshot ??
-     * row.fallback(facts)`), and this line used to write "yes"
-     * whenever cow milk was ticked. So ticking Cow replaced the list
-     * with the word "yes": the four plant milks disappeared and the
-     * row said nothing useful.
-     *
-     * Each milk has its own key below — `oat_milk`, `soy_milk` and so
-     * on — which is where a per-milk confirmation belongs. `milk` is
-     * left to the fallback, which builds the list from the columns.
-     */
     if (readBool(formData.get("has_oat_milk"))) push("oat_milk", "yes");
     if (readBool(formData.get("has_soy_milk"))) push("soy_milk", "yes");
     if (readBool(formData.get("has_coconut_milk"))) push("coconut_milk", "yes");
@@ -455,37 +420,51 @@ export async function createPlace(formData: FormData): Promise<void> {
     }
   }
 
-  /*
-   * No `add_place` award here.
-   *
-   * The credits for this place are paid when somebody else verifies
-   * it, not now — see `awardPlaceCreditsOnce` in lib/services/credits.
-   * Paying at creation would reward empty pins.
-   */
+  /* ---------- the author's opening note ----------
+
+     Whatever the person typed into "Add some comments" on the way
+     in becomes the FIRST comment on this place, under their own
+     username.
+
+     It used to go into `places.description`, where nothing ever read
+     it: the form collected the text, the column stored it, and no
+     page displayed it. The comments list is where a reader actually
+     looks for somebody's own words about a place, so that is where
+     this belongs.
+
+     NOT SUBJECT TO THE 24-HOUR CEILING. That ceiling is about how
+     often one person may speak about OTHER people's places. This is
+     part of creating one — it happens once, at the moment the place
+     appears.
+
+     AND NEVER FATAL. The place exists and is on the map by the time
+     this runs. If the comment cannot be written, the right answer is
+     a line in the logs, not an error thrown at somebody whose place
+     was saved perfectly well. 0021 may not have been applied to the
+     database yet, and that is exactly the case this has to survive.
+
+     `displayName` is already resolved above, for the field checks —
+     the username, never the local part of an email. */
+
+  const openingNote = String(formData.get("description") ?? "").trim();
+
+  if (openingNote) {
+    const { error: commentError } = await supabase
+      .from("place_comments")
+      .insert({
+        place_id: place.id,
+        user_id: user.id,
+        author_name: displayName,
+        body: openingNote.slice(0, 200),
+      });
+
+    if (commentError) {
+      console.error("[createPlace] opening comment", commentError.message);
+    }
+  }
 
   revalidatePath("/");
-  revalidatePath("/new");
+  revalidatePath(`/place/${place.id}`);
 
   redirect(`/place/${place.id}`);
-}
-
-/* ====================================================== */
-/* HELPERS                                                 */
-/* ====================================================== */
-
-function readBool(value: FormDataEntryValue | null): boolean {
-  return String(value) === "true";
-}
-
-function numberOrNull(value: FormDataEntryValue | null): number | null {
-  const n = Number(value);
-
-  return Number.isFinite(n) && n >= 0 ? n : null;
-}
-
-function clockTime(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
