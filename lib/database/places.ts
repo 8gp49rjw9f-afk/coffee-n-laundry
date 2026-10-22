@@ -153,13 +153,32 @@ export async function getPlace(id: string): Promise<
         .eq("place_id", id)
         .order("kind"),
 
-      /* Newest first: what somebody said most recently is what a
-         reader wants, and it is the order the panel draws. */
+      /*
+       * OLDEST FIRST — and that is a change.
+       *
+       * The list used to run newest-first, which is the right order
+       * for a conversation and the wrong one for this page. The first
+       * comment on a place is now written by the person who ADDED it:
+       * whatever they typed into "Add some comments" during creation
+       * is inserted as the first row, under their own name.
+       *
+       * With newest-first that opening note sat at the bottom of the
+       * list — the one remark that explains the place, buried under
+       * every remark that came after. Oldest-first puts the author's
+       * own word at the top, where a reader meets it before the rest,
+       * and the newer comments stack underneath in the order they
+       * arrived.
+       *
+       * The trade is deliberate: on a heavily commented place, the
+       * newest remark is now the lowest one. That is acceptable here
+       * because the top of this list is not "what happened last" — it
+       * is "what this place is", written by whoever put it on the map.
+       */
       supabase
         .from("place_comments")
         .select("id, author_name, body, created_at")
         .eq("place_id", id)
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: true })
         .limit(COMMENTS_PER_PAGE),
 
       /* One row per field: who last verified it, and when. */
