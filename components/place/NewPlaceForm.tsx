@@ -548,12 +548,19 @@ export function NewPlaceForm({
             />
           </label>
 
+          {/*
+           * The picker takes ONE prop — `onPicked(lat, lng)` — and
+           * keeps its own resolved position, its own search box and
+           * its own map dialog. It does not read latitude, longitude
+           * or address back from the parent: an earlier version of
+           * this form passed `value` and `onChange` as if it were a
+           * controlled input, which it is not, and the build failed on
+           * the prop that does not exist.
+           */}
           <LocationPicker
-            value={{ latitude, longitude, address }}
-            onChange={(next) => {
-              setLatitude(next.latitude);
-              setLongitude(next.longitude);
-              setAddress(next.address);
+            onPicked={(lat, lng) => {
+              setLatitude(lat);
+              setLongitude(lng);
             }}
           />
 
@@ -1062,7 +1069,7 @@ export function NewPlaceForm({
 
       <Button
         type="submit"
-        disabled={(!canSubmit || (Boolean(chainHit) && !chainConfirmed))}
+        disabled={!canSubmit || (Boolean(chainHit) && !chainConfirmed)}
         className="w-full"
       >
         {loading ? "Saving…" : "Add the place"}
