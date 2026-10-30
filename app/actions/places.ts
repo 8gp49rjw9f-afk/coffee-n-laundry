@@ -8,6 +8,7 @@ import { getSettings } from "@/lib/services/settings";
 import { reverseGeocode } from "@/lib/services/geocoding";
 import { uploadPlacePhoto } from "@/lib/services/upload";
 import { displayNameFor } from "@/lib/database/places";
+import { requireNotBanned } from "@/lib/services/admin";
 
 import type { FieldKey } from "@/lib/fieldKeys";
 import type { PlaceType } from "@/lib/types";
@@ -59,6 +60,21 @@ export async function createPlace(formData: FormData): Promise<void> {
   if (!user) {
     redirect("/login?next=/new");
   }
+
+  /*
+   * The suspension comes before anything else writes. A suspended
+   * account keeps every other right — it reads the map, opens places,
+   * reads the comments — but adding a new place is the exact gesture
+   * the ban exists to stop.
+   *
+   * AND IT IS PLACED BEFORE THE FIRST VALIDATION, not after. This
+   * function ends in redirect(), and a redirect in a Server Action is
+   * an exception Next.js throws on purpose: a caught one would look
+   * like a failure, and anything placed after the last await would
+   * never be reached. So the gate belongs here, at the top, where
+   * nothing has happened yet.
+   */
+  await requireNotBanned();
 
   const settings = await getSettings();
 
