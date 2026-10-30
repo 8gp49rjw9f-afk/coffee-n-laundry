@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card, Input, Button, ErrorBanner } from "@/components/ui";
 
 import { signUp } from "@/app/actions/auth";
+import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { getSettings } from "@/lib/services/settings";
 
 const MESSAGES: Record<string, string> = {
@@ -30,16 +31,33 @@ export default async function SignupPage({
   const keptUsername =
     typeof query.username === "string" ? query.username : "";
 
+  /* The address the confirmation was sent to. Its presence means the
+     account was created a moment ago and the only thing left is the
+     click in the inbox — so the form is replaced rather than repeated.
+     A form repeated here is the worst possible answer: the person
+     would fill it in again, be told the address already exists, and
+     never learn that a letter is waiting. */
+  const pending =
+    typeof query.pending === "string" && query.pending.trim().length > 0
+      ? query.pending.trim()
+      : null;
+
   return (
     <main className="mx-auto max-w-md px-4 py-10 sm:px-8">
-      <h1 className="text-2xl font-bold text-slate-900">Create an account</h1>
+      <h1 className="text-2xl font-bold text-slate-900">
+        {pending ? "Check your inbox" : "Create an account"}
+      </h1>
 
       <p className="mb-6 mt-1 text-sm text-slate-600">
-        Free for the first year. Contributing earns credits you can spend later.
+        {pending
+          ? "One click and you are in. Until then the account stays asleep."
+          : "Free for the first year. Contributing earns credits you can spend later."}
       </p>
 
       <Card>
-        {settings.registrations_enabled ? (
+        {pending ? (
+          <ResendConfirmation email={pending} />
+        ) : settings.registrations_enabled ? (
           <form action={signUp} className="space-y-4">
             <Input label="Email" name="email" type="email" autoComplete="email" required />
 
