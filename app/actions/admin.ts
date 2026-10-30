@@ -63,7 +63,7 @@ function absoluteUrl(value: string): string {
 
   if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return "";
 
-  return `[${text.replace(](https://${text.replace(/^\/+/) "")}`;
+    return `[${text.replace(](https://${text.replace(/^\/+/) "")}`;
 }
 
 export async function saveSettings(formData: FormData): Promise<void> {
