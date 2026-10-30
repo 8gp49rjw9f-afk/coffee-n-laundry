@@ -8,6 +8,7 @@ import { awardCredits } from "@/lib/services/credits";
 import { getSettings } from "@/lib/services/settings";
 import { reverseGeocode } from "@/lib/services/geocoding";
 import { canEdit } from "@/lib/services/accountAge";
+import { requireNotBanned } from "@/lib/services/admin";
 
 import type { PlaceType } from "@/lib/types";
 
@@ -22,15 +23,18 @@ import type { PlaceType } from "@/lib/types";
  * `place_updates` carries one row per field that moved, so the
  * timeline reads as a list of facts rather than one vague "edited".
  *
- * Three rules decide who may write what, and they are enforced HERE,
+ * Four rules decide who may write what, and they are enforced HERE,
  * not in the form. A form is a suggestion; this file is the rule:
  *
  *   1. Nobody signed out writes anything — the page redirects to
  *      /login before this runs, and the guard is repeated below.
- *   2. Anyone signed in may correct the facts about the place: prices,
+ *   2. Nobody suspended writes anything — the ban is absolute and
+ *      comes before every other test, because every other test below
+ *      is about degree and this one is about permission.
+ *   3. Anyone signed in may correct the facts about the place: prices,
  *      hours, machines, coffee, amenities, payment, website, notes —
  *      once their account is a week old.
- *   3. The person who created the place may also change its IDENTITY —
+ *   4. The person who created the place may also change its IDENTITY —
  *      its name, its address, and where it sits on the map. Those
  *      three are what make it *this* place and not another one, which
  *      is why strangers cannot move them.
@@ -156,6 +160,19 @@ export async function updatePlace(formData: FormData): Promise<void> {
 
   if (!placeId) throw new Error("PLACE_NOT_FOUND");
 
+  /*
+   * Rule 2 — nobody suspended writes anything.
+   *
+   * Placed before the account-age gate on purpose, and the order is
+   * not cosmetic. An account suspended yesterday and two days old
+   * would otherwise be told it is too young — which is true, but not
+   * the reason it cannot act. The ban is a decision somebody made;
+   * the age is a delay. A sentence about the delay would hide the
+   * decision, and the person would come back tomorrow expecting to
+   * be let in.
+   */
+  await requireNotBanned();
+
   /* ---------- the place as it stands ---------- */
 
   const { data: place } = await supabase
@@ -203,7 +220,7 @@ export async function updatePlace(formData: FormData): Promise<void> {
    * Order matters for the message a person reads. An account that is
    * two days old and has also edited something today should be told
    * the first thing, not the smaller one: the week is why it cannot
-   * act at all, and “one coffee shop a day” would suggest trying again
+   * act at all, and "one coffee shop a day" would suggest trying again
    * tomorrow when tomorrow changes nothing.
    *
    * The creator is exempt, and that is the whole shape of the rule —
