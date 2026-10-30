@@ -12,6 +12,7 @@ import { CreditRulesPanel } from "@/components/admin/CreditRulesPanel";
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { AdminsPanel } from "@/components/admin/AdminsPanel";
 import { UserSearch } from "@/components/admin/UserSearch";
+import { BannedPanel, type BannedRow } from "@/components/admin/BannedPanel";
 
 import type { CreditRuleRow } from "@/components/admin/CreditRulesPanel";
 import type { ReportGroup, FlaggedPlace } from "@/components/admin/ReportsPanel";
@@ -47,6 +48,7 @@ export default async function AdminPage({
     { key: "rewards", label: "Rewards", emoji: "🏅" },
     { key: "moderation", label: "Moderation", emoji: "🚩" },
     { key: "users", label: "Users", emoji: "👤" },
+    { key: "banned", label: "Banned", emoji: "🚫" },
     ...(master ? [{ key: "admins", label: "Admins", emoji: "🔑" }] : []),
   ];
 
@@ -152,6 +154,17 @@ export default async function AdminPage({
         .select("email, is_master, created_at, notify_email")
     : { data: null };
 
+  /*
+   * The Banned tab. One call, and 0026 decides who may read it — it
+   * raises ADMIN_ONLY for anybody else, which comes back as an error
+   * rather than rows. That is why the failure is swallowed into an
+   * empty list here: an admin page should still draw if this one
+   * function is missing, and 0026 may not have been pasted yet.
+   */
+  const { data: bannedRows } = await supabase.rpc("list_banned_users");
+
+  const banned = (bannedRows ?? []) as BannedRow[];
+
   return (
     <main className="mx-auto max-w-3xl space-y-4 px-4 py-6 sm:px-8">
       <div>
@@ -199,6 +212,8 @@ export default async function AdminPage({
       )}
 
       {active === "users" && <UserSearch term={term} />}
+
+      {active === "banned" && <BannedPanel rows={banned} />}
 
       {active === "admins" && master && (
         <AdminsPanel admins={(adminRows ?? []) as AdminRow[]} self={admin.email} />
