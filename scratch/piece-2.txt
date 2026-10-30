@@ -1,0 +1,93 @@
+  PLACE_NOT_FOUND: {
+    title: "That place is gone",
+    body: "It may have been removed since the page was opened.",
+    severity: "blocking",
+  },
+
+  /* ---------- editing a place ---------- */
+  UPDATE_DAILY_LIMIT_COFFEE: {
+    title: "One coffee shop a day",
+    body: "You already edited a coffee shop today. You can edit another tomorrow.",
+    severity: "blocking",
+  },
+  UPDATE_DAILY_LIMIT_LAUNDRY: {
+    title: "One laundromat a day",
+    body: "You already edited a laundromat today. You can edit another tomorrow.",
+    severity: "blocking",
+  },
+  UPDATE_SAVE_FAILED: {
+    title: "Could not save those changes",
+    body: "Your edits are still in the form. Try again.",
+    severity: "blocking",
+    retry: true,
+  },
+  UPDATE_COFFEE_DETAILS_FAILED: {
+    title: "Could not save the coffee details",
+    body: "The rest of your changes may not have been saved either. Try again.",
+    severity: "blocking",
+    retry: true,
+  },
+  UPDATE_LAUNDRY_DETAILS_FAILED: {
+    title: "Could not save the machine details",
+    body: "The rest of your changes may not have been saved either. Try again.",
+    severity: "blocking",
+    retry: true,
+  },
+
+  /* ---------- photos ---------- */
+  PHOTO_SIGNED_OUT: {
+    title: "Sign in first",
+    body: "An account is needed to add or change a photo.",
+    severity: "blocking",
+  },
+  PHOTO_NONE_ATTACHED: {
+    title: "No photo chosen",
+    body: "Pick an image and try again.",
+    severity: "blocking",
+    retry: true,
+  },
+  PHOTO_TOO_LARGE: {
+    title: "That photo is too large",
+    body: "The limit is 10 MB. A smaller version of the same picture will do.",
+    severity: "blocking",
+    retry: true,
+  },
+  PHOTO_BAD_FORMAT: {
+    title: "That file is not an image",
+    body: "JPEG, PNG, WebP, GIF and HEIC are accepted.",
+    severity: "blocking",
+    retry: true,
+  },
+  PHOTO_PROCESS_FAILED: {
+    title: "Could not process that photo",
+    body: "Try a smaller one, or take a new picture.",
+    severity: "blocking",
+    retry: true,
+  },
+  PHOTO_UPLOAD_FAILED: {
+    title: "Could not upload the photo",
+    body: "Check your connection and try again.",
+    severity: "blocking",
+    retry: true,
+  },
+  PHOTO_DELETE_DENIED: {
+    title: "That photo is not yours to remove",
+    body: "Only the person who added a photo, or the person who added the place, can delete it.",
+    severity: "blocking",
+  },
+  PHOTO_ALREADY_GONE: {
+    title: "That photo is already gone",
+    body: "Someone may have removed it a moment ago.",
+    severity: "muted",
+  },
+  PHOTO_COVER_FAILED: {
+    title: "Could not set the cover",
+    body: "The previous cover has been kept. Try again.",
+    severity: "warning",
+    retry: true,
+  },
+  PHOTO_REPLACE_DENIED: {
+    title: "That photo is not yours to change",
+    body: "Only the person who added a photo, or the person who added the place, can change it.",
+    severity: "blocking",
+  },
