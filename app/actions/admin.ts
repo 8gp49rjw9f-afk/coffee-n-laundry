@@ -63,7 +63,7 @@ function absoluteUrl(value: string): string {
 
   if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return "";
 
-  return `https://${text.replace(/^\/+/, "")}`;
+  return `[${text.replace(](https://${text.replace(/^\/+/) "")}`;
 }
 
 export async function saveSettings(formData: FormData): Promise<void> {
@@ -542,4 +542,79 @@ export async function setAdminNotify(formData: FormData): Promise<void> {
   }
 
   revalidatePath("/admin");
+}
+
+/* ---------- banning an account ---------- */
+
+/*
+ * A ban, not a delete. The account stays, the places stay unless the
+ * admin asks for them hidden, and the person can still sign in and
+ * read the map. What stops is their ability to write anything.
+ *
+ * The real gate is requireNotBanned(), called at the top of every
+ * action that writes — this function only records the decision. Both
+ * halves are needed: without the gate a banned person contributes
+ * again, and without this there is nothing for the gate to read.
+ */
+
+export async function banUser(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const supabase = await createClient();
+
+  const userId = String(formData.get("user_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const hidePlaces = String(formData.get("hide_places")) === "true";
+
+  if (!userId) throw new Error("USER_NOT_FOUND");
+
+  /* 0026 checks this a second time inside the function — an admin
+     banned by mistake is the one mistake this screen cannot undo
+     from the interface, because the buttons that would undo it live
+     behind an admin session. */
+  const { error } = await supabase.rpc("ban_user", {
+    target_user_id: userId,
+    reason: reason.length > 0 ? reason : null,
+    hide_places: hidePlaces,
+  });
+
+  if (error) {
+    console.error("[banUser]", error.message);
+
+    throw new Error(
+      error.message.includes("ADMIN_CANNOT_BAN_ADMIN")
+        ? "ADMIN_CANNOT_BAN_ADMIN"
+        : error.message.includes("ADMIN_ONLY")
+          ? "ADMIN_ONLY"
+          : "ADMIN_BAN_FAILED"
+    );
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/user/${userId}`);
+  revalidatePath("/");
+}
+
+export async function unbanUser(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const supabase = await createClient();
+
+  const userId = String(formData.get("user_id") ?? "");
+
+  if (!userId) throw new Error("USER_NOT_FOUND");
+
+  const { error } = await supabase.rpc("unban_user", {
+    target_user_id: userId,
+  });
+
+  if (error) {
+    console.error("[unbanUser]", error.message);
+
+    throw new Error("ADMIN_UNBAN_FAILED");
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/user/${userId}`);
+  revalidatePath("/");
 }
