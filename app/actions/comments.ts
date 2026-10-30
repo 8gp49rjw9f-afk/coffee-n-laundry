@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { displayNameFor } from "@/lib/database/places";
 import { canCommentOrReport } from "@/lib/services/accountAge";
+import { currentBan } from "@/lib/services/admin";
 
 /* ====================================================== */
 /* COMMENTS — one person, one short thing, once a day      */
@@ -13,7 +14,7 @@ import { canCommentOrReport } from "@/lib/services/accountAge";
 /*
  * One comment per PERSON per 24 hours — not per place.
  *
- * This started as “one per person per place”, which does not do the
+ * This started as "one per person per place", which does not do the
  * job it was written for. What it is there to stop is a wave: one
  * person opening twenty places and leaving a word on each in ten
  * minutes. A per-place ceiling lets all twenty through, because each
@@ -34,9 +35,15 @@ import { canCommentOrReport } from "@/lib/services/accountAge";
  * everyone to read, which puts it in the same class as rewriting the
  * place itself. Decided, not defaulted.
  *
- * The two rules are different questions and both are asked:
+ * THREE RULES, THREE DIFFERENT QUESTIONS, AND ALL THREE ARE ASKED:
+ *   - currentBan         — is this account suspended
  *   - canCommentOrReport — may this ACCOUNT write about a place at all
  *   - the window below   — has it already written today
+ *
+ * The ban comes first because it is the cheapest and the most
+ * absolute: a suspended account is not "too new", and answering
+ * "your account is too new" to somebody who was suspended yesterday
+ * would be a lie about the decision that was actually made.
  *
  * A moving 24-hour window, counted backwards from now, for the same
  * reason as reports: 23:59 and 00:01 are two minutes apart in
@@ -79,6 +86,12 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
     return { ok: false, code: "COMMENT_SIGNED_OUT" };
   }
 
+  /* The suspension, before the age gate. A banned account may still
+     READ every comment on the site — that is the difference between a
+     ban and a delete. It may not add one. */
+  const ban = await currentBan();
+  if (ban.banned) return { ok: false, code: "ACCOUNT_BANNED" };
+
   const placeId = String(formData.get("place_id") ?? "");
   const body = String(formData.get("body") ?? "").trim();
 
@@ -90,8 +103,8 @@ export async function writeComment(formData: FormData): Promise<CommentResult> {
     return { ok: false, code: "COMMENT_TOO_LONG" };
   }
 
-  /* The age gate, first. Nothing else is worth asking if the account
-     has been open for two hours. */
+  /* The age gate. Nothing else is worth asking if the account has
+     been open for two hours. */
   if (!(await canCommentOrReport(user.id))) {
     return { ok: false, code: "ACCOUNT_TOO_NEW_TO_EDIT" };
   }
