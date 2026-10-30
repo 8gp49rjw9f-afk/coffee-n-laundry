@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { awardCredits } from "@/lib/services/credits";
 import { uploadPlacePhoto } from "@/lib/services/upload";
+import { requireNotBanned } from "@/lib/services/admin";
 
 /* Photos are for deciding whether to walk over: a machine, a price
    list, the front door. They are compressed on the client before
@@ -20,6 +21,16 @@ function storagePathFrom(url: string): string {
   return url.split("/").slice(-2).join("/");
 }
 
+/*
+ * A SUSPENDED ACCOUNT MAY NOT EDIT THE PHOTOS EITHER.
+ *
+ * The four functions below all open with requireNotBanned(), and in
+ * deletePlacePhoto it comes before the photo is even read — a
+ * deletion cannot be undone, so a gate that fires after the lookup
+ * would let a suspended account remove somebody else's picture and
+ * only then be told it was not allowed.
+ */
+
 export async function addPlacePhotos(formData: FormData): Promise<void> {
   const supabase = await createClient();
 
@@ -32,6 +43,8 @@ export async function addPlacePhotos(formData: FormData): Promise<void> {
   if (!user) {
     throw new Error("PHOTO_SIGNED_OUT");
   }
+
+  await requireNotBanned();
 
   if (!placeId) {
     throw new Error("PLACE_NOT_FOUND");
@@ -99,6 +112,8 @@ export async function setPrimaryPhoto(
   if (!user) {
     throw new Error("PHOTO_SIGNED_OUT");
   }
+
+  await requireNotBanned();
 
   /* Remember the current cover so it can be restored if the second
      write fails. */
@@ -183,6 +198,12 @@ export async function deletePlacePhoto(
     throw new Error("PHOTO_SIGNED_OUT");
   }
 
+  /* Before the lookup, not after. A deletion cannot be undone, so a
+     gate that fired once the photo had been read would still leave a
+     window in which a suspended account could remove a picture and
+     only then be refused. */
+  await requireNotBanned();
+
   const { data: photo } = await supabase
     .from("place_photos")
     .select("id, storage_path")
@@ -238,6 +259,8 @@ export async function replacePlacePhoto(formData: FormData): Promise<void> {
   if (!user) {
     throw new Error("PHOTO_SIGNED_OUT");
   }
+
+  await requireNotBanned();
 
   const placeId = String(formData.get("place_id") ?? "");
   const photoId = String(formData.get("photo_id") ?? "");
