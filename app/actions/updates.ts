@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/services/settings";
-import { currentAdmin } from "@/lib/services/admin";
+import { currentAdmin, currentBan } from "@/lib/services/admin";
 import { canCommentOrReport } from "@/lib/services/accountAge";
 
 /* ====================================================== */
@@ -83,6 +83,12 @@ import { canCommentOrReport } from "@/lib/services/accountAge";
  *
  * The index is now plain rather than unique (see 0020) and stays,
  * because the lookup below still wants it.
+ *
+ * AND A SUSPENDED ACCOUNT IS REFUSED BEFORE ANY OF IT — including an
+ * admin who has been suspended, except that an admin cannot be
+ * suspended at all (see 0026 and ban_user). The check is here because
+ * a ban must not be escapable by finding a route the ban did not
+ * think of, and reporting is one of the routes that writes.
  */
 
 const REPORT_WINDOW_HOURS = 24;
@@ -105,6 +111,13 @@ export async function reportPlace(formData: FormData): Promise<ReportResult> {
   if (!user) {
     return { ok: false, code: "REPORT_SIGNED_OUT" };
   }
+
+  /* The suspension, ahead of the age gate and the admin exemption
+     both. Order matters here: an admin skips the age gate and the
+     24-hour window, and if the ban were checked after that branch a
+     suspended account would skip the ban too. */
+  const ban = await currentBan();
+  if (ban.banned) return { ok: false, code: "ACCOUNT_BANNED" };
 
   const placeId = String(formData.get("place_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
@@ -303,7 +316,7 @@ async function notifyAdmins({
       `Page: /place/${placeId}`,
     ].join("\n");
 
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch("[api.resend.com](https://api.resend.com/emails)", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
