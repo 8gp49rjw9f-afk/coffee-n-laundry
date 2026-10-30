@@ -83,3 +83,64 @@ export async function requireMaster(): Promise<AdminIdentity> {
 
   return admin;
 }
+
+/* ====================================================== */
+/* BANNED — the gate that keeps a suspended account still   */
+/* ====================================================== */
+
+/*
+ * A ban leaves the account alive: the person signs in, reads the map,
+ * and sees a banner saying it is suspended. What stops is writing.
+ *
+ * WHY THIS IS A HELPER AND NOT A CHECK IN EACH ACTION
+ *
+ * Seven actions write something — a place, a comment, a report, a
+ * confirmation, a price, a photo, a message. Testing the column in
+ * each one means seven chances to forget, and the failure is silent:
+ * a banned person quietly contributing again, with nothing on screen
+ * to say the gate was missed. One function, called first in every one
+ * of them, is the only version of this that stays true.
+ *
+ * It throws a CODE, like every other guard here, so describeError can
+ * turn it into a sentence.
+ */
+
+export interface BanState {
+  banned: boolean;
+  reason: string | null;
+}
+
+export async function currentBan(): Promise<BanState> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { banned: false, reason: null };
+
+  /* 0026 adds these columns. Before it is applied the read fails with
+     a missing-column error, and the honest answer then is "not
+     banned" — a site that refuses every write because a migration has
+     not been pasted yet would be worse than the ban it is guarding. */
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("banned_at, banned_reason")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error || !data) return { banned: false, reason: null };
+
+  return {
+    banned: Boolean(data.banned_at),
+    reason: (data.banned_reason as string | null) ?? null,
+  };
+}
+
+export async function requireNotBanned(): Promise<void> {
+  const { banned } = await currentBan();
+
+  if (banned) {
+    throw new Error("ACCOUNT_BANNED");
+  }
+}
