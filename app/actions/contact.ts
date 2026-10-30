@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { currentBan } from "@/lib/services/admin";
 
 /*
  * Bug reports and messages, both sent to the admins as a plain email
@@ -18,6 +19,10 @@ import { createClient } from "@/lib/supabase/server";
  * Every failure answers with a CODE. This action returns rather than
  * throws — it is called from a client component across the boundary —
  * so a code in the return value is what reaches the popup.
+ *
+ * AND A BANNED ACCOUNT IS REFUSED. The form is open to visitors, so
+ * somebody suspended can still reach it — the gate has to be here,
+ * not only in the screens they are signed into.
  */
 
 export interface ContactResult {
@@ -41,6 +46,13 @@ function opening(message: string): string {
 }
 
 export async function sendContact(formData: FormData): Promise<ContactResult> {
+  /* First, before anything is read or sent. A suspended account keeps
+     the right to read the site and to write to us about the
+     suspension — but not through this form, which posts a message
+     into the admins' inbox. */
+  const ban = await currentBan();
+  if (ban.banned) return { ok: false, code: "ACCOUNT_BANNED" };
+
   const kind = String(formData.get("kind") ?? "other");
   const message = String(formData.get("message") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -89,7 +101,7 @@ export async function sendContact(formData: FormData): Promise<ContactResult> {
     .join("\n");
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch("[api.resend.com](https://api.resend.com/emails)", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
