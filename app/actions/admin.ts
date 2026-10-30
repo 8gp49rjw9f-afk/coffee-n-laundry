@@ -47,24 +47,30 @@ import { revokePlaceCredits } from "@/lib/services/credits";
  *
  * So the scheme is added here rather than demanded of the person.
  * Anything already absolute is left exactly as typed, and anything
- * else gets the scheme in front. An empty value stays empty, which is
- * the switch being off rather than an error.
+ * else gets it in front. An empty value stays empty, which is the
+ * switch being off rather than an error.
  *
  * A scheme that is not http(s) is REFUSED rather than rewritten: a
  * `javascript:` in a link is not a typo, and prefixing it would be
  * worse than dropping it.
+ *
+ * THE SCHEME IS BUILT IN PIECES, and that is not a style choice. It
+ * was written whole, and the whole form kept arriving in this file
+ * mangled into a Markdown link — brackets and all — every time it
+ * travelled through a chat window. Split in three, the intact
+ * sequence never appears in the source, so nothing can rewrite it.
+ * The string the browser receives is identical either way.
  */
 function absoluteUrl(value: string): string {
   const text = value.trim();
 
   if (!text) return "";
 
-  if (/^https?:\/\//i.test(text)) return text;
+  if (/^http/i.test(text)) return text;
 
   if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return "";
 
-  return `[${text.replace(](https://${text.replace(/^\/+/) "")}`;
-
+  return "ht" + "tps://" + text.replace(/^\/+/, "");
 }
 
 export async function saveSettings(formData: FormData): Promise<void> {
