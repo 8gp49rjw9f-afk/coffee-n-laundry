@@ -47,7 +47,7 @@ import { revokePlaceCredits } from "@/lib/services/credits";
  *
  * So the scheme is added here rather than demanded of the person.
  * Anything already absolute is left exactly as typed, and anything
- * else gets `https://` in front. An empty value stays empty, which is
+ * else gets the scheme in front. An empty value stays empty, which is
  * the switch being off rather than an error.
  *
  * A scheme that is not http(s) is REFUSED rather than rewritten: a
@@ -63,7 +63,7 @@ function absoluteUrl(value: string): string {
 
   if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return "";
 
-    return `[${text.replace(](https://${text.replace(/^\/+/) "")}`;
+  return `[${text.replace(](https://${text.replace(/^\/+/) "")}`;
 }
 
 export async function saveSettings(formData: FormData): Promise<void> {
@@ -109,7 +109,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
   /*
    * The donation address, put in the shape the button needs.
    *
-   * The stored value may have been typed without `https://` — the
+   * The stored value may have been typed without the scheme — the
    * field does not demand it, and the first version of this function
    * stored whatever arrived. The button then refused to build a link
    * and hid itself, with nothing on screen to say why. Normalising
@@ -551,10 +551,10 @@ export async function setAdminNotify(formData: FormData): Promise<void> {
  * admin asks for them hidden, and the person can still sign in and
  * read the map. What stops is their ability to write anything.
  *
- * The real gate is requireNotBanned(), called at the top of every
- * action that writes — this function only records the decision. Both
- * halves are needed: without the gate a banned person contributes
- * again, and without this there is nothing for the gate to read.
+ * The real gate is currentBan(), called at the top of every action
+ * that writes — this function only records the decision. Both halves
+ * are needed: without the gate a banned person contributes again, and
+ * without this there is nothing for the gate to read.
  */
 
 export async function banUser(formData: FormData): Promise<void> {
