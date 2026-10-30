@@ -10,6 +10,8 @@ import {
   getUserPlaces,
 } from "@/lib/database/users";
 
+import { banUser, unbanUser } from "@/app/actions/admin";
+
 /*
  * One person, as an admin needs to see them when something has gone
  * wrong: who they are, what they have contributed, what they have
@@ -228,6 +230,103 @@ export default async function AdminUserPage({
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      {/*
+       * Moderation.
+       *
+       * The reason is optional on purpose: an admin under pressure
+       * will not fill a mandatory field, they will ban without one —
+       * and a record with no reason is worth less than one that took
+       * two seconds to write. Making it required gets the sentence
+       * "spam" typed by somebody in a hurry.
+       *
+       * An admin account is refused here rather than hidden. Hiding
+       * the buttons would leave an admin wondering whether the screen
+       * is broken; saying why answers it. And 0026 refuses it a second
+       * time, because a banned admin is the one mistake this screen
+       * cannot undo from the interface — the buttons that would undo
+       * it live behind an admin session.
+       */}
+      <Card>
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
+          Moderation
+        </h2>
+
+        {user.is_admin ? (
+          <p className="mt-3 text-sm text-slate-600">
+            This is an admin account. Administrators cannot be suspended.
+            Remove the admin rights first if it should lose access.
+          </p>
+        ) : user.is_blocked ? (
+          <>
+            <p className="mt-3 text-sm text-slate-700">
+              This account is suspended. It can sign in and read the map, but
+              nothing it adds will be recorded.
+            </p>
+
+            <form action={unbanUser} className="mt-3">
+              <input type="hidden" name="user_id" value={user.id} />
+
+              <button
+                type="submit"
+                className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Lift the suspension
+              </button>
+            </form>
+          </>
+        ) : (
+          <form action={banUser} className="mt-3 space-y-3">
+            <input type="hidden" name="user_id" value={user.id} />
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Reason (optional)
+              </span>
+
+              <input
+                name="reason"
+                maxLength={200}
+                placeholder="Spam in the comments"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-slate-500"
+              />
+
+              <span className="mt-1 block text-xs text-slate-500">
+                Kept on the record and shown in the Banned tab. Never shown to
+                the person.
+              </span>
+            </label>
+
+            <button
+              type="submit"
+              className="min-h-11 w-full rounded-xl bg-slate-900 px-4 font-semibold text-white transition hover:bg-slate-800"
+            >
+              Suspend this account
+            </button>
+
+            <p className="text-xs text-slate-500">
+              The account keeps its places on the map. It can sign in and read
+              everything, but it cannot add anything.
+            </p>
+
+            <button
+              type="submit"
+              name="hide_places"
+              value="true"
+              className="min-h-11 w-full rounded-xl border border-amber-300 bg-amber-50 px-4 font-semibold text-amber-900 transition hover:bg-amber-100"
+            >
+              ⚠️ Suspend and hide their places
+            </button>
+
+            <p className="text-xs text-slate-500">
+              Same suspension, and every place this person added leaves the
+              map. The places are not deleted: lifting the suspension puts
+              them all back, unless a moderator has closed one in the
+              meantime.
+            </p>
+          </form>
         )}
       </Card>
     </main>
