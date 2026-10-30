@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { currentAdmin } from "@/lib/services/admin";
+import { currentAdmin, currentBan } from "@/lib/services/admin";
 import { getSettings } from "@/lib/services/settings";
 import { displayNameFor } from "@/lib/database/places";
 
@@ -26,8 +26,20 @@ import HeaderClient from "./HeaderClient";
  * row, so the settings come along for the same trip rather than a
  * fetch from the browser.
  *
- * THREE WAYS IT COMES BACK EMPTY, and all three mean the same thing
- * — no line for it:
+ * WHY THE BAN COMES ALONG TOO
+ *
+ * Same reason. The banner lives in the client component and the state
+ * lives in `profiles`, and this is the request that already has the
+ * session in hand. Reading it here costs one more query on a page
+ * that has already made several.
+ *
+ * `currentBan()` answers "not banned" when 0026 has not been pasted
+ * yet, or when the columns cannot be read — so deploying this before
+ * the migration is safe, and the only symptom is a banner that never
+ * appears.
+ *
+ * THREE WAYS THE DONATION ADDRESS COMES BACK EMPTY, and all three
+ * mean the same thing — no line for it:
  *
  *   - the switch is off in Admin → Site;
  *   - the address was never filled in;
@@ -45,10 +57,11 @@ export default async function HomeHeader() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [admin, settings, username] = await Promise.all([
+  const [admin, settings, username, ban] = await Promise.all([
     user ? currentAdmin() : Promise.resolve(null),
     getSettings(),
     user ? displayNameFor(user.id) : Promise.resolve(null),
+    user ? currentBan() : Promise.resolve({ banned: false, reason: null }),
   ]);
 
   /*
@@ -66,6 +79,7 @@ export default async function HomeHeader() {
       admin={Boolean(admin)}
       username={username}
       donationUrl={donationUrl}
+      banned={ban.banned}
     />
   );
 }
