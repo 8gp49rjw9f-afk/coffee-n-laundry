@@ -94,6 +94,18 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     severity: "blocking",
     retry: true,
   },
+
+  /* The same wall seen from the other door. Supabase answers the
+     login with an "email not confirmed" error, which the action
+     currently reads as a wrong password — so someone who mistyped
+     nothing at all is told their credentials are wrong. */
+  AUTH_EMAIL_NOT_CONFIRMED: {
+    title: "Confirm your email first",
+    body: "This account exists but the address has not been confirmed yet. Open the link we sent, then sign in. You can send it again from the sign-up page.",
+    severity: "blocking",
+  },
+
+
   AUTH_REGISTRATIONS_CLOSED: {
     title: "Registrations are closed",
     body: "New accounts are not being created at the moment.",
@@ -109,6 +121,23 @@ export const ERROR_COPY: Record<string, ErrorCopy> = {
     title: "Could not create the account",
     body: "That address may already have an account. Try signing in instead.",
     severity: "blocking",
+  },
+
+
+  /*
+   * The account exists, but nobody can use it yet. Supabase sends a
+   * confirmation link at signup and holds the session back until the
+   * link is opened — so the person who has just filled this form in
+   * will be turned away at the login screen, and nothing on the site
+   * told them why.
+   *
+   * A `warning` and not a `blocking`: nothing failed. The account was
+   * created and the email is on its way.
+   */
+  AUTH_CONFIRM_EMAIL: {
+    title: "Check your inbox",
+    body: "We sent a confirmation link to that address. Open it and click the link — the account is not active until you do, and signing in will not work before then. Nothing after a few minutes? Look in the spam folder, or send the email again from the sign-up page.",
+    severity: "warning",
   },
 
   /* ---------- usernames ---------- */
