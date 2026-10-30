@@ -7,6 +7,12 @@ import { signIn } from "@/app/actions/auth";
 const MESSAGES: Record<string, string> = {
   missing: "Enter your email and password.",
   invalid: "That email and password do not match.",
+  /* The account exists and the password may well be right — the
+     address has simply never been confirmed. Saying "those do not
+     match" here sends someone into a loop of retyping a password
+     that was never wrong. */
+  unconfirmed:
+    "This account exists but the email has not been confirmed yet. Open the link we sent, then log in — or sign up again to send a new one.",
 };
 
 export default async function LoginPage({
