@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { awardCredits, awardPlaceCreditsOnce } from "@/lib/services/credits";
 import { displayNameFor } from "@/lib/database/places";
 import { canVerify } from "@/lib/services/accountAge";
+import { requireNotBanned } from "@/lib/services/admin";
 
 /*
  * A Postgres code, turned into one of ours.
@@ -33,6 +34,12 @@ function explain(error: { code?: string }): string {
  * lib/services/accountAge.ts, with the reasoning for each. A master
  * or an admin is not exempt here — ADMINS are, in reportPlace, but
  * these are not moderation actions and there is nothing to exempt.
+ *
+ * AND THE SUSPENSION SITS ABOVE THE AGE GATE, in both functions.
+ * A suspended account is not "too new", and telling somebody who was
+ * suspended yesterday that their account is too young would be a lie
+ * about the decision that was actually made. These functions throw,
+ * unlike reportPlace, so the gate is requireNotBanned().
  */
 
 export async function verifyField(
@@ -48,6 +55,8 @@ export async function verifyField(
   if (!user) {
     throw new Error("VERIFY_SIGNED_OUT");
   }
+
+  await requireNotBanned();
 
   if (!(await canVerify(user.id))) {
     throw new Error("ACCOUNT_TOO_NEW_TO_VERIFY");
@@ -101,6 +110,8 @@ export async function confirmStillOpen(placeId: string): Promise<void> {
   if (!user) {
     throw new Error("VERIFY_SIGNED_OUT");
   }
+
+  await requireNotBanned();
 
   if (!(await canVerify(user.id))) {
     throw new Error("ACCOUNT_TOO_NEW_TO_VERIFY");
