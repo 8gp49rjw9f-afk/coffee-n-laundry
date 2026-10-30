@@ -103,13 +103,7 @@ export function Logo({
  *
  * `/pricing` still exists and still renders — the page and the credit
  * system behind it are untouched. What went away is the row in the
- * hamburger. The credits do not behave well enough to be advertised
- * from the main navigation yet, and a link called "Pricing" in a menu
- * that also says the map is free invites the one question the site is
- * not ready to answer.
- *
- * Put the row back here — one line in ABOUT below — when the system
- * settles, and nothing else has to change.
+ * hamburger.
  *
  * THREE RULES THAT CANNOT ALL SHOW AT ONCE
  *
@@ -172,11 +166,23 @@ export default function HeaderClient({
   admin,
   username = null,
   donationUrl = null,
+  banned = false,
 }: {
   signedIn: boolean;
   admin: boolean;
   username?: string | null;
   donationUrl?: string | null;
+  /*
+   * A suspended account still signs in and still reads the map. What
+   * it cannot do is write anything, and without this banner the only
+   * sign of that would be every form failing for no visible reason —
+   * which reads as a broken site, not as a decision somebody made.
+   *
+   * The reason the admin typed is deliberately NOT shown here. It is
+   * on the record for the admins, and the same sentence reaching an
+   * innocent person banned by mistake is worse than saying nothing.
+   */
+  banned?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -236,6 +242,18 @@ export default function HeaderClient({
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
+      {/* Sticky, and above the bar: a suspended person scrolls, and a
+          notice that scrolls away with them would be missed on the
+          form they are about to fill in. */}
+      {banned && (
+        <div className="border-b border-amber-300 bg-amber-50 px-4 py-2.5 text-center text-sm text-amber-900 sm:px-8">
+          <strong className="font-semibold">
+            Your account is suspended.
+          </strong>{" "}
+          You can still read the map, but nothing you add will be recorded.
+        </div>
+      )}
+
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-8">
         <Link href="/" className="flex items-center gap-2">
           <Logo size={48} />
