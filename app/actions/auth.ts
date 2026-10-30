@@ -19,11 +19,19 @@ export async function signIn(formData: FormData): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/login?error=invalid&next=${encodeURIComponent(next)}`);
+    const why = NOT_CONFIRMED.test(error.message) ? "unconfirmed" : "invalid";
+
+    redirect(`/login?error=${why}&next=${encodeURIComponent(next)}`);
   }
 
   redirect(next);
 }
+
+/* Supabase refuses a session until the address is confirmed, and its
+   error message for that case contains this phrase. Without the check
+   the login action told everyone their password was wrong, and people
+   who had mistyped nothing at all retyped it until they gave up. */
+const NOT_CONFIRMED = /email not confirmed|not confirmed/i;
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,10}$/;
 
@@ -104,5 +112,10 @@ export async function signUp(formData: FormData): Promise<void> {
     });
   }
 
-  redirect(username.length > 0 ? "/" : "/profile?welcome=name");
+  /* The account exists — but Supabase holds the session back until the
+     link in the confirmation email is opened. Sending the person to the
+     home page here was the bug: they arrived signed out, with no idea
+     why, and the site never mentioned the email. Hand the address back
+     instead and let /signup explain what is waiting in the inbox. */
+  redirect(`/signup?pending=${encodeURIComponent(email)}`);
 }
