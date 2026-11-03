@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Card, Badge } from "@/components/ui";
 
+import { createClient } from "@/lib/supabase/server";
 import { searchUsers, type UserSearchRow } from "@/lib/database/users";
 
 /*
@@ -26,6 +27,51 @@ import { searchUsers, type UserSearchRow } from "@/lib/database/users";
  * JavaScript off — the results are already in the HTML.
  */
 
+/*
+ * THE TWO NUMBERS ABOVE THE FIELD.
+ *
+ * How many accounts exist, and who arrived last. Both read from
+ * `profiles`, and both are read here rather than through a new
+ * Postgres function.
+ *
+ * The tempting route was a `admin_stats()` function alongside
+ * `search_users`, which is `SECURITY DEFINER` and reads auth.users.
+ * Nothing here needs the email, though: a name is enough for the
+ * line, and `profiles` is already readable — so no migration, and
+ * nothing new to paste into the Supabase SQL editor, which is where
+ * this project has lost the most time.
+ *
+ * What that choice costs, said plainly: the count includes a
+ * sign-up that never confirmed its address. `auth.users` is where
+ * `email_confirmed_at` lives, and reaching it would mean the
+ * function after all. A count that is slightly generous is the right
+ * trade for a line that is only ever read.
+ */
+async function userStats(): Promise<{
+  total: number;
+  latest: string | null;
+}> {
+  const supabase = await createClient();
+
+  /* head:true asks for the number and nothing else — Postgres counts
+     the rows without sending them. */
+  const { count } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true });
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("username")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    total: count ?? 0,
+    latest: data?.username ?? null,
+  };
+}
+
 export async function UserSearch({ term }: { term: string }) {
   const clean = term.trim();
 
@@ -35,9 +81,43 @@ export async function UserSearch({ term }: { term: string }) {
 
   const searched = clean.length >= 2;
 
+  /* Fails softly: a missing `profiles` row or an unreadable table
+     leaves the line off the page rather than taking the tab down
+     with it. */
+  let stats: { total: number; latest: string | null } = {
+    total: 0,
+    latest: null,
+  };
+
+  try {
+    stats = await userStats();
+  } catch (error) {
+    console.error("[UserSearch] stats", error);
+  }
+
+  const countLabel = `${stats.total} ${
+    stats.total === 1 ? "user" : "users"
+  }`;
+
   return (
     <div className="space-y-3">
       <Card>
+        {/* The two numbers, said the way a person would say them.
+            No heading: the sentence is short enough to read as one
+            fact, and a label above it would say it twice. */}
+        <p className="mb-3 text-sm text-slate-600">
+          <span className="font-semibold text-slate-900">{countLabel}</span>
+          {stats.latest && (
+            <>
+              {" · "}
+              last new user ={" "}
+              <span className="font-semibold text-slate-900">
+                {stats.latest}
+              </span>
+            </>
+          )}
+        </p>
+
         {/* A GET form: the browser puts the term in the query string
             itself, so there is no state to keep in sync. */}
         <form action="/admin" method="get" className="block">
