@@ -44,7 +44,21 @@ export default async function HomePage() {
         showFilters
       />
 
-      <section className="mt-6 grid grid-cols-2 gap-3">
+      {/*
+       * Three figures, in one row on a phone as well as a laptop.
+       *
+       * The grid was two columns because there were two numbers. The
+       * row now carries three, and it stays `grid-cols-3` at every
+       * width rather than wrapping to a second line: the three are
+       * read as one sentence — what is on the map, and who put it
+       * there — and a number alone on its own row would read as a
+       * footnote to the other two.
+       *
+       * `padding="sm"` and the smaller rounding keep each card
+       * narrow enough that three fit side by side on the smallest
+       * phone width without the label wrapping under its own number.
+       */}
+      <section className="mt-6 grid grid-cols-3 gap-3">
         <Card padding="sm" className="text-center">
           <p className="text-3xl font-bold text-slate-900">{counts.coffee}</p>
           <p className="mt-1 text-sm text-slate-500">☕ coffee spots</p>
@@ -53,6 +67,14 @@ export default async function HomePage() {
         <Card padding="sm" className="text-center">
           <p className="text-3xl font-bold text-slate-900">{counts.laundry}</p>
           <p className="mt-1 text-sm text-slate-500">🧺 laundromats</p>
+        </Card>
+
+        {/* The person glyph matches the one on a place page, where
+            the line above the address reads “👤 @name”. Same glyph,
+            same meaning: a person, counted. */}
+        <Card padding="sm" className="text-center">
+          <p className="text-3xl font-bold text-slate-900">{counts.users}</p>
+          <p className="mt-1 text-sm text-slate-500">👤 users</p>
         </Card>
       </section>
 
