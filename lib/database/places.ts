@@ -355,10 +355,28 @@ export async function getPlacesByUser(userId: string): Promise<Place[]> {
   return (data ?? []) as unknown as Place[];
 }
 
+/*
+ * Three numbers under the map: coffee spots, laundromats, and the
+ * people who put them there.
+ *
+ * The first two already filtered on `status`, and the third is a
+ * count of `profiles` — the same table the Admin / Users tab reads.
+ * That choice is deliberate, and so is what it costs: an account that
+ * signed up and never confirmed its address is counted here.
+ * `email_confirmed_at` lives in `auth.users`, which no client can
+ * select, and reaching it would mean a new Postgres function — a
+ * migration to paste by hand, for a number whose only job is to say
+ * how many people are here. A count slightly generous is the right
+ * trade.
+ *
+ * head:true asks Postgres for the number alone: it counts the rows
+ * without sending them, so this costs one round trip and no payload,
+ * on a page that already loads every marker on the map.
+ */
 export async function getGlobalCounts() {
   const supabase = await createClient();
 
-  const [coffee, laundry] = await Promise.all([
+  const [coffee, laundry, users] = await Promise.all([
     supabase
       .from("places")
       .select("id", { count: "exact", head: true })
@@ -370,7 +388,13 @@ export async function getGlobalCounts() {
       .select("id", { count: "exact", head: true })
       .eq("place_type", "laundry")
       .neq("status", "closed"),
+
+    supabase.from("profiles").select("id", { count: "exact", head: true }),
   ]);
 
-  return { coffee: coffee.count ?? 0, laundry: laundry.count ?? 0 };
+  return {
+    coffee: coffee.count ?? 0,
+    laundry: laundry.count ?? 0,
+    users: users.count ?? 0,
+  };
 }
