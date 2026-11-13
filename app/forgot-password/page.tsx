@@ -11,27 +11,41 @@ import { requestPasswordReset } from "@/app/actions/password";
  *                whether or not the address exists; saying which ones
  *                are registered is not our business.
  *
- *   ?error=…   — something was refused. `missing` is the form itself.
- *                `failed` is the other one: it arrives from
- *                /auth/confirm, when a recovery link could not be
- *                exchanged for a session. That code had no entry here
- *                for a long time, so MESSAGES returned undefined, the
- *                banner never rendered, and a person whose link had
- *                broken was shown the request form again with no word
- *                about what had just happened.
+ *   ?error=…   — something was refused, and WHICH something is the
+ *                point of this block.
  *
- * `failed` therefore gets more than a sentence. A recovery link can be
- * rewritten on its way through a mail gateway — the address is
- * correct, the gateway substitutes its own domain to inspect the
- * target, and the substitution does not resolve. The person sees a
- * page that has nothing to do with us. That is not their fault and
- * there is nothing to fix on their side, so the help below spells out
- * the one repair they can make: put our address back at the front and
- * keep the rest.
+ * THE CODES, AND WHY THERE ARE FOUR OF THEM.
+ *
+ * There used to be two, and the second one was doing three jobs.
+ * `failed` was returned for a link that arrived damaged, for a send
+ * Supabase had refused, and for anything else that went wrong — so a
+ * person whose request never left the building was shown "Links can
+ * be altered in transit", a sentence about email gateways, with no
+ * send ever having happened.
+ *
+ * Each failure now carries its own code, because each has a
+ * different thing to say and a different thing to do about it:
+ *
+ *   missing  — the form arrived empty.
+ *   send     — Supabase refused to send the email. Almost always its
+ *              rate limit on a small project, so the advice is to
+ *              wait rather than to check anything.
+ *   expired  — the link was opened too late.
+ *   used     — the link had already been consumed, often by a mail
+ *              scanner visiting it before its owner did.
+ *   failed   — the link arrived without a code or a token. This is
+ *              the ONLY case the gateway note below describes, and
+ *              the only one it is still shown for.
+ *
+ * `expired` and `used` are set by /auth/confirm, which reads them
+ * from the parameters Supabase appends when a verify is refused.
  */
 
 const MESSAGES: Record<string, string> = {
   missing: "Enter your email address.",
+  send: "The email could not be sent. Wait a little and try once more.",
+  expired: "That link has expired. Ask for a new one below.",
+  used: "That link has already been used. Ask for a new one below.",
   failed:
     "That link did not work. Links can be altered in transit — see the note below.",
 };
@@ -43,9 +57,20 @@ export default async function ForgotPasswordPage({
 }) {
   const query = await searchParams;
 
-  const error = typeof query.error === "string" ? MESSAGES[query.error] : undefined;
+  const code = typeof query.error === "string" ? query.error : undefined;
 
-  const linkFailed = query.error === "failed";
+  const error = code ? MESSAGES[code] : undefined;
+
+  /*
+   * The long note appears for `failed` alone.
+   *
+   * It was written for one failure — a link rewritten on its way
+   * through a mail gateway — and it describes that failure in three
+   * steps. Shown for an expired link, or for a send Supabase
+   * refused, it teaches a procedure that cannot help and implies the
+   * person's email provider did something it did not do.
+   */
+  const linkFailed = code === "failed";
 
   const sent = Boolean(query.sent);
 
@@ -91,11 +116,13 @@ export default async function ForgotPasswordPage({
       {/*
        * The repair, in three steps, only where it is needed.
        *
-       * SHOWN AFTER `failed` AND NOT ALWAYS. Someone who simply typed
-       * the wrong address does not need a lesson in link rewriting,
-       * and a page that explains a rare failure to everybody teaches
-       * no one. It appears when the link has actually failed, which is
-       * the only moment the instruction has a subject.
+       * SHOWN AFTER `failed` AND NOT ALWAYS. Someone who typed the
+       * wrong address does not need a lesson in link rewriting, and
+       * a page that explains a rare failure to everybody teaches no
+       * one. It appears when the link has actually failed, which is
+       * the only moment the instruction has a subject — and now
+       * that the other failures have codes of their own, that is the
+       * only moment it appears at all.
        */}
       {linkFailed && (
         <Card>
@@ -146,6 +173,28 @@ export default async function ForgotPasswordPage({
           <p className="mt-4 text-sm text-slate-600">
             Or simply ask for a new link below — many providers leave the
             second one alone.
+          </p>
+        </Card>
+      )}
+
+      {/*
+       * A link that had already been used gets one line of its own,
+       * and it is here rather than in the banner because it is not a
+       * fault. A mail scanner opening the link first is the usual
+       * cause, and the person did nothing wrong — so the note names
+       * the cause instead of asking for a fix.
+       */}
+      {code === "used" && (
+        <Card>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
+            Most likely, nothing is broken
+          </h2>
+
+          <p className="mt-2 text-sm leading-relaxed text-slate-700">
+            Some email providers open the links in a message to check
+            them before the message reaches you. Opening the link is
+            what uses it up, so it can be spent before you ever see
+            it. Ask for a new one and it will usually arrive intact.
           </p>
         </Card>
       )}
