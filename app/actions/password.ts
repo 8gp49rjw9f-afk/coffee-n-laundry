@@ -40,6 +40,29 @@ async function siteOrigin(): Promise<string> {
   return `${proto}://${host}`;
 }
 
+/*
+ * TWO FAILURES, TWO CODES — and this is a correction.
+ *
+ * The send used to end at `?error=failed` whatever went wrong, and
+ * that code is the one /forgot-password renders as "That link did not
+ * work. Links can be altered in transit." The sentence is about a
+ * link that arrived damaged, and it was being shown to somebody
+ * whose link had never been sent at all: Supabase had refused the
+ * request, the action swallowed the reason into the logs, and the
+ * page explained mail gateways to a person who was still looking at
+ * the form.
+ *
+ * So `send` is a code of its own now. `failed` stays where it
+ * belongs — on the link that comes back wrong, which /auth/confirm
+ * still uses for exactly that case and nothing else.
+ *
+ * WHAT ACTUALLY REFUSES A SEND, since it is worth knowing while
+ * reading the logs: Supabase rate-limits these emails hard on a
+ * small project, and a run of attempts in one evening will hit the
+ * ceiling. `over_email_send_rate_limit` is the one to expect. No
+ * code change fixes that — the wait does — but the screen should
+ * stop blaming the link for it.
+ */
 export async function requestPasswordReset(formData: FormData): Promise<void> {
   const supabase = await createClient();
 
@@ -56,9 +79,15 @@ export async function requestPasswordReset(formData: FormData): Promise<void> {
   });
 
   if (error) {
-    console.error("[requestPasswordReset]", error.message);
+    /* The real reason stays in the logs, where it is useful. The
+       screen gets a code it can word honestly. */
+    console.error(
+      "[requestPasswordReset]",
+      error.code ?? "",
+      error.message
+    );
 
-    redirect("/forgot-password?error=failed");
+    redirect("/forgot-password?error=send");
   }
 
   /* The same answer whether or not the address exists: telling a
