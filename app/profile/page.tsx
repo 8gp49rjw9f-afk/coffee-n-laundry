@@ -4,19 +4,38 @@ import { redirect } from "next/navigation";
 import { Card, Button, Badge } from "@/components/ui";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCreditSummary } from "@/lib/services/credits";
-import { getSettings } from "@/lib/services/settings";
 import { getPlacesByUser } from "@/lib/database/places";
 
-import { RedeemButton } from "@/components/profile/RedeemButton";
 import { UsernameForm } from "@/components/profile/UsernameForm";
 
-const STATUS_LABEL: Record<string, string> = {
-  free_trial: "Free year",
-  active: "Active",
-  credit_month: "Free month from credits",
-  expired: "Expired",
-};
+/*
+ * THE CREDIT SYSTEM IS NOT DISPLAYED, AND THAT IS DELIBERATE.
+ *
+ * Not deleted — suspended. The balance, the redeem button, the
+ * "N credits = one free month" sentence and the credit history are
+ * all still in this file, commented out, and the machinery behind
+ * them (getCreditSummary, RedeemButton, the credit_rules table) is
+ * untouched. Restoring the page is uncommenting blocks, not
+ * rebuilding them.
+ *
+ * WHY IT WENT QUIET. A number in the top card of your own profile
+ * reads as a score. It invites the question "how many do I have"
+ * before the question "is this place still open" — and the map is
+ * the product. Until the reward means something a person can spend
+ * on this site, showing it teaches the wrong habit.
+ *
+ * WHAT STAYED, AND WHY IT IS NOT THE SAME THING. The three figures
+ * under the balance are counts of contribution, not credit: places
+ * added, places confirmed by somebody else, checks made. They are
+ * the honest description of what a person has done here, they carry
+ * no reward, and they are the part of this card worth keeping.
+ *
+ * THE SUBSCRIPTION STATUS BADGE IS GONE TOO, and for a related
+ * reason: it renders a word about billing — "Free year", "Expired"
+ * — on a page whose subject is your contribution. The subscription
+ * row is still read below, because the status is worth keeping in
+ * the logs; nothing draws it now.
+ */
 
 const ACTION_LABEL: Record<string, string> = {
   add_place: "Added a place",
@@ -63,11 +82,10 @@ export default async function ProfilePage() {
     redirect("/login?next=/profile");
   }
 
-  const [summary, settings, myPlaces, subscription, profileResult, statsResult] =
+  const [myPlaces, subscription, profileResult, statsResult] =
     await Promise.all([
-      getCreditSummary(user.id),
-      getSettings(),
       getPlacesByUser(user.id),
+
       supabase
         .from("subscriptions")
         .select("status, current_period_end")
@@ -97,11 +115,15 @@ export default async function ProfilePage() {
   const profile = profileResult.data as ProfileRow | null;
   const stats = statsResult.data as ContributorStats | null;
 
-  const status = subscription.data?.status ?? "free_trial";
-  const canRedeem = summary.balance >= settings.credits_per_free_month;
-
   const placesAdded = stats?.places_added ?? myPlaces.length;
   const verifiedByOthers = stats?.verified_places ?? 0;
+
+  /* Read and kept, drawn nowhere for now. Kept in the logs so a
+     lookup that starts failing is visible before the badge comes
+     back. */
+  const subscriptionStatus = subscription.data?.status ?? "free_trial";
+
+  console.log("[profile] subscription", user.id, subscriptionStatus);
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-8">
@@ -133,22 +155,18 @@ export default async function ProfilePage() {
         changedAt={profile?.username_changed_at ?? null}
       />
 
+      {/*
+       * WHAT YOU HAVE DONE, with the balance taken off the top.
+       *
+       * The card used to open with a large credit number and a
+       * billing badge, and the three counts sat underneath as a
+       * footnote to them. The counts are now the whole card. Nothing
+       * here mentions credits, and nothing here can be spent.
+       */}
       <Card>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-              Your credits
-            </p>
-
-            <p className="text-4xl font-bold text-slate-900">
-              {summary.balance}
-            </p>
-          </div>
-
-          <Badge className="bg-slate-100 text-slate-700">
-            {STATUS_LABEL[status] ?? status}
-          </Badge>
-        </div>
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+          What you have contributed
+        </p>
 
         <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl bg-slate-50 p-3">
@@ -178,6 +196,45 @@ export default async function ProfilePage() {
         </dl>
 
         <p className="mt-3 text-sm text-slate-600">
+          “Verified” counts your places that somebody else has confirmed —
+          that is what makes a pin worth trusting. “Checks” counts the times
+          you confirmed a place for everyone else.
+        </p>
+      </Card>
+
+      {/*
+       * ------ SUSPENDED: the credit block ------ 
+       *
+       * Everything below is the page as it was, kept in place so the
+       * restore is an uncomment. It is not dead code to be tidied
+       * away: the balance card, the redeem button and the history
+       * list are the whole credit feature, and they are the map back
+       * to it if the reward is ever made spendable.
+       *
+       * The one import this leaves unused is RedeemButton — it is
+       * commented out with the block, on purpose, because a file that
+       * imports a component it never renders is what fails a lint
+       * pass in the middle of a quiet change.
+       */}
+      {/*
+      <Card>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              Your credits
+            </p>
+
+            <p className="text-4xl font-bold text-slate-900">
+              {summary.balance}
+            </p>
+          </div>
+
+          <Badge className="bg-slate-100 text-slate-700">
+            {STATUS_LABEL[status] ?? status}
+          </Badge>
+        </div>
+
+        <p className="mt-3 text-sm text-slate-600">
           {settings.credits_per_free_month} credits = one free month. Credits
           are a thank-you for keeping the map accurate — there is no ranking,
           and nobody else can see your balance. “Verified” counts your places
@@ -189,6 +246,41 @@ export default async function ProfilePage() {
           <RedeemButton canRedeem={canRedeem} />
         </div>
       </Card>
+
+      <Card>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+          Credit history
+        </h2>
+
+        {summary.history.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No credits yet. Adding a place is the quickest way to start.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {summary.history.map((row) => (
+              <li
+                key={row.id}
+                className="flex items-center justify-between gap-3 py-2.5"
+              >
+                <span className="min-w-0 text-sm text-slate-700">
+                  {row.note ?? ACTION_LABEL[row.action_key] ?? row.action_key}
+                </span>
+
+                <span
+                  className={`shrink-0 text-sm font-bold ${
+                    row.amount > 0 ? "text-emerald-700" : "text-rose-700"
+                  }`}
+                >
+                  {row.amount > 0 ? "+" : ""}
+                  {row.amount}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      */}
 
       <Card>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
@@ -223,40 +315,6 @@ export default async function ProfilePage() {
                     {place.city ?? place.country ?? ""}
                   </span>
                 </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <Card>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-          Credit history
-        </h2>
-
-        {summary.history.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            No credits yet. Adding a place is the quickest way to start.
-          </p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {summary.history.map((row) => (
-              <li
-                key={row.id}
-                className="flex items-center justify-between gap-3 py-2.5"
-              >
-                <span className="min-w-0 text-sm text-slate-700">
-                  {row.note ?? ACTION_LABEL[row.action_key] ?? row.action_key}
-                </span>
-
-                <span
-                  className={`shrink-0 text-sm font-bold ${
-                    row.amount > 0 ? "text-emerald-700" : "text-rose-700"
-                  }`}
-                >
-                  {row.amount > 0 ? "+" : ""}
-                  {row.amount}
-                </span>
               </li>
             ))}
           </ul>
