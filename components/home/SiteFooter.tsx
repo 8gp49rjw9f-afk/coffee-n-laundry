@@ -13,9 +13,22 @@ import Link from "next/link";
  * costs a query is a footer that breaks the page it sits under.
  */
 
+/*
+ * PRICING IS COMMENTED OUT, not deleted — the same treatment the
+ * hamburger entry got. The page at /pricing still exists and still
+ * renders; what is gone is the way in from here. Restoring it is
+ * uncommenting one line, which is the point of doing it this way
+ * rather than removing the entry and having to reconstruct it later.
+ *
+ * The decision behind it: a price list under a free community map
+ * invites a question the site has not settled yet. Until the
+ * subscription is something the site actually asks for, the footer
+ * stays quiet about it and keeps the three links that are about the
+ * site itself.
+ */
 const LINKS = [
   { href: "/goal", label: "The goal" },
-  { href: "/pricing", label: "Pricing" },
+  // { href: "/pricing", label: "Pricing" },
   { href: "/report-bug", label: "Report a bug" },
   { href: "/reach-us", label: "Reach us" },
 ];
