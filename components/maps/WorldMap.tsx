@@ -226,20 +226,38 @@ function TheMap({
     /* The wrapper is relative so the overlays can sit over the map
        without being invalid children of MapContainer. */
     <div className="relative h-full w-full">
+      {/*
+       * ZOOM 17, AND WHY IT IS NOT 18 ANY MORE.
+       *
+       * The map used to stop at 18, which OpenStreetMap does not
+       * serve everywhere — past its deepest level for the area, the
+       * server answers empty tiles, Leaflet paints nothing, and what
+       * is left on screen is the container's own grey. The pin tool
+       * was reported for the same grey at 19.
+       *
+       * 17 is the level OSM carries essentially worldwide, so the
+       * floor is real at every coordinate instead of depending on
+       * which city is in view.
+       *
+       * WHAT IT COSTS: one level of closeness. Nothing on this map
+       * needs more — the pins are chosen by eye and by address, and
+       * the zoom bar's "+" now stops honestly at the deepest level
+       * the tiles can fill.
+       *
+       * BEFORE RAISING IT BACK: the number here and the number on the
+       * TileLayer have to agree with what the source actually serves,
+       * or the grey returns. Raising both past OSM's floor is a
+       * change of provider, not a change of number.
+       */}
       <MapContainer
         center={[20, 0]}
         zoom={2}
         minZoom={2}
-        maxZoom={18}
+        maxZoom={17}
         /* Leaflet's own control is a tall rounded bar down the left
            edge. Replaced by the horizontal bar below. */
         zoomControl={false}
         worldCopyJump
-        maxBounds={[
-          [-90, -180],
-          [90, 180],
-        ]}
-        maxBoundsViscosity={1}
         style={{ height: "100%", width: "100%" }}
       >
         <MapState onZoom={onZoom} onBounds={onBounds} />
@@ -256,9 +274,16 @@ function TheMap({
             and throws. */}
         <ZoomBar breakpoint={breakpoint} />
 
+        {/*
+         * maxZoom on the layer as well as the container. Without it
+         * Leaflet keeps requesting tiles at the container's ceiling
+         * even if the source stops lower, which is the same grey by a
+         * different route.
+         */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={17}
         />
 
         {visible.map((place) => (
