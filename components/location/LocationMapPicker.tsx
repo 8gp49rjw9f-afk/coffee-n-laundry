@@ -29,10 +29,8 @@ import { Button } from "@/components/ui";
  * at maximum zoom — which is the clue that solved it. Leaflet builds
  * its own panes inside the container and they climb to z-index 700;
  * the crosshair had none, so as soon as the tiles painted it was
- * covered. At maximum zoom the map goes grey because the tile source
- * has no imagery that deep: nothing repaints over the guide and it is
- * visible again. It was never a mount or a timer problem — the
- * crosshair was simply underneath the map.
+ * covered. It was never a mount or a timer problem — the crosshair
+ * was simply underneath the map, so it now sits at z-[800].
  *
  * No timer of any kind here, and no invalidateSize(). Two used to run
  * in this one map — MapResizeFix (250ms) and SettleOnOpen (200ms) —
@@ -45,34 +43,39 @@ import { Button } from "@/components/ui";
  * page scroll it claimed to, and it was the only useMapEvents in the
  * project.
  *
- * THE GREY AT FULL ZOOM, PROPERLY FIXED
+ * THE GREY AT FULL ZOOM, AND WHAT ACTUALLY FIXES IT
  *
  * The note above recorded the grey as a symptom of the crosshair
- * problem and moved on, because the crosshair was the thing being
- * chased. It was a second, unrelated fault sitting in the same
- * screenful: OpenStreetMap's own tile service does not carry imagery
- * all the way down everywhere, so past its deepest level for the area
- * the server answers empty tiles. Leaflet paints nothing, and the
- * container shows its grey. Nothing about the crosshair can fix that,
- * and hiding it behind a z-index never did.
+ * problem and moved on, because the crosshair was what was being
+ * chased. It was a second, unrelated fault in the same screenful:
+ * OpenStreetMap's tile service does not carry imagery to level 19
+ * everywhere, so past its deepest level for the area the server
+ * answers empty tiles, Leaflet paints nothing, and the container
+ * shows its own grey. No z-index can hide that.
  *
- * The tile source is ESRI World Imagery now, which is served in
- * raster down to level 19 — the level this map already asks for, so
- * no zoom had to be surrendered. It needs no key, and it is licensed
- * for non-commercial use, which is what this site is.
+ * The map was asking for 19 and the tiles stop before it. The fix is
+ * to stop asking: maxZoom is 17 here, which OSM serves essentially
+ * everywhere. Nothing else about pin placement needs the two extra
+ * levels — the crosshair aims at a door, and at 17 a city block fills
+ * the screen.
  *
- * THE ATTRIBUTION IS PART OF THE DEAL, not decoration. ESRI and its
- * data partners require the credit to be visible, and the line below
- * names the providers the tiles actually come from. It is longer than
- * the OSM line it replaced and that is how it has to be; shortening
- * it by dropping the partner names would breach the terms the tiles
- * are given under.
+ * WORTH KNOWING BEFORE RAISING THIS NUMBER AGAIN: 17 is the deepest
+ * level OSM promises globally. If a future screen genuinely needs
+ * closer, the source has to change with it — a second provider, or a
+ * separate layer above this one — because turning maxZoom up on its
+ * own is what produced the grey field in the first place.
  *
- * ONE THING TO KNOW IF THE GREY EVER COMES BACK: this source serves
- * imagery, not street names, so at high zoom the map reads as a
- * photograph. That is the trade for having a floor at 19 at all. If
- * the labels are wanted back, the answer is a second label layer on
- * top of this one, not a return to the source that ran out.
+ * THE MAP WRAPS AROUND NOW
+ *
+ * `maxBounds` and `maxBoundsViscosity` used to hold the view inside
+ * the world rectangle, and they contradicted `worldCopyJump`, which
+ * is the prop that lets the map scroll past the date line and pick up
+ * the same world on the other side. Both were set, so the jump never
+ * happened: the edge simply stopped the drag. The bounds are gone, so
+ * a long drag west from Tokyo keeps going instead of hitting a wall.
+ *
+ * Latitude needs no replacement — you cannot scroll past the poles,
+ * and Leaflet already clamps that on its own.
  */
 
 function CentreWatcher({
@@ -231,28 +234,18 @@ export function LocationMapPicker({
             center={start}
             zoom={zoom}
             minZoom={2}
-            maxZoom={19}
+            maxZoom={17}
             worldCopyJump
-            maxBounds={[
-              [-90, -180],
-              [90, 180],
-            ]}
-            maxBoundsViscosity={1}
             style={{ height: "100%", width: "100%" }}
           >
             {/* The URL is inside braces so JSX leaves {z}/{x}/{y}
                 alone for Leaflet to substitute. Written as a plain
                 attribute, JSX reads them as JS and the path breaks. */}
 
-            {/* maxNativeZoom is what stops the grey: ESRI serves this
-                imagery to level 19, the map never asks past it, and
-                the two numbers now agree. */}
-
             <TileLayer
-              attribution='&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, and the GIS community'
-              url={"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"}
-              maxNativeZoom={19}
-              maxZoom={19}
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url={"https://tile.openstreetmap.org/{z}/{x}/{y}.png"}
+              maxZoom={17}
             />
 
             <CentreWatcher
