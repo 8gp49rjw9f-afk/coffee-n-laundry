@@ -44,6 +44,35 @@ import { Button } from "@/components/ui";
  * listener object, which attaches nothing — so it never prevented the
  * page scroll it claimed to, and it was the only useMapEvents in the
  * project.
+ *
+ * THE GREY AT FULL ZOOM, PROPERLY FIXED
+ *
+ * The note above recorded the grey as a symptom of the crosshair
+ * problem and moved on, because the crosshair was the thing being
+ * chased. It was a second, unrelated fault sitting in the same
+ * screenful: OpenStreetMap's own tile service does not carry imagery
+ * all the way down everywhere, so past its deepest level for the area
+ * the server answers empty tiles. Leaflet paints nothing, and the
+ * container shows its grey. Nothing about the crosshair can fix that,
+ * and hiding it behind a z-index never did.
+ *
+ * The tile source is ESRI World Imagery now, which is served in
+ * raster down to level 19 — the level this map already asks for, so
+ * no zoom had to be surrendered. It needs no key, and it is licensed
+ * for non-commercial use, which is what this site is.
+ *
+ * THE ATTRIBUTION IS PART OF THE DEAL, not decoration. ESRI and its
+ * data partners require the credit to be visible, and the line below
+ * names the providers the tiles actually come from. It is longer than
+ * the OSM line it replaced and that is how it has to be; shortening
+ * it by dropping the partner names would breach the terms the tiles
+ * are given under.
+ *
+ * ONE THING TO KNOW IF THE GREY EVER COMES BACK: this source serves
+ * imagery, not street names, so at high zoom the map reads as a
+ * photograph. That is the trade for having a floor at 19 at all. If
+ * the labels are wanted back, the answer is a second label layer on
+ * top of this one, not a return to the source that ran out.
  */
 
 function CentreWatcher({
@@ -215,9 +244,15 @@ export function LocationMapPicker({
                 alone for Leaflet to substitute. Written as a plain
                 attribute, JSX reads them as JS and the path breaks. */}
 
+            {/* maxNativeZoom is what stops the grey: ESRI serves this
+                imagery to level 19, the map never asks past it, and
+                the two numbers now agree. */}
+
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url={"https://tile.openstreetmap.org/{z}/{x}/{y}.png"}
+              attribution='&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, and the GIS community'
+              url={"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"}
+              maxNativeZoom={19}
+              maxZoom={19}
             />
 
             <CentreWatcher
